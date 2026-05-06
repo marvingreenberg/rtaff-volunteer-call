@@ -3,8 +3,7 @@
 Let's do some usability items.
 
 ## Variations on call "kind"
-There are three kinds of calls initially supported.  RTX, AC Rescue, Ramp, and Chairlift.  Three is the number of the
-holy handgrenade!
+There are four kinds of calls initially supported: RTX, AC Rescue, Ramp, and Chairlift.
 
 RTX is the only call that supports multiple tasks.  All the others are single task, single date.
 When creating a call, a radio button group is presented with the 4 possibilities, one must be chosen to create the call.
@@ -12,6 +11,43 @@ The other permutation is that now each Volunteer has additional properties, skil
 skill:hvac.  And program:rtx, program:acr, program:ramp, program:chairlift
 
 Only the volunteers for a given program get notifications for a given call.
+
+### Design questions before starting
+
+**Schema impact (current model can't support this without changes):**
+
+- `Person.skill_category` is a single enum today (`skilled | unskilled | unknown`). Per-skill tags
+  (plumbing/electrical/carpentry/hvac) need many-to-many — either a `Skill` enum + `PersonSkill`
+  join, or a `skills: list[Skill]` array column.
+- No `program` concept exists at all. New tables: `Program` (or enum), `PersonProgram` join,
+  and either `VolunteerCall.program_id` FK or a call-kind enum.
+- `Task.skilled_needed` is currently just an int count, not linked to a specific skill. Open
+  question: do tasks need per-skill requirements ("1 plumber, 1 electrician"), or is "N skilled
+  people of any kind" sufficient?
+
+**Visibility-filtering touchpoints that all need updating once programs land:**
+
+- `routes/volunteer_calls.py::list_volunteer_calls` and `routes/volunteering.py` open-calls list —
+  filter by `volunteer.programs ∋ call.program`.
+- `routes/volunteer_calls.py::send_invites` recipient query (currently `role == VOLUNTEER and active`) —
+  add program membership.
+- `routes/volunteer_calls.py::list_jobs` and the assign-view available-volunteers logic —
+  same filter.
+- Staff/team-leader bypass: admins likely see all calls regardless of program membership.
+
+**UI implications of single-task-only kinds (AC Rescue / Ramp / Chairlift):**
+
+- The multi-task list + always-visible TaskEntryForm pattern needs to collapse to one inline task
+  with no add-more affordance, or the single task is auto-created when the call is created and the
+  user just edits it inline.
+- "Add Task" is the wrong gesture in single-task mode.
+
+**Rollout questions:**
+
+- Existing volunteers have no programs assigned. Default to all programs, none, or admin-assigned
+  per person?
+- If a call's `program` is changed after invites have gone out, what happens to existing
+  availabilities and assignments?
 
 
 
