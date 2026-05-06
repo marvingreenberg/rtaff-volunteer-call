@@ -16,11 +16,20 @@ Only the volunteers for a given program get notifications for a given call.
 
 **Schema impact (current model can't support this without changes):**
 
-- `Person.skill_category` is a single enum today (`skilled | unskilled | unknown`). Per-skill tags
-  (plumbing/electrical/carpentry/hvac) need many-to-many — either a `Skill` enum + `PersonSkill`
-  join, or a `skills: list[Skill]` array column.
-- No `program` concept exists at all. New tables: `Program` (or enum), `PersonProgram` join,
-  and either `VolunteerCall.program_id` FK or a call-kind enum.
+- `Person.skill_category` is a single enum today (`skilled | unskilled | unknown`). Replace with
+  `Person.skills: list[Skill]` (Postgres `ARRAY(Enum(Skill))`, with values "plumbing",
+  "electrical", "carpentry", "hvac"). Skills are simple tags; no per-skill metadata is anticipated,
+  so the array is sufficient. If certifications/dates ever need to be tracked per skill, this
+  promotes mechanically to a `person_skill` join table.
+- No `program` concept exists at all. Add a `Program` enum (values "RTX", "ACR", "Ramp",
+  "ChairLift") and a **join table** `volunteer_program(person_id, program, joined_at, active)`.
+  Per-program metadata (`joined_at`, possibly per-program active/paused) lives there. Use a join
+  table from the start — flat per-program columns on `Person` (`rtx_joined_at`, `acr_joined_at`,
+  …) duplicate columns per program and require a migration every time a program is added.
+  Aggregate stats — "months in program", "jobs total", "jobs this month per program" — stay
+  computed via JOIN over `team_assignment` / `task` / `volunteer_call.program`. No stored counts.
+- `VolunteerCall` gets a single `program: Program` field (enum, NOT NULL). Each call belongs to
+  exactly one program.
 - `Task.skilled_needed` is currently just an int count, not linked to a specific skill. Open
   question: do tasks need per-skill requirements ("1 plumber, 1 electrician"), or is "N skilled
   people of any kind" sufficient?
@@ -113,3 +122,43 @@ and somehow present conflicts to user when volunteering.  (This may require a de
 - `volunteerCalls.assignmentSummary` API method and `AssignmentSummaryItem` type are now unused
   (the read-only dashboard was replaced). Remove from `frontend/src/lib/api/client.ts`,
   `types.ts`, and the corresponding backend route + schema if nothing else depends on them.
+
+### Documentation gaps (for real deployment)
+
+The sibling project `../rtaff` has substantially more deployment-and-ops docs. Several pieces
+should be ported / adapted before this project can be deployed by anyone other than the original
+author. Concrete missing items:
+
+- **`README.md` is stale**: claims "Planning phase — no implementation yet" but the app is fully
+  implemented. Refresh with: actual feature list, dev quick-start that matches the current
+  `make dev`, env vars table (`DATABASE_URL`, `SMTP_HOST`/`SMTP_PORT`, `APP_BASE_URL`,
+  `CORS_ORIGIN`, `DEMO_MODE`), and an API endpoint summary.
+- **`docs/NEON_SQL.howto` is missing.** `scripts/setup-gcp-project` and
+  `scripts/set-gcloud-creds-for-deploy` reference this file but it doesn't exist in this repo.
+  Port from `../rtaff/docs/NEON_SQL.howto`: account creation, asyncpg-flavored connection
+  string, Secret Manager wiring (`gcloud secrets create rtaff-database-url …` →
+  `vcall-database-url` for this project), and seeding via the plain `postgresql://` URL.
+- **`docs/CLOUD_SQL.howto` is missing.** Same situation; port from `../rtaff/docs/CLOUD_SQL.howto`
+  as the upgrade path when Neon limits become a constraint.
+- **`RELEASE_PROCESS.md` is missing.** Adapt from rtaff: tag-driven release (`v<MAJOR>.<MINOR>.<PATCH>`
+  → CI builds and deploys), Dependabot review step, hotfix flow.
+- **GitHub Actions secrets** referenced by the rtaff workflows we'd port have no setup
+  documentation here:
+  - `GCP_SA_KEY` (the github-deploy service-account JSON, set by
+    `scripts/set-gcloud-creds-for-deploy`).
+  - `GCP_PROJECT` (project ID).
+  - `GHCR_PAT` (for pushing images to ghcr.io).
+  - Codecov token, if coverage upload is wanted.
+  Document in the (yet-to-be-written) deploy docs how each one is created and what scopes/roles
+  each needs.
+- **`DESIGN.md` is missing.** rtaff has a 374-line architecture/data-model document that has been
+  invaluable for context. Worth a much shorter version here (entities, lifecycle, notification
+  flow), pulled from this project's own conversational history rather than copied from rtaff.
+- **`scripts/setup-gcp-project` and `scripts/set-gcloud-creds-for-deploy` reference a non-existent
+  `docs/`.** Either port the docs (preferred) or update the script comments.
+- **Service-account / runtime naming**: rtaff's runtime account is `rtaff-runtime`. The
+  deploy script in this repo still refers to `rtaff-runtime` and image names like `rtaff` (see
+  `Makefile` `SERVICE_NAME := vcall` vs the GCP-side defaults). Audit the GCP-deploy scripts
+  for hardcoded `rtaff*` strings before first cloud deploy.
+- **`README.md` API table** (a la rtaff's at-a-glance endpoint summary) — not strictly a
+  deployment doc but the same audience benefits.
