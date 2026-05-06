@@ -1,106 +1,112 @@
 #!/usr/bin/env bash
-# Check development prerequisites for RT-AFF
+# Checks that required development tools are installed and meet minimum
+# version requirements, plus a couple of project-specific warnings (active
+# GCP project, fswatch for schema-watching).
+set -euo pipefail
 
-set -e
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+GREEN='\033[0;32m'
+NC='\033[0m'
 
-WARNINGS=0
-FAILURES=0
+REQUIRED_PYTHON_MAJOR=3
+REQUIRED_PYTHON_MINOR=11
+REQUIRED_NODE_MAJOR=18
 
-warn() {
-    echo "⚠️  WARNING: $1"
-    WARNINGS=$((WARNINGS + 1))
-}
+# Substring used to spot-check the active GCP project. The deploy
+# SERVICE_NAME is "volunteer-call"; project ids typically look like
+# "volunteer-call", "volunteer-call-prod", "volunteer-call-dev", etc.
+EXPECTED_GCP_PROJECT_PREFIX="volunteer-call"
 
-fail() {
-    echo "❌ REQUIRED: $1"
-    FAILURES=$((FAILURES + 1))
-}
+errors=0
+warnings=0
 
-ok() {
-    echo "✓ $1"
-}
+pass() { echo -e "${GREEN}  ✓${NC} $1"; }
+warn() { echo -e "${YELLOW}  ⚠${NC} $1"; warnings=$((warnings + 1)); }
+fail() { echo -e "${RED}  ✗${NC} $1"; errors=$((errors + 1)); }
 
 echo "Checking prerequisites..."
-echo
+echo ""
 
 # Python 3.11+
-if command -v python3 &> /dev/null; then
-    PY_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-    PY_MAJOR=$(echo "$PY_VERSION" | cut -d. -f1)
-    PY_MINOR=$(echo "$PY_VERSION" | cut -d. -f2)
-    if [ "$PY_MAJOR" -ge 3 ] && [ "$PY_MINOR" -ge 11 ]; then
-        ok "Python $PY_VERSION"
+if command -v python3 &>/dev/null; then
+    py_version=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+    py_major=$(echo "$py_version" | cut -d. -f1)
+    py_minor=$(echo "$py_version" | cut -d. -f2)
+    if [[ "$py_major" -ge "$REQUIRED_PYTHON_MAJOR" && "$py_minor" -ge "$REQUIRED_PYTHON_MINOR" ]]; then
+        pass "Python $py_version"
     else
-        fail "Python 3.11+ required (found $PY_VERSION)"
+        fail "Python $py_version found — ${REQUIRED_PYTHON_MAJOR}.${REQUIRED_PYTHON_MINOR}+ required"
     fi
 else
-    fail "Python 3.11+ not found"
+    fail "Python 3 not found"
 fi
 
-# uv (fast Python package manager)
-if command -v uv &> /dev/null; then
-    ok "uv $(uv --version | awk '{print $2}')"
+# uv
+if command -v uv &>/dev/null; then
+    pass "uv $(uv --version | awk '{print $2}')"
 else
-    fail "uv not found — install: brew install uv (or: curl -LsSf https://astral.sh/uv/install.sh | sh)"
+    fail "uv not found — install from https://docs.astral.sh/uv/"
 fi
 
 # Node.js 18+
-if command -v node &> /dev/null; then
-    NODE_VERSION=$(node -v | sed 's/v//' | cut -d. -f1)
-    if [ "$NODE_VERSION" -ge 18 ]; then
-        ok "Node.js $(node -v)"
+if command -v node &>/dev/null; then
+    node_version=$(node --version | sed 's/v//')
+    node_major=$(echo "$node_version" | cut -d. -f1)
+    if [[ "$node_major" -ge "$REQUIRED_NODE_MAJOR" ]]; then
+        pass "Node.js v$node_version"
     else
-        fail "Node.js 18+ required (found $(node -v))"
+        fail "Node.js v$node_version found — v${REQUIRED_NODE_MAJOR}+ required"
     fi
 else
-    fail "Node.js 18+ not found"
+    fail "Node.js not found — install from https://nodejs.org"
 fi
 
-# Docker or Podman
-if command -v docker &> /dev/null; then
-    ok "Docker $(docker --version | awk '{print $3}' | tr -d ',')"
-elif command -v podman &> /dev/null; then
-    ok "Podman $(podman --version | awk '{print $3}')"
+# pnpm
+if command -v pnpm &>/dev/null; then
+    pass "pnpm $(pnpm --version)"
 else
-    fail "Docker or Podman not found"
+    fail "pnpm not found — install with: npm install -g pnpm"
 fi
 
-# fswatch for auto-reseed on schema changes (optional)
-if command -v fswatch &> /dev/null; then
-    ok "fswatch (schema file watching)"
+# Docker (required for the dev Postgres + Mailpit containers)
+if command -v docker &>/dev/null; then
+    pass "Docker $(docker --version | awk '{print $3}' | tr -d ',')"
 else
-    warn "fswatch not found — schema file watching disabled in 'make dev'. Install: brew install fswatch"
+    warn "Docker not found — needed for the local dev DB (scripts/dev-db.sh) and Mailpit (scripts/dev-mailpit.sh), and for 'make build-image' / cloud deploys"
 fi
 
-# WeasyPrint native dependencies (macOS)
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    if brew list pango &> /dev/null; then
-        ok "pango (for PDF generation)"
+# fswatch (optional — enables schema-watching reseed in scripts/dev-db.sh)
+if command -v fswatch &>/dev/null; then
+    pass "fswatch (for scripts/dev-db.sh schema watching)"
+else
+    warn "fswatch not found — schema-file watching disabled in 'make dev'. Install: brew install fswatch (macOS) or apt install fswatch"
+fi
+
+# gcloud CLI (optional — needed for deploy)
+if command -v gcloud &>/dev/null; then
+    pass "gcloud $(gcloud --version 2>/dev/null | head -1 | awk '{print $4}')"
+
+    gcp_project=$(gcloud config get-value project 2>/dev/null || true)
+    if [[ -z "$gcp_project" ]]; then
+        warn "No active GCP project — run: gcloud config set project ${EXPECTED_GCP_PROJECT_PREFIX}-prod"
+    elif [[ "$gcp_project" != "$EXPECTED_GCP_PROJECT_PREFIX"* ]]; then
+        warn "Active GCP project '${gcp_project}' does not start with '${EXPECTED_GCP_PROJECT_PREFIX}'"
+        warn "  This may belong to a sibling project (e.g. rtaff). Run: gcloud config set project <volunteer-call-...>"
     else
-        warn "pango not installed - local PDF tests will fail. Run: brew install pango gdk-pixbuf libffi"
+        pass "Active GCP project: ${gcp_project}"
     fi
+else
+    warn "gcloud CLI not found — needed for 'make deploy' and the docs/*.howto walkthroughs"
+    warn "  Install from https://cloud.google.com/sdk/docs/install"
 fi
 
-# WeasyPrint native dependencies (Linux)
-if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    if ldconfig -p 2>/dev/null | grep -q libpango; then
-        ok "libpango (for PDF generation)"
-    else
-        warn "libpango not installed - local PDF tests will fail. Run: apt install libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0"
-    fi
-fi
-
-echo
-echo "─────────────────────────────────"
-if [ $FAILURES -gt 0 ]; then
-    echo "❌ $FAILURES required prerequisite(s) missing"
-    echo "   Setup cannot continue until these are resolved."
+echo ""
+if [[ "$errors" -gt 0 ]]; then
+    echo -e "${RED}Prerequisites check failed — $errors error(s) must be resolved before setup.${NC}"
     exit 1
-elif [ $WARNINGS -gt 0 ]; then
-    echo "⚠️  $WARNINGS optional prerequisite(s) missing"
-    echo "   Some functionality may be limited."
-    exit 0
+elif [[ "$warnings" -gt 0 ]]; then
+    echo -e "${YELLOW}Prerequisites check passed with $warnings warning(s) — optional tools missing or misconfigured.${NC}"
 else
-    echo "✓ All prerequisites satisfied"
-    exit 0
+    echo -e "${GREEN}All prerequisites satisfied.${NC}"
 fi

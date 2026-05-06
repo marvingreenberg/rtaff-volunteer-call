@@ -14,7 +14,7 @@ export DB_PORT SMTP_PORT MAILPIT_UI_PORT
 DEMO_MODE ?= false
 export DEMO_MODE
 
-.PHONY: help setup setup-backend setup-frontend \
+.PHONY: help check-prereqs setup setup-backend setup-frontend \
         dev dev-db-reset mailpit \
         test test-backend test-frontend types \
         lint lint-be lint-fe format format-be format-fe \
@@ -22,7 +22,8 @@ export DEMO_MODE
 
 help:
 	@echo "Available targets:"
-	@echo "  setup          - Set up all components"
+	@echo "  check-prereqs  - Verify dev prerequisites (python, uv, node, pnpm, docker, gcloud)"
+	@echo "  setup          - Set up all components (runs check-prereqs first)"
 	@echo "  setup-backend  - Set up backend Python environment"
 	@echo "  setup-frontend - Install frontend dependencies"
 	@echo "  lint           - Run all linters (API + UI)"
@@ -41,7 +42,10 @@ help:
 	@echo "  types          - Generate TypeScript types from OpenAPI"
 	@echo "  clean          - Clean all build artifacts"
 
-setup: setup-backend setup-frontend
+check-prereqs:
+	@./scripts/check_prerequisites.sh
+
+setup: check-prereqs setup-backend setup-frontend
 
 setup-backend:
 	make -C backend setup
