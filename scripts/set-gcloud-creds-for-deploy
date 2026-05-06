@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Creates GCP service accounts for GitHub Actions deployment:
 #   1. github-deploy   — used by CI to push images and deploy
-#   2. rtaff-runtime   — used by Cloud Run at runtime (secret access only)
+#   2. volunteer-call-runtime — used by Cloud Run at runtime (secret access only)
 #
 # Also sets the required GitHub repository secrets (GCP_SA_KEY, GCP_PROJECT).
 #
@@ -24,7 +24,7 @@ fi
 
 DEPLOY_SA_NAME="github-deploy"
 DEPLOY_SA_EMAIL="${DEPLOY_SA_NAME}@${PROJECT}.iam.gserviceaccount.com"
-RUNTIME_SA_NAME="rtaff-runtime"
+RUNTIME_SA_NAME="volunteer-call-runtime"
 RUNTIME_SA_EMAIL="${RUNTIME_SA_NAME}@${PROJECT}.iam.gserviceaccount.com"
 KEY_FILE=$(mktemp)
 
@@ -35,7 +35,7 @@ DEPLOY_ROLES=(
 )
 
 RUNTIME_SECRET_BINDINGS=(
-    "rtaff-database-url"
+    "volunteer-call-database-url"
 )
 
 usage() {
@@ -79,7 +79,7 @@ create_runtime_sa() {
     echo "Creating runtime service account ${RUNTIME_SA_NAME}..."
     gcloud iam service-accounts create "$RUNTIME_SA_NAME" \
         --project="$PROJECT" \
-        --display-name="RTAFF Cloud Run Runtime"
+        --display-name="Volunteer Call Cloud Run Runtime"
 
     for secret in "${RUNTIME_SECRET_BINDINGS[@]}"; do
         echo "  Granting secretAccessor on ${secret}..."

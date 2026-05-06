@@ -5,6 +5,22 @@ Neon provides free-tier serverless PostgreSQL. The free tier includes 0.5 GB
 storage, auto-suspend after 5 minutes of inactivity, and ~1s cold-start on
 reconnect. This is fine for a low-traffic volunteer coordination app.
 
+Prerequisites
+-------------
+This walk-through stores the Neon connection string in GCP Secret Manager so
+the deployed app can read it. That requires a working GCP project with the
+Secret Manager API enabled. Run `docs/GCP_SETUP.howto` first if you haven't
+already — concretely you need:
+
+- gcloud CLI installed and authenticated (`gcloud auth login`)
+- An active project set (`gcloud config set project <id>`)
+- `secretmanager.googleapis.com` enabled (the `setup-gcp-project` script
+  does this for you)
+
+If you only want to point local dev at a hosted Postgres (no GCP, no deploy),
+you can skip step 3 below and just set `DATABASE_URL` in your shell or a
+`.env` file.
+
 1. Create account and project
 -----------------------------
 - Sign up at https://neon.tech

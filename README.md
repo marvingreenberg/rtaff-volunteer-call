@@ -10,7 +10,7 @@ Extracted from the larger [rtaff workflow system](https://github.com/...) to ope
 
 ## Planned Features
 
-- **Volunteer Call Creation** — administrators enter a list of tasks, each with description, date, time range, full address, and team lead
+- **Volunteer Call Creation** — administrators enter a list of tasks, each with description, date, start time, full address, and team lead
 - **Notification Dispatch** — send calls via email (cloud service integration) and/or SMS with subscription management
 - **Volunteer Response** — volunteers indicate availability through a mobile-friendly interface
 - **Team Assignment** — assign volunteers to tasks, set/update team leads
@@ -56,15 +56,45 @@ rtaff-volunteer-call/
 ## Development
 
 ```bash
-make dev          # Start DB + backend + frontend
+make dev          # Start DB + Mailpit + backend + frontend
 make test         # Run all tests
 make lint         # Run all linters
 make dev-db-reset # Destroy DB volume and start fresh
 ```
 
+The dev stack runs PostgreSQL and Mailpit (a local SMTP catcher) in
+Docker; the backend defaults to `localhost:1025` for SMTP and emails
+are visible in Mailpit's web UI at `http://localhost:8025`.
+
+## Deployment
+
+Production deployment is to GCP Cloud Run with PostgreSQL hosted on
+Neon (free tier) or Cloud SQL. Setup is staged across three docs:
+
+1. `docs/GCP_SETUP.howto` — one-time GCP project setup (gcloud auth,
+   project create, API enablement, service accounts, GitHub Actions
+   secrets). Driven by `scripts/setup-gcp-project` and
+   `scripts/set-gcloud-creds-for-deploy`.
+2. `docs/NEON_SQL.howto` — Neon database setup, asyncpg connection
+   string, Secret Manager wiring, seeding.
+3. `docs/CLOUD_SQL.howto` — upgrade path from Neon to Cloud SQL.
+
+A CI/deploy workflow modelled on the parent rtaff project still needs to
+be ported (see `# todo.md`).
+
 ## Status
 
-Planning phase — no implementation yet. See `volunteer-call.md` for the full task specification.
+Phase-1 implementation is in place: backend (FastAPI + SQLAlchemy +
+PostgreSQL) with magic-link auth, people management, volunteer calls
+with tasks, availability submission, team assignments with an
+interactive assign view, and email/SMS notification scaffolding (email
+via Mailpit in dev). Frontend (SvelteKit + Svelte 5) covers the admin
+flows for call creation, the assignment view, and the volunteer-facing
+availability submission. Local dev runs end-to-end via `make dev`.
+
+Production deployment hasn't been performed yet — the GitHub Actions
+CI/deploy workflows still need to be ported from the parent rtaff
+project. See `# todo.md` for the outstanding items.
 
 ## License
 

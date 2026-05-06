@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# One-time GCP project setup for rtaff deployment.
+# One-time GCP project setup for volunteer-call deployment.
 #
 # Creates the GCP project, links billing, and enables required APIs.
 # Does NOT set up the database — see docs/NEON_SQL.howto or docs/CLOUD_SQL.howto.
 #
-# Usage: ./scripts/setup-gcp-project --project-id=rtaff-prod
+# Usage: ./scripts/setup-gcp-project --project-id=volunteer-call-prod
 set -euo pipefail
 
 # ── Parse flags ─────────────────────────────────────────────────
@@ -62,7 +62,7 @@ else
     gcloud artifacts repositories create "$REPO_NAME" \
         --repository-format=docker \
         --location="$REGION" \
-        --description="Container images for rtaff"
+        --description="Container images for volunteer-call"
 fi
 
 # ── Done ───────────────────────────────────────────────────────
@@ -76,7 +76,7 @@ echo "     - Cloud SQL:   see docs/CLOUD_SQL.howto"
 echo ""
 echo "  2. Store the DATABASE_URL in Secret Manager:"
 echo "     echo -n 'postgresql+asyncpg://...' | \\"
-echo "       gcloud secrets create rtaff-database-url --data-file=-"
+echo "       gcloud secrets create volunteer-call-database-url --data-file=-"
 echo ""
 echo "  3. Set up GitHub Actions credentials:"
 echo "     ./scripts/set-gcloud-creds-for-deploy"

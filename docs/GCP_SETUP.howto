@@ -1,0 +1,136 @@
+GCP project setup for deployment
+================================
+
+One-time prerequisites before either NEON_SQL.howto or CLOUD_SQL.howto can
+be followed, and before any Cloud Run deploy will succeed. This document
+covers gcloud auth, project creation, API enablement, and the service
+accounts used by GitHub Actions and the Cloud Run runtime. Two scripts in
+`scripts/` automate most of it; this doc explains what they do, what they
+require, and what to fix by hand if something goes wrong.
+
+1. Install and authenticate gcloud
+----------------------------------
+- Install the Google Cloud SDK: https://cloud.google.com/sdk/docs/install
+- Authenticate as a user with permission to create projects and link
+  billing in the parent organization (or with Owner/Editor on an existing
+  project you intend to reuse):
+
+      gcloud auth login
+
+- If you'll let GitHub Actions push images and deploy, also install the
+  GitHub CLI and authenticate it (used by `set-gcloud-creds-for-deploy` to
+  set repo secrets):
+
+      brew install gh        # or apt install gh
+      gh auth login
+
+2. Create the GCP project and enable APIs
+-----------------------------------------
+The script `scripts/setup-gcp-project` creates the project, links a
+billing account, enables the required APIs, and creates an Artifact
+Registry Docker repo:
+
+      ./scripts/setup-gcp-project --project-id=<your-project-id>
+      # default region us-central1; pass --region=<region> to change
+
+What it does (idempotent — safe to re-run):
+
+- `gcloud projects create <id>` (skipped if it already exists).
+- Picks the first open billing account with `gcloud billing accounts list`
+  and links it. If you have multiple billing accounts, link by hand:
+
+      gcloud billing projects link <project-id> --billing-account=<ACCOUNT_ID>
+
+- Enables `run.googleapis.com`, `artifactregistry.googleapis.com`,
+  `secretmanager.googleapis.com`.
+- Creates an Artifact Registry Docker repository named `container-images`
+  in the chosen region.
+
+After this completes you have an empty project with the right APIs on,
+but no database and no service accounts yet.
+
+3. Set up the database
+----------------------
+Pick one:
+
+- Free tier (recommended for first deploy): `docs/NEON_SQL.howto`.
+- Cloud SQL: `docs/CLOUD_SQL.howto`.
+
+Either way the result is a `volunteer-call-database-url` Secret in Secret
+Manager, and a database seeded with `scripts/initdb/01-schema.sql` and
+`scripts/initdb/02-reference-data.sql`.
+
+The order matters: the runtime service account in the next step grants
+`roles/secretmanager.secretAccessor` on `volunteer-call-database-url`, so
+the secret must exist first.
+
+4. Create deploy + runtime service accounts and GitHub secrets
+--------------------------------------------------------------
+The script `scripts/set-gcloud-creds-for-deploy` creates two service
+accounts and writes the GitHub repo secrets used by the (yet-to-be-ported)
+deploy workflow:
+
+      ./scripts/set-gcloud-creds-for-deploy            # create (idempotent)
+      ./scripts/set-gcloud-creds-for-deploy --new      # delete and recreate
+      ./scripts/set-gcloud-creds-for-deploy --clear    # delete only
+
+Service accounts:
+
+- `github-deploy@<project>.iam.gserviceaccount.com` — used by CI to push
+  images and deploy to Cloud Run. Granted `roles/run.admin`,
+  `roles/artifactregistry.writer`, `roles/iam.serviceAccountUser`. The
+  script generates a JSON key and writes it to the `GCP_SA_KEY` GitHub
+  Actions secret, plus the project id to `GCP_PROJECT`.
+- `volunteer-call-runtime@<project>.iam.gserviceaccount.com` — used by
+  Cloud Run at request time. Granted
+  `roles/secretmanager.secretAccessor` on `volunteer-call-database-url`.
+
+5. Verify
+---------
+- Project: `gcloud projects describe <project-id>`
+- Required APIs enabled:
+
+      gcloud services list --enabled \
+        --filter="name:(run OR artifactregistry OR secretmanager)"
+
+- Artifact Registry repo:
+
+      gcloud artifacts repositories list --location=<region>
+
+- Service accounts:
+
+      gcloud iam service-accounts list
+
+- DATABASE_URL secret accessible by the runtime SA:
+
+      gcloud secrets get-iam-policy volunteer-call-database-url
+
+- GitHub secrets set (from a clone of the repo):
+
+      gh secret list
+
+6. Cleanup
+----------
+To tear down everything created by these scripts:
+
+      ./scripts/set-gcloud-creds-for-deploy --clear   # SAs + GH secrets
+      gcloud projects delete <project-id>             # the whole project
+
+Project deletion is reversible for ~30 days.
+
+7. Other GitHub Actions secrets (forward reference)
+---------------------------------------------------
+Once a CI/deploy workflow is ported from the rtaff sibling project, two
+other secrets are referenced by `.github/workflows/deploy.yml`:
+
+- `GHCR_PAT` — a GitHub Personal Access Token with `write:packages` for
+  pushing images to ghcr.io. Create one at
+  https://github.com/settings/tokens?type=beta and set it via:
+
+      gh secret set GHCR_PAT --body '<token>'
+
+- A Codecov token, if coverage upload is wanted (set via `gh secret set
+  CODECOV_TOKEN`). Optional.
+
+These are not handled by `set-gcloud-creds-for-deploy` because they are
+not GCP credentials.
