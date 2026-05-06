@@ -16,7 +16,7 @@ beforeEach(() => {
   authState.error = null;
   vi.mocked(auth.me).mockReset();
   if (typeof localStorage !== "undefined") {
-    localStorage.removeItem("vcall_token");
+    localStorage.removeItem("volunteer_call_token");
   }
 });
 
@@ -60,14 +60,14 @@ describe("initFromToken", () => {
   it("stores token in localStorage on success", async () => {
     vi.mocked(auth.me).mockResolvedValue({ id: "p1" } as any);
     await initFromToken("persist-token");
-    expect(localStorage.getItem("vcall_token")).toBe("persist-token");
+    expect(localStorage.getItem("volunteer_call_token")).toBe("persist-token");
   });
 
   it("removes token from localStorage on failure", async () => {
-    localStorage.setItem("vcall_token", "old-token");
+    localStorage.setItem("volunteer_call_token", "old-token");
     vi.mocked(auth.me).mockRejectedValue(new Error("401"));
     await initFromToken("old-token");
-    expect(localStorage.getItem("vcall_token")).toBeNull();
+    expect(localStorage.getItem("volunteer_call_token")).toBeNull();
   });
 });
 

@@ -1,6 +1,6 @@
 import { auth as authApi, type PersonResponse } from "$lib/api/client";
 
-const TOKEN_KEY = "vcall_token";
+const TOKEN_KEY = "volunteer_call_token";
 
 let _user = $state<PersonResponse | null>(null);
 let _loading = $state(true);

@@ -1,7 +1,7 @@
 VERSION     := $(shell git describe --tags --always 2>/dev/null | sed 's/^v//; s/-\([0-9]*\)-g\(.*\)/.dev\1+g\2/' || echo "0.0.0")
 DOCKER_TAG  := $(shell echo "$(VERSION)" | sed 's/+.*//')
 
-SERVICE_NAME   := vcall
+SERVICE_NAME   := volunteer-call
 
 # Dev ports — single source of truth, exported to scripts and child processes.
 FRONTEND_PORT   ?= 5173

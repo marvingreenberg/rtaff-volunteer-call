@@ -39,7 +39,7 @@ const API_BASE = "/api";
 
 function authHeaders(): Record<string, string> {
   if (typeof localStorage !== "undefined") {
-    const token = localStorage.getItem("vcall_token");
+    const token = localStorage.getItem("volunteer_call_token");
     if (token) return { Authorization: `Bearer ${token}` };
   }
   return {};

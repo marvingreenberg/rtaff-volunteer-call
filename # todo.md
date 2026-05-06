@@ -137,7 +137,7 @@ author. Concrete missing items:
   `scripts/set-gcloud-creds-for-deploy` reference this file but it doesn't exist in this repo.
   Port from `../rtaff/docs/NEON_SQL.howto`: account creation, asyncpg-flavored connection
   string, Secret Manager wiring (`gcloud secrets create rtaff-database-url …` →
-  `vcall-database-url` for this project), and seeding via the plain `postgresql://` URL.
+  `volunteer-call-database-url` for this project), and seeding via the plain `postgresql://` URL.
 - **`docs/CLOUD_SQL.howto` is missing.** Same situation; port from `../rtaff/docs/CLOUD_SQL.howto`
   as the upgrade path when Neon limits become a constraint.
 - **`RELEASE_PROCESS.md` is missing.** Adapt from rtaff: tag-driven release (`v<MAJOR>.<MINOR>.<PATCH>`
@@ -158,7 +158,7 @@ author. Concrete missing items:
   `docs/`.** Either port the docs (preferred) or update the script comments.
 - **Service-account / runtime naming**: rtaff's runtime account is `rtaff-runtime`. The
   deploy script in this repo still refers to `rtaff-runtime` and image names like `rtaff` (see
-  `Makefile` `SERVICE_NAME := vcall` vs the GCP-side defaults). Audit the GCP-deploy scripts
+  `Makefile` `SERVICE_NAME := volunteer-call` vs the GCP-side defaults). Audit the GCP-deploy scripts
   for hardcoded `rtaff*` strings before first cloud deploy.
 - **`README.md` API table** (a la rtaff's at-a-glance endpoint summary) — not strictly a
   deployment doc but the same audience benefits.

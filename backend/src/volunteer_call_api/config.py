@@ -6,7 +6,9 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
-    database_url: str = "postgresql+asyncpg://vcall:vcall_dev@localhost:5432/vcall"
+    database_url: str = (
+        "postgresql+asyncpg://volunteer_call:volunteer_call_dev@localhost:5432/volunteer_call"
+    )
 
     # SMTP — defaults point to Mailpit (dev) on port 1025.
     # Set smtp_host=console to print emails to stdout instead.

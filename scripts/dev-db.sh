@@ -4,12 +4,12 @@
 
 set -euo pipefail
 
-CONTAINER=vcall-dev-db
-VOLUME=vcall-dev-pgdata
+CONTAINER=volunteer-call-dev-db
+VOLUME=volunteer-call-dev-pgdata
 IMAGE=postgres:16-alpine
-DB_USER=vcall
-DB_PASS=vcall_dev
-DB_NAME=vcall
+DB_USER=volunteer_call
+DB_PASS=volunteer_call_dev
+DB_NAME=volunteer_call
 PORT="${DB_PORT:-5432}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

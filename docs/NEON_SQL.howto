@@ -9,33 +9,33 @@ reconnect. This is fine for a low-traffic volunteer coordination app.
 -----------------------------
 - Sign up at https://neon.tech
 - Create a new project (any region; us-east-2 is fine for Cloud Run us-central1)
-- Create a database named "vcall" with a role/user of your choice
+- Create a database named "volunteer_call" with a role/user of your choice
 
 2. Get the connection string
 ----------------------------
 From the Neon dashboard, copy the "pooled" connection string. It looks like:
 
-    postgresql://vcall_user:password@ep-cool-name-123456.us-east-2.aws.neon.tech/vcall?sslmode=require
+    postgresql://volunteer_call_user:password@ep-cool-name-123456.us-east-2.aws.neon.tech/volunteer_call?sslmode=require
 
 For asyncpg (what the app uses), change the scheme:
 
-    postgresql+asyncpg://vcall_user:password@ep-cool-name-123456.us-east-2.aws.neon.tech/vcall?ssl=require
+    postgresql+asyncpg://volunteer_call_user:password@ep-cool-name-123456.us-east-2.aws.neon.tech/volunteer_call?ssl=require
 
 3. Store in GCP Secret Manager
 -------------------------------
-    echo -n 'postgresql+asyncpg://vcall_user:password@ep-cool-name-123456.us-east-2.aws.neon.tech/vcall?ssl=require' | \
-      gcloud secrets create vcall-database-url --data-file=-
+    echo -n 'postgresql+asyncpg://volunteer_call_user:password@ep-cool-name-123456.us-east-2.aws.neon.tech/volunteer_call?ssl=require' | \
+      gcloud secrets create volunteer-call-database-url --data-file=-
 
 To update later:
 
     echo -n 'new-connection-string' | \
-      gcloud secrets versions add vcall-database-url --data-file=-
+      gcloud secrets versions add volunteer-call-database-url --data-file=-
 
 4. Seed the database
 --------------------
 Use the plain postgresql:// connection string (not asyncpg) with psql:
 
-    export DATABASE_URL='postgresql://vcall_user:password@ep-cool-name-123456.us-east-2.aws.neon.tech/vcall?sslmode=require'
+    export DATABASE_URL='postgresql://volunteer_call_user:password@ep-cool-name-123456.us-east-2.aws.neon.tech/volunteer_call?sslmode=require'
     psql "$DATABASE_URL" -f scripts/initdb/01-schema.sql
     psql "$DATABASE_URL" -f scripts/initdb/02-reference-data.sql
 

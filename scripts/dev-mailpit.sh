@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-CONTAINER=vcall-mailpit
+CONTAINER=volunteer-call-mailpit
 IMAGE=axllent/mailpit:latest
 SMTP_PORT="${SMTP_PORT:-1025}"
 UI_PORT="${MAILPIT_UI_PORT:-8025}"

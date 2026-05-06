@@ -11,7 +11,7 @@ adding a Cloud SQL connection flag to the deploy command.
 
 2. Create a Cloud SQL instance
 ------------------------------
-    gcloud sql instances create vcall-db \
+    gcloud sql instances create volunteer-call-db \
       --database-version=POSTGRES_16 \
       --tier=db-f1-micro \
       --region=us-central1 \
@@ -21,15 +21,15 @@ adding a Cloud SQL connection flag to the deploy command.
 db-f1-micro is ~$10/month. For lower cost during development, stop the
 instance when not in use:
 
-    gcloud sql instances patch vcall-db --activation-policy=NEVER   # stop
-    gcloud sql instances patch vcall-db --activation-policy=ALWAYS  # start
+    gcloud sql instances patch volunteer-call-db --activation-policy=NEVER   # stop
+    gcloud sql instances patch volunteer-call-db --activation-policy=ALWAYS  # start
 
 3. Create database and user
 ---------------------------
-    gcloud sql databases create vcall --instance=vcall-db
+    gcloud sql databases create volunteer_call --instance=volunteer-call-db
 
-    gcloud sql users create vcall_user \
-      --instance=vcall-db \
+    gcloud sql users create volunteer_call_user \
+      --instance=volunteer-call-db \
       --password=<generate-a-strong-password>
 
 4. Update DATABASE_URL in Secret Manager
@@ -37,20 +37,20 @@ instance when not in use:
 Cloud SQL connection string uses the instance connection name (not a hostname):
 
     PROJECT=$(gcloud config get-value project)
-    CONN_NAME="${PROJECT}:us-central1:vcall-db"
+    CONN_NAME="${PROJECT}:us-central1:volunteer-call-db"
 
     # The app connects via Cloud SQL Auth Proxy built into Cloud Run
-    DATABASE_URL="postgresql+asyncpg://vcall_user:<password>@/vcall?host=/cloudsql/${CONN_NAME}"
+    DATABASE_URL="postgresql+asyncpg://volunteer_call_user:<password>@/volunteer_call?host=/cloudsql/${CONN_NAME}"
 
     echo -n "$DATABASE_URL" | \
-      gcloud secrets versions add vcall-database-url --data-file=-
+      gcloud secrets versions add volunteer-call-database-url --data-file=-
 
 5. Update Cloud Run deploy command
 -----------------------------------
 Add the --add-cloudsql-instances flag. In the Makefile deploy target or
 .github/workflows/deploy.yml, add:
 
-    --add-cloudsql-instances=$(PROJECT):us-central1:vcall-db
+    --add-cloudsql-instances=$(PROJECT):us-central1:volunteer-call-db
 
 6. Grant Cloud SQL access to Cloud Run service account
 ------------------------------------------------------
@@ -58,7 +58,7 @@ The runtime service account (created by `scripts/set-gcloud-creds-for-deploy`)
 needs `roles/cloudsql.client`:
 
     PROJECT=$(gcloud config get-value project)
-    RUNTIME_SA="vcall-runtime@${PROJECT}.iam.gserviceaccount.com"
+    RUNTIME_SA="volunteer-call-runtime@${PROJECT}.iam.gserviceaccount.com"
 
     gcloud projects add-iam-policy-binding "$PROJECT" \
       --member="serviceAccount:${RUNTIME_SA}" \
@@ -72,10 +72,10 @@ dedicated runtime SA, substitute `${PROJECT_NUMBER}-compute@developer.gserviceac
 Install the proxy: https://cloud.google.com/sql/docs/postgres/sql-proxy
 
     # Terminal 1: start proxy
-    cloud-sql-proxy ${PROJECT}:us-central1:vcall-db --port=5433
+    cloud-sql-proxy ${PROJECT}:us-central1:volunteer-call-db --port=5433
 
     # Terminal 2: seed
-    export DATABASE_URL='postgresql://vcall_user:<password>@localhost:5433/vcall'
+    export DATABASE_URL='postgresql://volunteer_call_user:<password>@localhost:5433/volunteer_call'
     psql "$DATABASE_URL" -f scripts/initdb/01-schema.sql
     psql "$DATABASE_URL" -f scripts/initdb/02-reference-data.sql
 

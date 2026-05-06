@@ -2,9 +2,9 @@ export type Density = "large" | "standard" | "compact";
 export type Theme = "light" | "dark";
 export type ListView = "pill" | "table";
 
-const DENSITY_KEY = "vcall_density";
-const THEME_KEY = "vcall_theme";
-const LIST_VIEW_KEY = "vcall_list_view";
+const DENSITY_KEY = "volunteer_call_density";
+const THEME_KEY = "volunteer_call_theme";
+const LIST_VIEW_KEY = "volunteer_call_list_view";
 const VALID_DENSITIES: readonly string[] = ["large", "standard", "compact"];
 const VALID_THEMES: readonly string[] = ["light", "dark"];
 const VALID_LIST_VIEWS: readonly string[] = ["pill", "table"];
