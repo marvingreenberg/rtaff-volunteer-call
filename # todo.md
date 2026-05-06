@@ -19,3 +19,61 @@ Only the volunteers for a given program get notifications for a given call.
 
 Users can connect their google, yahoo, apple calendar to the app.  For each call, it will import relevant dates
 and somehow present conflicts to user when volunteering.  (This may require a deployed app with an oauth grant?)
+
+
+## Deferred items from prior sessions
+
+### CI / CD
+
+- Set up GitHub Actions for this project, modelled on `../rtaff/.github/workflows/`:
+  - `ci.yml` — backend job (Postgres service, `make lint-be`, `make test-backend`, codecov upload),
+    frontend job (`make lint-fe`, `make test-frontend`), and a type-generation verification job.
+  - `deploy.yml` — Docker build to GHCR + GCP Artifact Registry, Cloud Run deploy on `v*` tags.
+  - Dependabot config for npm + uv lockfiles.
+
+### End-to-end testing
+
+- `frontend/e2e/demo-scenario.spec.ts` exists but is stale — references the old "Add Task" toggle,
+  old placeholders ("e.g., Roof repair at 123 Main St", "123 Main St"), the removed
+  "Open for Volunteers" / "Close Call" buttons, and the deleted dashboard/availability routes.
+  Either rebuild it against the current UI or split into smaller targeted specs (call creation,
+  task entry, assignment).
+- Decide whether e2e runs in CI (headless) or stays manual-only for the demo recording use case.
+- Wire whichever choice into `make test-e2e` so it's discoverable.
+
+### Backend tests
+
+- `backend/tests/conftest.py` currently has no DB fixture, so route-level tests are absent
+  (route coverage is 20-40%). Add a Postgres test-DB fixture (mirroring rtaff's CI service
+  pattern) and write integration tests for:
+  - `send-invites` self-transitions Draft to Open and rejects when already Closed.
+  - `PUT /volunteer-calls/{id}` no longer fires notifications on close.
+  - `POST /send-assignment-notices` requires Closed status and returns counts.
+  - `assignment-overview` includes `available_volunteers` filtered correctly.
+
+### Task / call UI follow-ups
+
+- Delete-task affordance on `TaskRow` (deferred from the task-entry redesign).
+- Address autocomplete on `TaskEntryForm` (city is hardcoded; address is plain text pending a source).
+- Reintroduce a `notes` affordance for tasks once there's a place to display them
+  (currently captured by the API but not surfaced anywhere).
+- Gray-default visual for time/number inputs (Svelte placeholder doesn't reach native inputs).
+- Backend PUT `update_task` skips `None` values (`routes/volunteer_calls.py:408-411`), so
+  clearing nullable fields back to null is impossible; revisit when notes/team_lead become editable.
+- Under-/over-assignment policy: the assign view doesn't cap at `volunteers_needed`, and
+  Send Assignment Notices doesn't gate on every task being full. Decide intended behaviour.
+- Admin-on-behalf-of-volunteer availability entry was dropped with the `/availability` page;
+  if needed, add a small affordance inside the assign view (per-task "Add availability" combobox).
+- Optimistic UI on the assign page (currently refetches `assignment-overview` after each
+  click — fine at this scale but will feel sluggish at higher task/volunteer counts).
+
+### People
+
+- Import / export for users: bulk and per-user, after the source-of-truth volunteer adapter is decided
+  (SharePoint, external DB, manual). The People editor at `/people/[id]` is the current entry point.
+
+### Cleanup
+
+- `volunteerCalls.assignmentSummary` API method and `AssignmentSummaryItem` type are now unused
+  (the read-only dashboard was replaced). Remove from `frontend/src/lib/api/client.ts`,
+  `types.ts`, and the corresponding backend route + schema if nothing else depends on them.
