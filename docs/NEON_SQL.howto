@@ -29,16 +29,41 @@ you can skip step 3 below and just set `DATABASE_URL` in your shell or a
 
 2. Get the connection string
 ----------------------------
-From the Neon dashboard, copy the "pooled" connection string. It looks like:
+From the Neon dashboard, copy the "pooled" connection string. Today Neon
+generates URLs like:
 
-    postgresql://volunteer_call_user:password@ep-cool-name-123456.us-east-2.aws.neon.tech/volunteer_call?sslmode=require
+    postgresql://volunteer_call_user:password@ep-cool-name-123456.us-east-2.aws.neon.tech/volunteer_call?sslmode=require&channel_binding=require
 
-For asyncpg (what the app uses), change the scheme:
+For seeding via psql (libpq, step 4 below) the URL above works as-is —
+keep both `sslmode` and `channel_binding`.
+
+For the app at runtime (asyncpg), use the `+asyncpg` scheme and translate
+the query parameters:
 
     postgresql+asyncpg://volunteer_call_user:password@ep-cool-name-123456.us-east-2.aws.neon.tech/volunteer_call?ssl=require
 
+Two notes on what changed and why:
+
+- `sslmode=require` becomes `ssl=require` (asyncpg's name for the same
+  knob). asyncpg's `require` is "encrypt the connection but do not verify
+  the certificate"; libpq's `require` is the same. To verify the
+  certificate, use `ssl=verify-full` instead — Neon presents a valid cert
+  signed by Let's Encrypt, so this works.
+- `channel_binding=require` is stripped. asyncpg 0.30+ accepts the
+  parameter, but the failure modes differ from libpq's, and silently
+  carrying the param across versions is a foot-gun. Channel binding still
+  happens automatically when Neon offers SCRAM-SHA-256-PLUS over TLS
+  (which it always does); dropping the parameter only removes the hard
+  *requirement* that channel binding be negotiated. If you need the
+  guarantee at the protocol level, do the verification on the libpq side
+  (e.g., a startup check from a container running psql) — or pin asyncpg
+  and test the parameter explicitly.
+
 3. Store in GCP Secret Manager
 -------------------------------
+The asyncpg-flavored URL (with `channel_binding` stripped) is what the
+deployed app reads at startup:
+
     echo -n 'postgresql+asyncpg://volunteer_call_user:password@ep-cool-name-123456.us-east-2.aws.neon.tech/volunteer_call?ssl=require' | \
       gcloud secrets create volunteer-call-database-url --data-file=-
 
@@ -49,9 +74,10 @@ To update later:
 
 4. Seed the database
 --------------------
-Use the plain postgresql:// connection string (not asyncpg) with psql:
+Use the plain postgresql:// connection string with psql — keep
+`channel_binding=require` here:
 
-    export DATABASE_URL='postgresql://volunteer_call_user:password@ep-cool-name-123456.us-east-2.aws.neon.tech/volunteer_call?sslmode=require'
+    export DATABASE_URL='postgresql://volunteer_call_user:password@ep-cool-name-123456.us-east-2.aws.neon.tech/volunteer_call?sslmode=require&channel_binding=require'
     psql "$DATABASE_URL" -f scripts/initdb/01-schema.sql
     psql "$DATABASE_URL" -f scripts/initdb/02-reference-data.sql
 
