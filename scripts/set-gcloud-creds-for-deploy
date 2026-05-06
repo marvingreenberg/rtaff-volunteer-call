@@ -1,0 +1,163 @@
+#!/usr/bin/env bash
+# Creates GCP service accounts for GitHub Actions deployment:
+#   1. github-deploy   — used by CI to push images and deploy
+#   2. rtaff-runtime   — used by Cloud Run at runtime (secret access only)
+#
+# Also sets the required GitHub repository secrets (GCP_SA_KEY, GCP_PROJECT).
+#
+# Prerequisites:
+#   - gcloud CLI authenticated with project owner permissions
+#   - gh CLI authenticated with repo access
+#   - GCP project already created (run setup-gcp-project first)
+#
+# Usage:
+#   ./scripts/set-gcloud-creds-for-deploy          # create (idempotent)
+#   ./scripts/set-gcloud-creds-for-deploy --new    # delete and recreate
+#   ./scripts/set-gcloud-creds-for-deploy --clear  # delete only
+set -euo pipefail
+
+PROJECT=$(gcloud config get-value project 2>/dev/null)
+if [[ -z "$PROJECT" ]]; then
+    echo "ERROR: No GCP project set. Run: gcloud config set project <project-id>"
+    exit 1
+fi
+
+DEPLOY_SA_NAME="github-deploy"
+DEPLOY_SA_EMAIL="${DEPLOY_SA_NAME}@${PROJECT}.iam.gserviceaccount.com"
+RUNTIME_SA_NAME="rtaff-runtime"
+RUNTIME_SA_EMAIL="${RUNTIME_SA_NAME}@${PROJECT}.iam.gserviceaccount.com"
+KEY_FILE=$(mktemp)
+
+DEPLOY_ROLES=(
+    "roles/run.admin"
+    "roles/artifactregistry.writer"
+    "roles/iam.serviceAccountUser"
+)
+
+RUNTIME_SECRET_BINDINGS=(
+    "rtaff-database-url"
+)
+
+usage() {
+    echo "Usage: $(basename "$0") [--new | --clear]"
+    echo ""
+    echo "  (no args)  Create SAs and set GitHub secrets (idempotent)"
+    echo "  --new      Delete existing SAs and secrets, then recreate"
+    echo "  --clear    Delete existing SAs and secrets only"
+    exit 1
+}
+
+cleanup() { rm -f "$KEY_FILE"; }
+trap cleanup EXIT
+
+# ── Helpers ──────────────────────────────────────────────────────
+
+sa_exists() {
+    gcloud iam service-accounts describe "$1" --project="$PROJECT" &>/dev/null
+}
+
+secrets_exist() {
+    gh secret list 2>/dev/null | grep -q "GCP_SA_KEY"
+}
+
+create_deploy_sa() {
+    echo "Creating deploy service account ${DEPLOY_SA_NAME}..."
+    gcloud iam service-accounts create "$DEPLOY_SA_NAME" \
+        --project="$PROJECT" \
+        --display-name="GitHub Actions Deploy"
+
+    for role in "${DEPLOY_ROLES[@]}"; do
+        echo "  Granting ${role}..."
+        gcloud projects add-iam-policy-binding "$PROJECT" \
+            --member="serviceAccount:${DEPLOY_SA_EMAIL}" \
+            --role="$role" \
+            --quiet &>/dev/null
+    done
+}
+
+create_runtime_sa() {
+    echo "Creating runtime service account ${RUNTIME_SA_NAME}..."
+    gcloud iam service-accounts create "$RUNTIME_SA_NAME" \
+        --project="$PROJECT" \
+        --display-name="RTAFF Cloud Run Runtime"
+
+    for secret in "${RUNTIME_SECRET_BINDINGS[@]}"; do
+        echo "  Granting secretAccessor on ${secret}..."
+        gcloud secrets add-iam-policy-binding "$secret" \
+            --member="serviceAccount:${RUNTIME_SA_EMAIL}" \
+            --role="roles/secretmanager.secretAccessor" \
+            --quiet &>/dev/null
+    done
+}
+
+delete_sa() {
+    local email=$1 name=$2
+    if sa_exists "$email"; then
+        echo "Deleting service account ${name}..."
+        gcloud iam service-accounts delete "$email" \
+            --project="$PROJECT" --quiet
+    fi
+}
+
+set_secrets() {
+    echo "Generating key and setting GitHub secrets..."
+    gcloud iam service-accounts keys create "$KEY_FILE" \
+        --iam-account="$DEPLOY_SA_EMAIL" --quiet
+
+    gh secret set GCP_SA_KEY < "$KEY_FILE"
+    gh secret set GCP_PROJECT --body "$PROJECT"
+    echo "GitHub secrets GCP_SA_KEY and GCP_PROJECT set."
+}
+
+clear_secrets() {
+    echo "Removing GitHub secrets..."
+    gh secret delete GCP_SA_KEY 2>/dev/null && echo "  Deleted GCP_SA_KEY" || echo "  GCP_SA_KEY not found"
+    gh secret delete GCP_PROJECT 2>/dev/null && echo "  Deleted GCP_PROJECT" || echo "  GCP_PROJECT not found"
+}
+
+# ── Main ─────────────────────────────────────────────────────────
+
+MODE="${1:-}"
+
+case "$MODE" in
+    --clear)
+        clear_secrets
+        delete_sa "$DEPLOY_SA_EMAIL" "$DEPLOY_SA_NAME"
+        delete_sa "$RUNTIME_SA_EMAIL" "$RUNTIME_SA_NAME"
+        echo "Done. Credentials cleared."
+        ;;
+    --new)
+        clear_secrets
+        delete_sa "$DEPLOY_SA_EMAIL" "$DEPLOY_SA_NAME"
+        delete_sa "$RUNTIME_SA_EMAIL" "$RUNTIME_SA_NAME"
+        create_deploy_sa
+        create_runtime_sa
+        set_secrets
+        echo "Done. Fresh credentials created."
+        ;;
+    "")
+        all_exist=true
+        if ! sa_exists "$DEPLOY_SA_EMAIL"; then
+            create_deploy_sa
+            all_exist=false
+        else
+            echo "Deploy SA ${DEPLOY_SA_NAME} already exists, reusing."
+        fi
+        if ! sa_exists "$RUNTIME_SA_EMAIL"; then
+            create_runtime_sa
+            all_exist=false
+        else
+            echo "Runtime SA ${RUNTIME_SA_NAME} already exists, reusing."
+        fi
+        if $all_exist && secrets_exist; then
+            echo "All service accounts and GitHub secrets already set."
+            echo "Use --new to recreate, or --clear to remove."
+            exit 0
+        fi
+        set_secrets
+        echo "Done."
+        ;;
+    *)
+        usage
+        ;;
+esac

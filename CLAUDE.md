@@ -58,11 +58,3 @@ Note that this is not a hard and fast rule, but that these targets should be use
 
 **All-in-one**: `make dev` (DB + backend + frontend; Ctrl+C stops all)
 **DB reset**: `make dev-db-reset` (destroy volume and start fresh)
-
-### Git Worktree Policy
-- The root repo directory is the user's workspace — never modify files or switch branches there
-- Always create a worktree under `.worktrees/` for implementation work: `git worktree add .worktrees/<name> -b <branch> main`
-- Each worktree gets its own `.venv` and `node_modules` (do NOT symlink or share these)
-- To merge into main: `git worktree add .worktrees/merge-main main`, merge there, remove worktree after
-- To push main: `git push origin main` works from any directory without checking out main
-- Leave local feature branches in place after merging. Do NOT push feature branches.
