@@ -91,8 +91,8 @@ if command -v gcloud &>/dev/null; then
     if [[ -z "$gcp_project" ]]; then
         warn "No active GCP project — run: gcloud config set project ${EXPECTED_GCP_PROJECT_PREFIX}-prod"
     elif [[ "$gcp_project" != "$EXPECTED_GCP_PROJECT_PREFIX"* ]]; then
-        warn "Active GCP project '${gcp_project}' does not start with '${EXPECTED_GCP_PROJECT_PREFIX}'"
-        warn "  This may belong to a sibling project (e.g. rtaff). Run: gcloud config set project <volunteer-call-...>"
+        fail "Active GCP project '${gcp_project}' does not start with '${EXPECTED_GCP_PROJECT_PREFIX}'"
+        fail "  This is almost certainly a sibling project (e.g. rtaff). Run: gcloud config set project <volunteer-call-...>"
     else
         pass "Active GCP project: ${gcp_project}"
     fi
