@@ -1,0 +1,58 @@
+Setting up Neon as the volunteer-call database
+==============================================
+
+Neon provides free-tier serverless PostgreSQL. The free tier includes 0.5 GB
+storage, auto-suspend after 5 minutes of inactivity, and ~1s cold-start on
+reconnect. This is fine for a low-traffic volunteer coordination app.
+
+1. Create account and project
+-----------------------------
+- Sign up at https://neon.tech
+- Create a new project (any region; us-east-2 is fine for Cloud Run us-central1)
+- Create a database named "vcall" with a role/user of your choice
+
+2. Get the connection string
+----------------------------
+From the Neon dashboard, copy the "pooled" connection string. It looks like:
+
+    postgresql://vcall_user:password@ep-cool-name-123456.us-east-2.aws.neon.tech/vcall?sslmode=require
+
+For asyncpg (what the app uses), change the scheme:
+
+    postgresql+asyncpg://vcall_user:password@ep-cool-name-123456.us-east-2.aws.neon.tech/vcall?ssl=require
+
+3. Store in GCP Secret Manager
+-------------------------------
+    echo -n 'postgresql+asyncpg://vcall_user:password@ep-cool-name-123456.us-east-2.aws.neon.tech/vcall?ssl=require' | \
+      gcloud secrets create vcall-database-url --data-file=-
+
+To update later:
+
+    echo -n 'new-connection-string' | \
+      gcloud secrets versions add vcall-database-url --data-file=-
+
+4. Seed the database
+--------------------
+Use the plain postgresql:// connection string (not asyncpg) with psql:
+
+    export DATABASE_URL='postgresql://vcall_user:password@ep-cool-name-123456.us-east-2.aws.neon.tech/vcall?sslmode=require'
+    psql "$DATABASE_URL" -f scripts/initdb/01-schema.sql
+    psql "$DATABASE_URL" -f scripts/initdb/02-reference-data.sql
+
+(The local dev script `scripts/dev-db.sh` runs the same files against the
+container DB; cloud seeding is the same files run via `psql`.)
+
+5. Free tier notes
+------------------
+- 0.5 GB storage, 1 project, 10 branches
+- Compute auto-suspends after 5 min idle; first query after suspend takes ~1s
+- 191.9 compute hours/month (enough for always-on single endpoint)
+- No charges; upgrade to paid if you need more storage or always-on compute
+- See https://neon.tech/docs/introduction/plans for current limits
+
+6. Upgrade path
+---------------
+When Neon's free tier becomes a constraint (storage, availability, cold-start
+latency), see `docs/CLOUD_SQL.howto` for moving to GCP Cloud SQL. The only
+runtime change is the `DATABASE_URL` secret value plus an
+`--add-cloudsql-instances` flag on the Cloud Run deploy.

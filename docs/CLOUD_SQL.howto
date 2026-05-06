@@ -1,0 +1,88 @@
+Upgrading to Cloud SQL for PostgreSQL
+======================================
+
+When Neon free tier limits become a constraint (storage, availability, cold
+starts), upgrade to Cloud SQL. The only change is the DATABASE_URL secret and
+adding a Cloud SQL connection flag to the deploy command.
+
+1. Enable Cloud SQL Admin API
+-----------------------------
+    gcloud services enable sqladmin.googleapis.com
+
+2. Create a Cloud SQL instance
+------------------------------
+    gcloud sql instances create vcall-db \
+      --database-version=POSTGRES_16 \
+      --tier=db-f1-micro \
+      --region=us-central1 \
+      --storage-size=10GB \
+      --storage-auto-increase
+
+db-f1-micro is ~$10/month. For lower cost during development, stop the
+instance when not in use:
+
+    gcloud sql instances patch vcall-db --activation-policy=NEVER   # stop
+    gcloud sql instances patch vcall-db --activation-policy=ALWAYS  # start
+
+3. Create database and user
+---------------------------
+    gcloud sql databases create vcall --instance=vcall-db
+
+    gcloud sql users create vcall_user \
+      --instance=vcall-db \
+      --password=<generate-a-strong-password>
+
+4. Update DATABASE_URL in Secret Manager
+----------------------------------------
+Cloud SQL connection string uses the instance connection name (not a hostname):
+
+    PROJECT=$(gcloud config get-value project)
+    CONN_NAME="${PROJECT}:us-central1:vcall-db"
+
+    # The app connects via Cloud SQL Auth Proxy built into Cloud Run
+    DATABASE_URL="postgresql+asyncpg://vcall_user:<password>@/vcall?host=/cloudsql/${CONN_NAME}"
+
+    echo -n "$DATABASE_URL" | \
+      gcloud secrets versions add vcall-database-url --data-file=-
+
+5. Update Cloud Run deploy command
+-----------------------------------
+Add the --add-cloudsql-instances flag. In the Makefile deploy target or
+.github/workflows/deploy.yml, add:
+
+    --add-cloudsql-instances=$(PROJECT):us-central1:vcall-db
+
+6. Grant Cloud SQL access to Cloud Run service account
+------------------------------------------------------
+The runtime service account (created by `scripts/set-gcloud-creds-for-deploy`)
+needs `roles/cloudsql.client`:
+
+    PROJECT=$(gcloud config get-value project)
+    RUNTIME_SA="vcall-runtime@${PROJECT}.iam.gserviceaccount.com"
+
+    gcloud projects add-iam-policy-binding "$PROJECT" \
+      --member="serviceAccount:${RUNTIME_SA}" \
+      --role="roles/cloudsql.client"
+
+(If you fall back to the default Compute Engine service account instead of a
+dedicated runtime SA, substitute `${PROJECT_NUMBER}-compute@developer.gserviceaccount.com`.)
+
+7. Seed data via cloud-sql-proxy
+---------------------------------
+Install the proxy: https://cloud.google.com/sql/docs/postgres/sql-proxy
+
+    # Terminal 1: start proxy
+    cloud-sql-proxy ${PROJECT}:us-central1:vcall-db --port=5433
+
+    # Terminal 2: seed
+    export DATABASE_URL='postgresql://vcall_user:<password>@localhost:5433/vcall'
+    psql "$DATABASE_URL" -f scripts/initdb/01-schema.sql
+    psql "$DATABASE_URL" -f scripts/initdb/02-reference-data.sql
+
+8. Cost reference
+-----------------
+- db-f1-micro: ~$10/month (shared CPU, 614 MB RAM)
+- db-g1-small: ~$26/month (shared CPU, 1.7 GB RAM)
+- Storage: $0.17/GB/month
+- Stop instance when not in use to avoid compute charges
+- See https://cloud.google.com/sql/pricing for current rates
