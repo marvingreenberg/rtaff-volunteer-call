@@ -45,19 +45,34 @@ the query parameters:
 Two notes on what changed and why:
 
 - `sslmode=require` becomes `ssl=require` (asyncpg's name for the same
-  knob). asyncpg's `require` is "encrypt the connection but do not verify
-  the certificate"; libpq's `require` is the same. To verify the
-  certificate, use `ssl=verify-full` instead — Neon presents a valid cert
-  signed by Let's Encrypt, so this works.
-- `channel_binding=require` is stripped. asyncpg 0.30+ accepts the
-  parameter, but the failure modes differ from libpq's, and silently
-  carrying the param across versions is a foot-gun. Channel binding still
-  happens automatically when Neon offers SCRAM-SHA-256-PLUS over TLS
-  (which it always does); dropping the parameter only removes the hard
-  *requirement* that channel binding be negotiated. If you need the
-  guarantee at the protocol level, do the verification on the libpq side
-  (e.g., a startup check from a container running psql) — or pin asyncpg
-  and test the parameter explicitly.
+  knob). Both mean "encrypt the connection, don't verify the cert". To
+  verify the cert, use `ssl=verify-full` instead — Neon presents a valid
+  Let's Encrypt cert, so this works.
+
+- `channel_binding=require` is stripped from the asyncpg URL. Some
+  background:
+
+  Postgres clients negotiate one of two auth methods over TLS:
+  `SCRAM-SHA-256` (plain) and `SCRAM-SHA-256-PLUS` (same, plus channel
+  binding — which ties the auth to the TLS channel and prevents a
+  MitM that's terminated TLS). Both libpq and asyncpg prefer the `-PLUS`
+  variant when the server offers it, and Neon always offers it. So in
+  practice channel binding happens whether the parameter is in the URL
+  or not.
+
+  What `channel_binding=require` adds is the *guarantee*: it turns
+  "prefer `-PLUS`, fall back to plain if something goes wrong" into
+  "fail the connection if `-PLUS` isn't negotiated". A safety net,
+  not a different default.
+
+  libpq has supported the parameter cleanly for years — keep it on the
+  psql/seed URL. asyncpg only added support in 0.30+, and version drift
+  to an older asyncpg would silently change the behavior. Dropping the
+  parameter from the asyncpg URL costs only the fail-closed guarantee;
+  the actual channel-binding protection still happens for every
+  connection to Neon. If you need the protocol-level guarantee
+  enforced by the runtime, pin asyncpg and re-add the parameter
+  explicitly.
 
 3. Store in GCP Secret Manager
 -------------------------------
