@@ -13,10 +13,11 @@ REQUIRED_PYTHON_MAJOR=3
 REQUIRED_PYTHON_MINOR=11
 REQUIRED_NODE_MAJOR=18
 
-# Substring used to spot-check the active GCP project. The deploy
-# SERVICE_NAME is "volunteer-call"; project ids typically look like
-# "volunteer-call", "volunteer-call-prod", "volunteer-call-dev", etc.
-EXPECTED_GCP_PROJECT_PREFIX="volunteer-call"
+# Substring the active GCP project id must contain. The deploy
+# SERVICE_NAME is "volunteer-call"; valid project ids include
+# "volunteer-call-prod", "rtaff-volunteer-call", "volunteer-call-dev",
+# etc. (the bare "volunteer-call" id is globally taken in GCP).
+EXPECTED_GCP_PROJECT_SUBSTRING="volunteer-call"
 
 errors=0
 warnings=0
@@ -89,10 +90,10 @@ if command -v gcloud &>/dev/null; then
 
     gcp_project=$(gcloud config get-value project 2>/dev/null || true)
     if [[ -z "$gcp_project" ]]; then
-        warn "No active GCP project — run: gcloud config set project ${EXPECTED_GCP_PROJECT_PREFIX}-prod"
-    elif [[ "$gcp_project" != "$EXPECTED_GCP_PROJECT_PREFIX"* ]]; then
-        fail "Active GCP project '${gcp_project}' does not start with '${EXPECTED_GCP_PROJECT_PREFIX}'"
-        fail "  This is almost certainly a sibling project (e.g. rtaff). Run: gcloud config set project <volunteer-call-...>"
+        warn "No active GCP project — run: gcloud config set project rtaff-${EXPECTED_GCP_PROJECT_SUBSTRING}"
+    elif [[ "$gcp_project" != *"$EXPECTED_GCP_PROJECT_SUBSTRING"* ]]; then
+        fail "Active GCP project '${gcp_project}' does not contain '${EXPECTED_GCP_PROJECT_SUBSTRING}'"
+        fail "  This is almost certainly a sibling project (e.g. rtaff). Run: gcloud config set project <something-volunteer-call-something>"
     else
         pass "Active GCP project: ${gcp_project}"
     fi

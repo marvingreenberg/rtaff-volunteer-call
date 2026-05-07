@@ -33,6 +33,10 @@ Registry Docker repo:
       ./scripts/setup-gcp-project --project-id=<your-project-id>
       # default region us-central1; pass --region=<region> to change
 
+GCP project ids are globally unique. The project id should contain 'volunteer-call'
+but may require a suffix or prefix for uniqueness in the global gcp namespace.
+The `check_prerequisites.sh` guard accepts any id that contains `volunteer-call`.
+
 What it does (idempotent — safe to re-run):
 
 - `gcloud projects create <id>` (skipped if it already exists).

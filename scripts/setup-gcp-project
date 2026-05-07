@@ -4,7 +4,13 @@
 # Creates the GCP project, links billing, and enables required APIs.
 # Does NOT set up the database — see docs/NEON_SQL.howto or docs/CLOUD_SQL.howto.
 #
-# Usage: ./scripts/setup-gcp-project --project-id=volunteer-call-prod
+# Usage: ./scripts/setup-gcp-project --project-id=rtaff-volunteer-call
+#
+# Pick any project-id you like, but note GCP project ids are globally
+# unique — the bare "volunteer-call" id is taken. Examples that work:
+# "rtaff-volunteer-call", "volunteer-call-mg", "volunteer-call-prod-2025".
+# The check_prerequisites.sh check accepts any id that contains
+# "volunteer-call".
 set -euo pipefail
 
 # ── Parse flags ─────────────────────────────────────────────────
