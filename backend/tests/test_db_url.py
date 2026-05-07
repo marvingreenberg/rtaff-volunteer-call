@@ -36,16 +36,16 @@ def test_strips_other_libpq_only_params() -> None:
 
 def test_preserves_unrelated_query_params() -> None:
     url, _ = normalize_async_url(
-        "postgresql+asyncpg://user:pw@host/db?sslmode=require&application_name=rtaff"
+        "postgresql+asyncpg://user:pw@host/db?sslmode=require&application_name=volunteer_call"
     )
-    assert url.query.get("application_name") == "rtaff"
+    assert url.query.get("application_name") == "volunteer_call"
 
 
 def test_no_query_params_is_passthrough() -> None:
     url, connect_args = normalize_async_url(
-        "postgresql+asyncpg://rtaff:rtaff_dev@localhost:5432/rtaff"
+        "postgresql+asyncpg://volunteer_call:volunteer_call_dev@localhost:5432/volunteer_call"
     )
     assert url.query == {}
     assert connect_args == {}
     assert url.host == "localhost"
-    assert url.database == "rtaff"
+    assert url.database == "volunteer_call"
