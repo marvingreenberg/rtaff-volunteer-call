@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 from jinja2 import Environment, PackageLoader, select_autoescape
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -15,7 +15,6 @@ from volunteer_call_api.models.volunteer_call import CallStatus, Task, TaskStatu
 from volunteer_call_api.schemas.volunteer_call import (
     AssignmentNoticesResponse,
     AssignmentOverviewResponse,
-    AssignmentSummaryItem,
     AvailableVolunteer,
     JobListItem,
     SendInvitesResponse,
@@ -23,7 +22,6 @@ from volunteer_call_api.schemas.volunteer_call import (
     TaskCreate,
     TaskOverviewItem,
     TaskResponse,
-    TaskSummary,
     TaskUpdate,
     VolunteerCallCreate,
     VolunteerCallListResponse,
@@ -250,71 +248,6 @@ async def send_assignment_notices(
     )
 
 
-# --- Assignment Summary ---
-
-
-@router.get("/{call_id}/assignment-summary", response_model=list[AssignmentSummaryItem])
-async def assignment_summary(
-    call_id: str, db: AsyncSession = Depends(get_db)
-) -> list[AssignmentSummaryItem]:
-    assignments_q = (
-        select(TeamAssignment)
-        .options(selectinload(TeamAssignment.task), selectinload(TeamAssignment.person))
-        .join(Task)
-        .where(Task.volunteer_call_id == call_id)
-    )
-    assignments_result = await db.execute(assignments_q)
-    assignments = assignments_result.scalars().unique().all()
-
-    avail_result = await db.execute(
-        select(VolunteerAvailability).where(VolunteerAvailability.volunteer_call_id == call_id)
-    )
-    availabilities = avail_result.scalars().all()
-    avail_by_person: dict[str, list[str]] = {}
-    max_tasks: dict[str, int] = {}
-    for av in availabilities:
-        avail_by_person.setdefault(av.person_id, [])
-        if av.task_id and av.available:
-            avail_by_person[av.person_id].append(av.task_id)
-        if av.max_tasks_per_week:
-            max_tasks[av.person_id] = av.max_tasks_per_week
-
-    by_person: dict[str, list[TeamAssignment]] = {}
-    for a in assignments:
-        by_person.setdefault(a.person_id, []).append(a)
-
-    total_q = select(TeamAssignment.person_id, func.count()).group_by(TeamAssignment.person_id)
-    total_result = await db.execute(total_q)
-    totals = dict(total_result.all())
-
-    items = []
-    all_person_ids = set(by_person.keys()) | set(avail_by_person.keys())
-    persons_q = await db.execute(select(Person).where(Person.id.in_(all_person_ids)))
-    persons = {p.id: p for p in persons_q.scalars().all()}
-
-    for pid in all_person_ids:
-        p = persons.get(pid)
-        if not p:
-            continue
-        person_assignments = by_person.get(pid, [])
-        items.append(
-            AssignmentSummaryItem(
-                person_id=pid,
-                person_name=f"{p.first_name} {p.last_name}",
-                skill_category=p.skill_category.value,
-                assignments_in_call=len(person_assignments),
-                assigned_tasks=[
-                    TaskSummary(task_id=a.task_id, date=a.task.date) for a in person_assignments
-                ],
-                max_tasks_per_week=max_tasks.get(pid, 1),
-                available_task_ids=avail_by_person.get(pid, []),
-                total_historical_assignments=totals.get(pid, 0),
-            )
-        )
-
-    return items
-
-
 # --- Assignment Overview ---
 
 
@@ -347,6 +280,8 @@ async def assignment_overview(
     task_availabilities = task_avail_result.scalars().unique().all()
     avail_by_task: dict[str, list[Person]] = {}
     for av in task_availabilities:
+        if av.task_id is None:  # filtered in WHERE; narrows for the type checker
+            continue
         person = av.person
         if not person.active:
             continue

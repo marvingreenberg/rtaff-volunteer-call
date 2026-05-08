@@ -24,7 +24,6 @@ import type {
   AvailableVolunteerResponse,
   SendInvitesResponse,
   AssignmentNoticesResponse,
-  AssignmentSummaryItem,
   AssignmentOverviewResponse,
   LoginRequest,
   LoginResponse,
@@ -191,11 +190,6 @@ export const volunteerCalls = {
     request<AssignmentNoticesResponse>(
       `/volunteer-calls/${callId}/send-assignment-notices`,
       { method: "POST" },
-    ),
-
-  assignmentSummary: (callId: string) =>
-    request<AssignmentSummaryItem[]>(
-      `/volunteer-calls/${callId}/assignment-summary`,
     ),
 
   assignmentOverview: (callId: string) =>

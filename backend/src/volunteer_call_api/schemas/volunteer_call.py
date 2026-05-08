@@ -95,26 +95,6 @@ class JobListItem(BaseModel):
     assigned_count: int
 
 
-class TaskSummary(BaseModel):
-    """Brief summary of a task assignment for the dashboard."""
-
-    task_id: str
-    date: datetime.date | None
-
-
-class AssignmentSummaryItem(BaseModel):
-    """Per-volunteer cross-task view for the assignment dashboard."""
-
-    person_id: str
-    person_name: str
-    skill_category: str
-    assignments_in_call: int
-    assigned_tasks: list[TaskSummary]
-    max_tasks_per_week: int
-    available_task_ids: list[str]
-    total_historical_assignments: int
-
-
 class TaskAssignment(BaseModel):
     assignment_id: str
     person_id: str

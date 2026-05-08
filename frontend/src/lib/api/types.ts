@@ -299,22 +299,6 @@ export interface AssignmentOverviewResponse {
   volunteers: VolunteerOverviewItem[];
 }
 
-export interface TaskSummary {
-  task_id: string;
-  date: string | null;
-}
-
-export interface AssignmentSummaryItem {
-  person_id: string;
-  person_name: string;
-  skill_category: string;
-  assignments_in_call: number;
-  assigned_tasks: TaskSummary[];
-  max_tasks_per_week: number;
-  available_task_ids: string[];
-  total_historical_assignments: number;
-}
-
 export interface SendInvitesResponse {
   volunteers_notified: number;
   volunteers_skipped: number;
