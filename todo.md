@@ -124,20 +124,3 @@ and somehow present conflicts to user when volunteering.  (This may require a de
 - Import / export for users: bulk and per-user, after the source-of-truth volunteer adapter is decided
   (SharePoint, external DB, manual). The People editor at `/people/[id]` is the current entry point.
 
-### Cleanup
-
-- `volunteerCalls.assignmentSummary` API method and `AssignmentSummaryItem` type are now unused
-  (the read-only dashboard was replaced). Remove from `frontend/src/lib/api/client.ts`,
-  `types.ts`, and the corresponding backend route + schema if nothing else depends on them.
-- **Landing page (`/`) is dead code.** `frontend/src/routes/+page.svelte` shows six nav cards —
-  Projects, Planning, Volunteering, Volunteer Calls, Execution, Reports — but Projects, Planning,
-  Execution, and Reports are rtaff features that don't exist in this app. The remaining cards
-  (Volunteering, Volunteer Calls) duplicate items already in the top nav. Replace `/` with a
-  role-based redirect:
-  - staff or team_leader → `/volunteer-calls`
-  - volunteer-only → `/volunteering`
-
-  `frontend/src/routes/+layout.svelte:17-21` already does a similar role-based redirect when a
-  user lands on `/login` or `/verify` — the same logic should fire for `/` itself (or the page
-  body should just `goto(...)` on mount). Once `/` is a pure redirect, also drop the unused
-  feature cards from `+page.svelte`.

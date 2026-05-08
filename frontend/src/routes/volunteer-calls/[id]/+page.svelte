@@ -84,6 +84,19 @@
     }
   }
 
+  async function handleDeleteTask(taskId: string) {
+    error = null;
+    try {
+      // Drop any pending autosave for the row about to vanish.
+      if (pendingEdit?.taskId === taskId) pendingEdit = null;
+      if (expandedTaskId === taskId) expandedTaskId = null;
+      await volunteerCalls.deleteTask(callId, taskId);
+      await loadCall();
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to delete task';
+    }
+  }
+
   async function handleSendInvites(confirmReSend = false) {
     if (call?.status === 'open' && !confirmReSend) {
       const ok = window.confirm(
@@ -242,6 +255,7 @@
               expanded={expandedTaskId === task.id}
               ontoggle={() => handleToggleRow(task.id)}
               onchange={handleRowChange}
+              ondelete={handleDeleteTask}
             />
           {/each}
         </div>

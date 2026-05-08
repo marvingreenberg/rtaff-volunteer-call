@@ -8,9 +8,17 @@
     expanded: boolean;
     ontoggle: () => void;
     onchange: (taskId: string, value: TaskCreate | null, dirty: boolean) => void;
+    ondelete: (taskId: string) => void;
   };
 
-  let { task, expanded, ontoggle, onchange }: Props = $props();
+  let { task, expanded, ontoggle, onchange, ondelete }: Props = $props();
+
+  function handleDeleteClick(e: MouseEvent) {
+    e.stopPropagation();
+    if (confirm(`Delete task "${task.short_description}"?`)) {
+      ondelete(task.id);
+    }
+  }
 </script>
 
 <div class="task-row" class:expanded>
@@ -36,6 +44,16 @@
         mode="edit"
         onchange={(value, dirty) => onchange(task.id, value, dirty)}
       />
+      <div class="row-actions">
+        <button
+          type="button"
+          class="delete-btn"
+          onclick={handleDeleteClick}
+          aria-label="Delete task"
+        >
+          Delete task
+        </button>
+      </div>
     </div>
   {/if}
 </div>
@@ -110,5 +128,26 @@
     padding: var(--spacing-md);
     /* No top border or background change — the form sits on the same green
        canvas as the summary. */
+  }
+
+  .row-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: var(--spacing-sm);
+  }
+
+  .delete-btn {
+    background: none;
+    border: 1px solid var(--rt-danger-text, #b00020);
+    color: var(--rt-danger-text, #b00020);
+    border-radius: var(--card-radius);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font: inherit;
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+  }
+
+  .delete-btn:hover {
+    background: var(--rt-danger-bg, #fdecea);
   }
 </style>

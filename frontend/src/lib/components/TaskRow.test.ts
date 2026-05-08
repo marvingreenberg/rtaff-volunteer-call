@@ -36,6 +36,7 @@ describe("TaskRow", () => {
         expanded: false,
         ontoggle: vi.fn(),
         onchange: vi.fn(),
+        ondelete: vi.fn(),
       },
     });
     expect(screen.getByText("07/01")).toBeInTheDocument();
@@ -48,6 +49,7 @@ describe("TaskRow", () => {
         expanded: false,
         ontoggle: vi.fn(),
         onchange: vi.fn(),
+        ondelete: vi.fn(),
       },
     });
     expect(screen.getByText("(4)")).toBeInTheDocument();
@@ -60,6 +62,7 @@ describe("TaskRow", () => {
         expanded: false,
         ontoggle: vi.fn(),
         onchange: vi.fn(),
+        ondelete: vi.fn(),
       },
     });
     expect(screen.getByText("(4/1)")).toBeInTheDocument();
@@ -72,6 +75,7 @@ describe("TaskRow", () => {
         expanded: false,
         ontoggle: vi.fn(),
         onchange: vi.fn(),
+        ondelete: vi.fn(),
       },
     });
     expect(container.querySelector("form")).not.toBeInTheDocument();
@@ -80,6 +84,7 @@ describe("TaskRow", () => {
       expanded: true,
       ontoggle: vi.fn(),
       onchange: vi.fn(),
+      ondelete: vi.fn(),
     });
     expect(container.querySelector("form")).toBeInTheDocument();
   });
@@ -92,6 +97,7 @@ describe("TaskRow", () => {
         expanded: false,
         ontoggle,
         onchange: vi.fn(),
+        ondelete: vi.fn(),
       },
     });
     await fireEvent.click(screen.getByRole("button", { expanded: false }));
@@ -106,6 +112,7 @@ describe("TaskRow", () => {
         expanded: true,
         ontoggle: vi.fn(),
         onchange,
+        ondelete: vi.fn(),
       },
     });
 
@@ -126,5 +133,44 @@ describe("TaskRow", () => {
       city: "Alexandria",
     });
     expect(lastCall[2]).toBe(true); // dirty
+  });
+
+  it("calls ondelete with the task id when the delete button is confirmed", async () => {
+    const ondelete = vi.fn();
+    const confirmSpy = vi
+      .spyOn(window, "confirm")
+      .mockImplementation(() => true);
+    render(TaskRow, {
+      props: {
+        task: makeTask({ short_description: "Roof patch" }),
+        expanded: true,
+        ontoggle: vi.fn(),
+        onchange: vi.fn(),
+        ondelete,
+      },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: /delete task/i }));
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(ondelete).toHaveBeenCalledWith("task-1");
+    confirmSpy.mockRestore();
+  });
+
+  it("does not call ondelete when the confirm dialog is dismissed", async () => {
+    const ondelete = vi.fn();
+    const confirmSpy = vi
+      .spyOn(window, "confirm")
+      .mockImplementation(() => false);
+    render(TaskRow, {
+      props: {
+        task: makeTask(),
+        expanded: true,
+        ontoggle: vi.fn(),
+        onchange: vi.fn(),
+        ondelete,
+      },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: /delete task/i }));
+    expect(ondelete).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
   });
 });

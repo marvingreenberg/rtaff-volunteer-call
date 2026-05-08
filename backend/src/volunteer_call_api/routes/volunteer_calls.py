@@ -412,23 +412,11 @@ async def update_task(
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    update_fields = [
-        "short_description",
-        "date",
-        "time_start",
-        "time_end",
-        "address",
-        "city",
-        "team_lead_id",
-        "volunteers_needed",
-        "skilled_needed",
-        "status",
-        "notes",
-    ]
-    for field in update_fields:
-        value = getattr(body, field)
-        if value is not None:
-            setattr(task, field, value)
+    # Use exclude_unset so explicit `null` clears nullable fields, while
+    # omitted fields are left untouched. (Naively `if value is not None`
+    # would conflate "client wants to clear" with "client didn't send".)
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(task, field, value)
 
     await db.commit()
     result = await db.execute(
