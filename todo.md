@@ -105,13 +105,10 @@ and somehow present conflicts to user when volunteering.  (This may require a de
 
 ### Task / call UI follow-ups
 
-- Delete-task affordance on `TaskRow` (deferred from the task-entry redesign).
 - Address autocomplete on `TaskEntryForm` (city is hardcoded; address is plain text pending a source).
 - Reintroduce a `notes` affordance for tasks once there's a place to display them
   (currently captured by the API but not surfaced anywhere).
 - Gray-default visual for time/number inputs (Svelte placeholder doesn't reach native inputs).
-- Backend PUT `update_task` skips `None` values (`routes/volunteer_calls.py:408-411`), so
-  clearing nullable fields back to null is impossible; revisit when notes/team_lead become editable.
 - Under-/over-assignment policy: the assign view doesn't cap at `volunteers_needed`, and
   Send Assignment Notices doesn't gate on every task being full. Decide intended behaviour.
 - Admin-on-behalf-of-volunteer availability entry was dropped with the `/availability` page;
