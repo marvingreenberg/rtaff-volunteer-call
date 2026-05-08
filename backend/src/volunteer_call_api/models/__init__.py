@@ -2,7 +2,14 @@
 
 from volunteer_call_api.models.base import Base
 from volunteer_call_api.models.notification import Notification, NotificationType
-from volunteer_call_api.models.person import Person, PersonRole, RoleType, SkillCategory
+from volunteer_call_api.models.person import (
+    Person,
+    PersonRole,
+    Program,
+    RoleType,
+    Skill,
+    VolunteerProgram,
+)
 from volunteer_call_api.models.slot_event import SlotEvent, SlotEventType
 from volunteer_call_api.models.team_assignment import AssignmentRole, TeamAssignment
 from volunteer_call_api.models.volunteer_availability import VolunteerAvailability
@@ -12,8 +19,10 @@ __all__ = [
     "Base",
     "Person",
     "PersonRole",
-    "SkillCategory",
+    "Program",
     "RoleType",
+    "Skill",
+    "VolunteerProgram",
     "VolunteerCall",
     "Task",
     "CallStatus",

@@ -8,7 +8,13 @@ from sqlalchemy.orm import selectinload
 
 from volunteer_call_api.config import settings
 from volunteer_call_api.database import get_db
-from volunteer_call_api.models.person import Person, PersonRole, RoleType
+from volunteer_call_api.models.person import (
+    Person,
+    PersonRole,
+    Program,
+    RoleType,
+    VolunteerProgram,
+)
 from volunteer_call_api.models.team_assignment import TeamAssignment
 from volunteer_call_api.models.volunteer_availability import VolunteerAvailability
 from volunteer_call_api.models.volunteer_call import CallStatus, Task, TaskStatus, VolunteerCall
@@ -58,8 +64,33 @@ jinja_env = Environment(
 async def create_volunteer_call(
     body: VolunteerCallCreate, db: AsyncSession = Depends(get_db)
 ) -> VolunteerCallResponse:
-    call = VolunteerCall(title=body.title, status=body.status, notes=body.notes)
+    call = VolunteerCall(
+        title=body.title, program=body.program, status=body.status, notes=body.notes
+    )
     db.add(call)
+    await db.flush()
+
+    # Single-task programs (ACR / RAMP / LIFT) often pass an initial task in
+    # the same request so the create form can be one screen, not two. RTX
+    # calls can use this too but typically add tasks on the detail page.
+    if body.initial_task is not None:
+        t = body.initial_task
+        db.add(
+            Task(
+                volunteer_call_id=call.id,
+                short_description=t.short_description,
+                date=t.date,
+                time_start=t.time_start,
+                time_end=t.time_end,
+                address=t.address,
+                city=t.city,
+                team_lead_id=t.team_lead_id,
+                volunteers_needed=t.volunteers_needed,
+                skilled_needed=t.skilled_needed,
+                notes=t.notes,
+            )
+        )
+
     await db.commit()
     call = await get_call_or_404(call.id, db)
     return call_response(call)
@@ -67,13 +98,17 @@ async def create_volunteer_call(
 
 @router.get("", response_model=list[VolunteerCallListResponse])
 async def list_volunteer_calls(
-    status: CallStatus | None = None, db: AsyncSession = Depends(get_db)
+    status: CallStatus | None = None,
+    program: Program | None = None,
+    db: AsyncSession = Depends(get_db),
 ) -> list[VolunteerCallListResponse]:
     query = select(VolunteerCall).options(
         selectinload(VolunteerCall.tasks).selectinload(Task.assignments)
     )
     if status is not None:
         query = query.where(VolunteerCall.status == status)
+    if program is not None:
+        query = query.where(VolunteerCall.program == program)
     query = query.order_by(VolunteerCall.created_at.desc())
     result = await db.execute(query)
     return [call_list_response(c) for c in result.scalars().all()]
@@ -132,6 +167,7 @@ async def list_jobs(call_id: str, db: AsyncSession = Depends(get_db)) -> list[Jo
     result = await db.execute(query)
     tasks = result.scalars().all()
 
+    call = await get_call_or_404(call_id, db)
     return [
         JobListItem(
             task_id=t.id,
@@ -143,6 +179,7 @@ async def list_jobs(call_id: str, db: AsyncSession = Depends(get_db)) -> list[Jo
             volunteers_needed=t.volunteers_needed,
             skilled_needed=t.skilled_needed,
             assigned_count=len(t.assignments),
+            program=call.program,
         )
         for t in tasks
     ]
@@ -178,10 +215,17 @@ async def send_invites(call_id: str, db: AsyncSession = Depends(get_db)) -> Send
 
     task_count = len(non_cancelled)
 
+    # Filter by program: only members of this call's program get the invite.
     result = await db.execute(
         select(Person)
         .join(Person.roles)
-        .where(PersonRole.role == RoleType.VOLUNTEER, Person.active.is_(True))
+        .join(Person.program_memberships)
+        .where(
+            PersonRole.role == RoleType.VOLUNTEER,
+            Person.active.is_(True),
+            VolunteerProgram.program == call.program,
+            VolunteerProgram.active.is_(True),
+        )
     )
     volunteers = result.scalars().unique().all()
 
@@ -294,9 +338,8 @@ async def assignment_overview(
     for t in tasks:
         assigned_ids = {a.person_id for a in t.assignments}
         candidates = [p for p in avail_by_task.get(t.id, []) if p.id not in assigned_ids]
-        candidates.sort(
-            key=lambda p: (p.skill_category.value != "skilled", p.first_name, p.last_name)
-        )
+        # Skilled (any tag) volunteers float to the top, then alpha by name.
+        candidates.sort(key=lambda p: (not p.skills, p.first_name, p.last_name))
         task_items.append(
             TaskOverviewItem(
                 task_id=t.id,
@@ -314,7 +357,7 @@ async def assignment_overview(
                         person_id=a.person_id,
                         person_name=f"{a.person.first_name} {a.person.last_name}",
                         initials=_initials(a.person.first_name, a.person.last_name),
-                        skill_category=a.person.skill_category.value,
+                        skills=list(a.person.skills),
                         role=a.role.value,
                     )
                     for a in t.assignments
@@ -324,7 +367,7 @@ async def assignment_overview(
                         person_id=p.id,
                         person_name=f"{p.first_name} {p.last_name}",
                         initials=_initials(p.first_name, p.last_name),
-                        skill_category=p.skill_category.value,
+                        skills=list(p.skills),
                     )
                     for p in candidates
                 ],
@@ -346,7 +389,7 @@ async def assignment_overview(
                 person_id=p.id,
                 person_name=f"{p.first_name} {p.last_name}",
                 initials=_initials(p.first_name, p.last_name),
-                skill_category=p.skill_category.value,
+                skills=list(p.skills),
                 phone=p.phone,
                 max_tasks_per_week=av.max_tasks_per_week or 1,
             )

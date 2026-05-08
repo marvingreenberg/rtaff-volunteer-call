@@ -66,6 +66,18 @@ The dev stack runs PostgreSQL and Mailpit (a local SMTP catcher) in
 Docker; the backend defaults to `localhost:1025` for SMTP and emails
 are visible in Mailpit's web UI at `http://localhost:8025`.
 
+## Database schema and migrations
+
+Pre-1.0: schema lives in `scripts/initdb/01-schema.sql` and reference
+data in `scripts/initdb/02-reference-data.sql`. The dev DB is reset
+and reseeded freely (`make dev-db-reset`); schema changes go directly
+into those files. The `backend/src/volunteer_call_api/alembic/`
+scaffolding is in place but **no migrations are written or applied
+until after the 1.0.0 release** — there is no production data to
+preserve, and migration overhead would only slow down iteration.
+After 1.0.0, write migrations against `scripts/initdb/01-schema.sql`
+as the baseline.
+
 ## Deployment
 
 Production deployment is to GCP Cloud Run with PostgreSQL hosted on

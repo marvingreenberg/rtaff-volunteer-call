@@ -49,6 +49,7 @@ def call_response(call: VolunteerCall) -> VolunteerCallResponse:
     return VolunteerCallResponse(
         id=call.id,
         title=call.title,
+        program=call.program,
         status=call.status,
         notes=call.notes,
         task_count=len(tasks),
@@ -62,6 +63,7 @@ def call_list_response(call: VolunteerCall) -> VolunteerCallListResponse:
     return VolunteerCallListResponse(
         id=call.id,
         title=call.title,
+        program=call.program,
         status=call.status,
         task_count=len(call.tasks),
         created_at=call.created_at,

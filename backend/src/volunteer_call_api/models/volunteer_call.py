@@ -8,6 +8,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from volunteer_call_api.models.base import Base, TimestampMixin, generate_uuid
+from volunteer_call_api.models.person import Program
 
 
 class CallStatus(enum.Enum):
@@ -29,6 +30,10 @@ class VolunteerCall(Base, TimestampMixin):
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True, default=generate_uuid)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
+    program: Mapped[Program] = mapped_column(
+        Enum(Program, name="program", values_callable=lambda e: [x.value for x in e]),
+        nullable=False,
+    )
     status: Mapped[CallStatus] = mapped_column(
         Enum(CallStatus, values_callable=lambda e: [x.value for x in e]),
         nullable=False,
@@ -81,6 +86,6 @@ class Task(Base, TimestampMixin):
     )
 
 
-from volunteer_call_api.models.person import Person  # noqa: E402
+from volunteer_call_api.models.person import Person  # noqa: E402,F811
 from volunteer_call_api.models.team_assignment import TeamAssignment  # noqa: E402
 from volunteer_call_api.models.volunteer_availability import VolunteerAvailability  # noqa: E402

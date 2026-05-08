@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends
 
 from volunteer_call_api.dependencies import get_current_user
 from volunteer_call_api.routes.auth import router as auth_router
+from volunteer_call_api.routes.calendar import calls_router as calendar_calls_router
+from volunteer_call_api.routes.calendar import people_router as calendar_people_router
 from volunteer_call_api.routes.notifications import router as notifications_router
 from volunteer_call_api.routes.people import router as people_router
 from volunteer_call_api.routes.reports import router as reports_router
@@ -32,5 +34,7 @@ authenticated.include_router(
 authenticated.include_router(reports_router, prefix="/reports", tags=["reports"])
 authenticated.include_router(volunteering_router, prefix="/volunteering", tags=["volunteering"])
 authenticated.include_router(notifications_router, prefix="/notifications", tags=["notifications"])
+authenticated.include_router(calendar_people_router, prefix="/people", tags=["calendar"])
+authenticated.include_router(calendar_calls_router, prefix="/volunteer-calls", tags=["calendar"])
 
 api_router.include_router(authenticated)

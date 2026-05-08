@@ -22,13 +22,13 @@ router = APIRouter()
 def _availability_response(avail: VolunteerAvailability) -> AvailabilityResponse:
     person = avail.person
     name = f"{person.first_name} {person.last_name}" if person else ""
-    skill = person.skill_category if person else None
+    skills = list(person.skills) if person else []
     return AvailabilityResponse(
         id=avail.id,
         volunteer_call_id=avail.volunteer_call_id,
         person_id=avail.person_id,
         person_name=name,
-        person_skill_category=skill,
+        person_skills=skills,
         task_id=avail.task_id,
         available=avail.available,
         max_tasks_per_week=avail.max_tasks_per_week,

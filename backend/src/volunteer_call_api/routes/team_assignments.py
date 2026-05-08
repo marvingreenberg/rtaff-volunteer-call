@@ -29,7 +29,7 @@ def _assignment_response(assignment: TeamAssignment) -> TeamAssignmentResponse:
         task_id=assignment.task_id,
         person_id=assignment.person_id,
         person_name=name,
-        person_skill_category=person.skill_category if person else None,
+        person_skills=list(person.skills) if person else [],
         person_phone=person.phone if person else None,
         person_email=person.email if person else None,
         role=assignment.role,
@@ -199,11 +199,12 @@ async def list_available_volunteers(
             AvailableVolunteerResponse(
                 person_id=person.id,
                 person_name=f"{person.first_name} {person.last_name}",
-                skill_category=person.skill_category,
+                skills=list(person.skills),
                 phone=person.phone,
                 email=person.email,
             )
         )
 
-    candidates.sort(key=lambda c: (c.skill_category.value != "skilled", c.person_name))
+    # Skilled (any tag) volunteers float to the top, then alpha by name.
+    candidates.sort(key=lambda c: (not c.skills, c.person_name))
     return candidates

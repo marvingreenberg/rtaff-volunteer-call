@@ -4,7 +4,7 @@ import datetime
 
 from pydantic import BaseModel
 
-from volunteer_call_api.models.person import SkillCategory
+from volunteer_call_api.models.person import Skill
 from volunteer_call_api.models.team_assignment import AssignmentRole
 
 
@@ -25,7 +25,7 @@ class TeamAssignmentResponse(BaseModel):
     task_id: str
     person_id: str
     person_name: str = ""
-    person_skill_category: SkillCategory = SkillCategory.UNKNOWN
+    person_skills: list[Skill] = []
     person_phone: str | None = None
     person_email: str | None = None
     role: AssignmentRole
@@ -40,7 +40,7 @@ class TeamAssignmentResponse(BaseModel):
 class AvailableVolunteerResponse(BaseModel):
     person_id: str
     person_name: str
-    skill_category: SkillCategory
+    skills: list[Skill]
     phone: str | None
     email: str | None
 

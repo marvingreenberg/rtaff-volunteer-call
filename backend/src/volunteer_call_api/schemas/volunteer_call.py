@@ -4,6 +4,7 @@ import datetime
 
 from pydantic import BaseModel
 
+from volunteer_call_api.models.person import Program, Skill
 from volunteer_call_api.models.volunteer_call import CallStatus, TaskStatus
 
 
@@ -58,19 +59,26 @@ class TaskResponse(BaseModel):
 
 class VolunteerCallCreate(BaseModel):
     title: str
+    program: Program
     status: CallStatus = CallStatus.DRAFT
     notes: str | None = None
+    # Convenience for single-task programs (ACR / RAMP / LIFT): caller can
+    # supply task fields inline and the server creates one task with the call.
+    initial_task: TaskCreate | None = None
 
 
 class VolunteerCallUpdate(BaseModel):
     title: str | None = None
     status: CallStatus | None = None
     notes: str | None = None
+    # `program` deliberately not updateable — once set, it's fixed. Avoids
+    # the "what happens to existing availabilities/assignments" question.
 
 
 class VolunteerCallResponse(BaseModel):
     id: str
     title: str
+    program: Program
     status: CallStatus
     notes: str | None
     task_count: int = 0
@@ -93,6 +101,7 @@ class JobListItem(BaseModel):
     volunteers_needed: int
     skilled_needed: int
     assigned_count: int
+    program: Program
 
 
 class TaskAssignment(BaseModel):
@@ -100,7 +109,7 @@ class TaskAssignment(BaseModel):
     person_id: str
     person_name: str
     initials: str
-    skill_category: str
+    skills: list[Skill] = []
     role: str
 
 
@@ -110,7 +119,7 @@ class AvailableVolunteer(BaseModel):
     person_id: str
     person_name: str
     initials: str
-    skill_category: str
+    skills: list[Skill] = []
 
 
 class TaskOverviewItem(BaseModel):
@@ -131,7 +140,7 @@ class VolunteerOverviewItem(BaseModel):
     person_id: str
     person_name: str
     initials: str
-    skill_category: str
+    skills: list[Skill] = []
     phone: str | None = None
     available_task_ids: list[str] = []
     max_tasks_per_week: int = 1
@@ -162,6 +171,7 @@ class AssignmentNoticesResponse(BaseModel):
 class VolunteerCallListResponse(BaseModel):
     id: str
     title: str
+    program: Program
     status: CallStatus
     task_count: int = 0
     created_at: datetime.datetime

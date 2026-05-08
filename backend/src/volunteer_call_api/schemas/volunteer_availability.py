@@ -4,7 +4,7 @@ import datetime
 
 from pydantic import BaseModel
 
-from volunteer_call_api.models.person import SkillCategory
+from volunteer_call_api.models.person import Skill
 
 
 class AvailabilityCreate(BaseModel):
@@ -35,7 +35,7 @@ class AvailabilityResponse(BaseModel):
     volunteer_call_id: str
     person_id: str
     person_name: str = ""
-    person_skill_category: SkillCategory = SkillCategory.UNKNOWN
+    person_skills: list[Skill] = []
     task_id: str | None
     available: bool
     max_tasks_per_week: int | None

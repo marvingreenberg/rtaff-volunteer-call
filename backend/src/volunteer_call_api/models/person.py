@@ -1,19 +1,29 @@
 """Person and PersonRole models."""
 
 import enum
-from datetime import date
+from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, Enum, ForeignKey, String, Text
+from sqlalchemy import JSON, Boolean, Date, DateTime, Enum, ForeignKey, String, Text
+from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from volunteer_call_api.models.base import Base, TimestampMixin, generate_uuid
 
 
-class SkillCategory(enum.Enum):
-    SKILLED = "skilled"
-    UNSKILLED = "unskilled"
-    UNKNOWN = "unknown"
+class Skill(enum.Enum):
+    PLUMBING = "plumbing"
+    ELECTRICAL = "electrical"
+    CARPENTRY = "carpentry"
+    HVAC = "hvac"
+
+
+class Program(enum.Enum):
+    RTX = "RTX"
+    ACR = "ACR"
+    RAMP = "RAMP"
+    LIFT = "LIFT"
 
 
 class RoleType(enum.Enum):
@@ -50,14 +60,26 @@ class Person(Base, TimestampMixin):
     email: Mapped[str | None] = mapped_column(String(255))
     phone: Mapped[str | None] = mapped_column(String(50))
     phone_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    skill_category: Mapped[SkillCategory] = mapped_column(
-        Enum(SkillCategory, values_callable=lambda e: [x.value for x in e]),
+    # Tag set of skills. Postgres ARRAY of the `skill` enum in production;
+    # JSON-list fallback for sqlite-backed unit tests via `with_variant`.
+    skills: Mapped[list[Skill]] = mapped_column(
+        ARRAY(
+            PG_ENUM(Skill, name="skill", values_callable=lambda e: [x.value for x in e])
+        ).with_variant(JSON, "sqlite"),
         nullable=False,
-        default=SkillCategory.UNKNOWN,
+        default=list,
+        server_default="{}",
     )
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     notes: Mapped[str | None] = mapped_column(Text)
     access_token: Mapped[str | None] = mapped_column(String(64), unique=True, index=True)
+
+    # Calendar integration. `calendar_url` is treated as a bearer secret —
+    # never returned in any API response. Only `calendar_connected` derives
+    # for the frontend.
+    calendar_url: Mapped[str | None] = mapped_column(String(2048))
+    calendar_provider: Mapped[str | None] = mapped_column(String(20))
+    calendar_url_added_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     notification_preference: Mapped[NotificationPreference] = mapped_column(
         Enum(NotificationPreference, values_callable=lambda e: [x.value for x in e]),
@@ -80,6 +102,29 @@ class Person(Base, TimestampMixin):
     roles: Mapped[list["PersonRole"]] = relationship(
         back_populates="person", cascade="all, delete-orphan"
     )
+    program_memberships: Mapped[list["VolunteerProgram"]] = relationship(
+        back_populates="person", cascade="all, delete-orphan"
+    )
+
+
+class VolunteerProgram(Base):
+    """Many-to-many: which programs a person volunteers for, with metadata."""
+
+    __tablename__ = "volunteer_programs"
+
+    person_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("people.id", ondelete="CASCADE"), primary_key=True
+    )
+    program: Mapped[Program] = mapped_column(
+        Enum(Program, name="program", values_callable=lambda e: [x.value for x in e]),
+        primary_key=True,
+    )
+    joined_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    person: Mapped["Person"] = relationship(back_populates="program_memberships")
 
 
 class PersonRole(Base):

@@ -1,7 +1,8 @@
 -- Volunteer Call System — Database Schema
 
 -- Enum types
-CREATE TYPE skillcategory AS ENUM ('skilled', 'unskilled', 'unknown');
+CREATE TYPE skill AS ENUM ('plumbing', 'electrical', 'carpentry', 'hvac');
+CREATE TYPE program AS ENUM ('RTX', 'ACR', 'RAMP', 'LIFT');
 CREATE TYPE roletype AS ENUM ('staff', 'team_leader', 'volunteer');
 CREATE TYPE notificationpreference AS ENUM ('email', 'sms', 'both');
 CREATE TYPE notificationdetaillevel AS ENUM ('summary', 'full');
@@ -20,7 +21,7 @@ CREATE TABLE people (
     email VARCHAR(255),
     phone VARCHAR(50),
     phone_verified BOOLEAN NOT NULL DEFAULT FALSE,
-    skill_category skillcategory NOT NULL DEFAULT 'unknown',
+    skills skill[] NOT NULL DEFAULT '{}',
     active BOOLEAN NOT NULL DEFAULT TRUE,
     notes TEXT,
     access_token VARCHAR(64) UNIQUE,
@@ -29,6 +30,11 @@ CREATE TABLE people (
     subscription_status subscriptionstatus NOT NULL DEFAULT 'active',
     pause_start DATE,
     pause_end DATE,
+    -- Calendar integration: bearer-secret iCal URL pasted by the user.
+    -- Never returned in API responses; only the boolean "connected" derives.
+    calendar_url VARCHAR(2048),
+    calendar_provider VARCHAR(20),
+    calendar_url_added_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -43,10 +49,21 @@ CREATE TABLE person_roles (
     UNIQUE(person_id, role)
 );
 
+-- Program memberships (volunteer × program join table).
+-- Per-program metadata lives here; aggregate stats are computed via JOINs.
+CREATE TABLE volunteer_programs (
+    person_id UUID NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+    program program NOT NULL,
+    joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    PRIMARY KEY (person_id, program)
+);
+
 -- Volunteer calls
 CREATE TABLE volunteer_calls (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     title VARCHAR(200) NOT NULL,
+    program program NOT NULL,
     status callstatus NOT NULL DEFAULT 'draft',
     notes TEXT,
     created_by_id UUID REFERENCES people(id),

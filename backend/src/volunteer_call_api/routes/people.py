@@ -6,13 +6,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from volunteer_call_api.database import get_db
-from volunteer_call_api.models.person import Person, PersonRole, RoleType, SkillCategory
+from volunteer_call_api.models.person import (
+    Person,
+    PersonRole,
+    Program,
+    RoleType,
+    Skill,
+    VolunteerProgram,
+)
 from volunteer_call_api.routes.helpers import apply_partial_update
 from volunteer_call_api.schemas.person import (
     PersonCreate,
     PersonListResponse,
     PersonResponse,
     PersonUpdate,
+    ProgramMembership,
 )
 
 router = APIRouter()
@@ -20,6 +28,13 @@ router = APIRouter()
 
 def _person_roles(person: Person) -> list[RoleType]:
     return [pr.role for pr in person.roles]
+
+
+def _person_programs(person: Person) -> list[ProgramMembership]:
+    return [
+        ProgramMembership(program=m.program, joined_at=m.joined_at, active=m.active)
+        for m in person.program_memberships
+    ]
 
 
 def _person_response(person: Person) -> PersonResponse:
@@ -30,7 +45,7 @@ def _person_response(person: Person) -> PersonResponse:
         email=person.email,
         phone=person.phone,
         phone_verified=person.phone_verified,
-        skill_category=person.skill_category,
+        skills=person.skills,
         active=person.active,
         notification_preference=person.notification_preference,
         notification_detail_level=person.notification_detail_level,
@@ -39,27 +54,44 @@ def _person_response(person: Person) -> PersonResponse:
         pause_end=person.pause_end,
         notes=person.notes,
         roles=_person_roles(person),
+        programs=_person_programs(person),
+        calendar_connected=person.calendar_url is not None,
+        calendar_provider=person.calendar_provider,
         created_at=person.created_at,
         updated_at=person.updated_at,
     )
 
 
+_PERSON_LOAD_OPTIONS = (
+    selectinload(Person.roles),
+    selectinload(Person.program_memberships),
+)
+
+
 @router.get("", response_model=list[PersonListResponse])
 async def list_people(
     role: RoleType | None = None,
-    skill_category: SkillCategory | None = None,
+    skill: Skill | None = None,
+    program: Program | None = None,
     active: bool | None = None,
     search: str | None = Query(None, min_length=1),
     db: AsyncSession = Depends(get_db),
 ) -> list[PersonListResponse]:
     """List people with optional filters."""
-    query = select(Person).options(selectinload(Person.roles))
+    query = select(Person).options(*_PERSON_LOAD_OPTIONS)
 
     if active is not None:
         query = query.where(Person.active == active)
 
-    if skill_category is not None:
-        query = query.where(Person.skill_category == skill_category)
+    if skill is not None:
+        # Postgres ARRAY containment via the @> operator.
+        query = query.where(Person.skills.contains([skill]))
+
+    if program is not None:
+        query = query.join(Person.program_memberships).where(
+            VolunteerProgram.program == program,
+            VolunteerProgram.active.is_(True),
+        )
 
     if search:
         pattern = f"%{search}%"
@@ -84,9 +116,10 @@ async def list_people(
             id=p.id,
             first_name=p.first_name,
             last_name=p.last_name,
-            skill_category=p.skill_category,
+            skills=p.skills,
             active=p.active,
             roles=_person_roles(p),
+            programs=[m.program for m in p.program_memberships if m.active],
         )
         for p in people
     ]
@@ -94,13 +127,13 @@ async def list_people(
 
 @router.post("", response_model=PersonResponse, status_code=201)
 async def create_person(body: PersonCreate, db: AsyncSession = Depends(get_db)) -> PersonResponse:
-    """Create a new person with roles."""
+    """Create a new person with roles and program memberships."""
     person = Person(
         first_name=body.first_name,
         last_name=body.last_name,
         email=body.email,
         phone=body.phone,
-        skill_category=body.skill_category,
+        skills=list(body.skills),
         active=body.active,
         notification_preference=body.notification_preference,
         notification_detail_level=body.notification_detail_level,
@@ -113,11 +146,13 @@ async def create_person(body: PersonCreate, db: AsyncSession = Depends(get_db)) 
     for role in body.roles:
         db.add(PersonRole(person_id=person.id, role=role))
 
+    for program in body.programs:
+        db.add(VolunteerProgram(person_id=person.id, program=program))
+
     await db.commit()
-    await db.refresh(person)
 
     result = await db.execute(
-        select(Person).options(selectinload(Person.roles)).where(Person.id == person.id)
+        select(Person).options(*_PERSON_LOAD_OPTIONS).where(Person.id == person.id)
     )
     person = result.scalar_one()
     return _person_response(person)
@@ -127,7 +162,7 @@ async def create_person(body: PersonCreate, db: AsyncSession = Depends(get_db)) 
 async def get_person(person_id: str, db: AsyncSession = Depends(get_db)) -> PersonResponse:
     """Get a person by ID."""
     result = await db.execute(
-        select(Person).options(selectinload(Person.roles)).where(Person.id == person_id)
+        select(Person).options(*_PERSON_LOAD_OPTIONS).where(Person.id == person_id)
     )
     person = result.scalar_one_or_none()
     if person is None:
@@ -139,9 +174,9 @@ async def get_person(person_id: str, db: AsyncSession = Depends(get_db)) -> Pers
 async def update_person(
     person_id: str, body: PersonUpdate, db: AsyncSession = Depends(get_db)
 ) -> PersonResponse:
-    """Update a person's information and/or roles."""
+    """Update a person's information, roles, and program memberships."""
     result = await db.execute(
-        select(Person).options(selectinload(Person.roles)).where(Person.id == person_id)
+        select(Person).options(*_PERSON_LOAD_OPTIONS).where(Person.id == person_id)
     )
     person = result.scalar_one_or_none()
     if person is None:
@@ -155,7 +190,7 @@ async def update_person(
             "last_name",
             "email",
             "phone",
-            "skill_category",
+            "skills",
             "active",
             "notification_preference",
             "notification_detail_level",
@@ -173,10 +208,23 @@ async def update_person(
         for role in body.roles:
             db.add(PersonRole(person_id=person.id, role=role))
 
+    if body.programs is not None:
+        # Full replace: drop the diff, add the diff. Preserves joined_at on
+        # programs the user is keeping.
+        existing = {m.program: m for m in person.program_memberships}
+        new_set = set(body.programs)
+        for prog, mem in list(existing.items()):
+            if prog not in new_set:
+                await db.delete(mem)
+        await db.flush()
+        for prog in new_set:
+            if prog not in existing:
+                db.add(VolunteerProgram(person_id=person.id, program=prog))
+
     await db.commit()
 
     result = await db.execute(
-        select(Person).options(selectinload(Person.roles)).where(Person.id == person.id)
+        select(Person).options(*_PERSON_LOAD_OPTIONS).where(Person.id == person.id)
     )
     person = result.scalar_one()
     return _person_response(person)
