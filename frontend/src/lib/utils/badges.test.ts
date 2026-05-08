@@ -43,17 +43,16 @@ describe("callStatusBadgeClass", () => {
 });
 
 describe("skillBadgeClass", () => {
-  it("returns badge-skilled for skilled", () => {
-    expect(skillBadgeClass("skilled")).toBe("badge-skilled");
+  it("returns badge-skilled for each known skill tag", () => {
+    expect(skillBadgeClass("plumbing")).toBe("badge-skilled");
+    expect(skillBadgeClass("electrical")).toBe("badge-skilled");
+    expect(skillBadgeClass("carpentry")).toBe("badge-skilled");
+    expect(skillBadgeClass("hvac")).toBe("badge-skilled");
   });
 
-  it("returns badge-unskilled for unskilled", () => {
-    expect(skillBadgeClass("unskilled")).toBe("badge-unskilled");
-  });
-
-  it("returns badge-unknown for unrecognized values", () => {
-    expect(skillBadgeClass("other")).toBe("badge-unknown");
-    expect(skillBadgeClass("")).toBe("badge-unknown");
+  it("returns badge-default for unrecognized values", () => {
+    expect(skillBadgeClass("other")).toBe("badge-default");
+    expect(skillBadgeClass("")).toBe("badge-default");
   });
 });
 

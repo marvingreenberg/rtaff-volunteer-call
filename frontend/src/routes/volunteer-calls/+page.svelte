@@ -1,8 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { volunteerCalls, type VolunteerCallListResponse, type VolunteerCallCreate } from '$lib/api/client';
+  import { goto } from '$app/navigation';
+  import { volunteerCalls, type VolunteerCallListResponse, type VolunteerCallCreate, type Program, type TaskCreate } from '$lib/api/client';
+  import { ALL_PROGRAMS, PROGRAM_LABELS, SINGLE_TASK_PROGRAMS } from '$lib/api/types';
   import Breadcrumb from '$lib/components/Breadcrumb.svelte';
-  import { callStatusBadgeClass } from '$lib/utils/badges';
+  import TaskEntryForm from '$lib/components/TaskEntryForm.svelte';
+  import { callStatusBadgeClass, programLabel } from '$lib/utils/badges';
   import { formatDate } from '$lib/utils/format';
 
   let calls: VolunteerCallListResponse[] = $state([]);
@@ -12,7 +15,10 @@
   let saving = $state(false);
   let statusFilter = $state('');
 
-  let newCall: VolunteerCallCreate = $state({ title: '' });
+  let newCall: VolunteerCallCreate = $state({ title: '', program: 'RTX' });
+  let newCallTask: TaskCreate | null = $state(null);
+
+  let isSingleTaskProgram = $derived(SINGLE_TASK_PROGRAMS.has(newCall.program));
 
   onMount(loadCalls);
 
@@ -34,15 +40,34 @@
     saving = true;
     error = null;
     try {
-      await volunteerCalls.create(newCall);
-      newCall = { title: '' };
+      const payload: VolunteerCallCreate = {
+        ...newCall,
+        // For single-task programs, send the captured initial_task with the
+        // create call so the user doesn't bounce to the detail page to add
+        // it. RTX leaves initial_task null and adds tasks on the detail page.
+        initial_task: isSingleTaskProgram ? newCallTask : null,
+      };
+      const created = await volunteerCalls.create(payload);
+      newCall = { title: '', program: 'RTX' };
+      newCallTask = null;
       showAddForm = false;
+      // Single-task programs jump straight to the detail page so the user
+      // can review the auto-created task; RTX keeps the list view.
+      if (isSingleTaskProgram) {
+        goto(`/volunteer-calls/${created.id}`);
+        return;
+      }
       await loadCalls();
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to create call';
     } finally {
       saving = false;
     }
+  }
+
+  function handleProgramChange(program: Program) {
+    newCall = { ...newCall, program };
+    if (!SINGLE_TASK_PROGRAMS.has(program)) newCallTask = null;
   }
 
   function handleFilterChange() {
@@ -71,6 +96,23 @@
     <div class="card add-form">
       <h2>New Volunteer Call</h2>
       <form onsubmit={(e) => { e.preventDefault(); handleAdd(); }}>
+        <div class="form-row program-row">
+          <span class="form-label">Program</span>
+          <div class="program-options">
+            {#each ALL_PROGRAMS as p (p)}
+              <label class="radio-label">
+                <input
+                  type="radio"
+                  name="program"
+                  value={p}
+                  checked={newCall.program === p}
+                  onchange={() => handleProgramChange(p)}
+                />
+                {PROGRAM_LABELS[p]}
+              </label>
+            {/each}
+          </div>
+        </div>
         <div class="form-row">
           <label class="form-field">
             Title *
@@ -83,6 +125,21 @@
             <textarea bind:value={newCall.notes} placeholder="Optional notes about this call"></textarea>
           </label>
         </div>
+
+        {#if isSingleTaskProgram}
+          <div class="single-task-block">
+            <h3>Task details</h3>
+            <p class="hint">
+              {programLabel(newCall.program)} calls have a single task — fill it in here.
+            </p>
+            <TaskEntryForm
+              submitLabel=""
+              onsubmit={() => undefined}
+              onchange={(value) => (newCallTask = value)}
+            />
+          </div>
+        {/if}
+
         <button type="submit" class="btn btn-primary" disabled={saving}>
           {saving ? 'Creating...' : 'Create Call'}
         </button>
@@ -108,6 +165,7 @@
       <thead>
         <tr>
           <th>Title</th>
+          <th>Program</th>
           <th>Tasks</th>
           <th>Status</th>
           <th>Created</th>
@@ -119,6 +177,7 @@
             <td>
               <a href="/volunteer-calls/{call.id}" class="row-link">{call.title}</a>
             </td>
+            <td>{programLabel(call.program)}</td>
             <td>{call.task_count}</td>
             <td>
               <span class="badge {callStatusBadgeClass(call.status)}">{call.status}</span>
@@ -144,6 +203,48 @@
     display: flex;
     gap: var(--spacing-md);
     margin-bottom: var(--spacing-md);
+  }
+
+  .program-row {
+    align-items: center;
+  }
+
+  .form-label {
+    font-weight: 500;
+    color: var(--rt-gray-600);
+    margin-right: var(--spacing-sm);
+  }
+
+  .program-options {
+    display: flex;
+    gap: var(--spacing-md);
+    flex-wrap: wrap;
+  }
+
+  .radio-label {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    cursor: pointer;
+  }
+
+  .single-task-block {
+    margin: var(--spacing-md) 0;
+    padding: var(--spacing-md);
+    background: var(--rt-bg-subtle, #f9f7f2);
+    border: 1px solid var(--rt-gray-200);
+    border-radius: var(--card-radius);
+  }
+
+  .single-task-block h3 {
+    margin: 0 0 var(--spacing-xs) 0;
+    font-size: var(--btn-font-size);
+  }
+
+  .hint {
+    font-size: var(--font-size-sm);
+    color: var(--rt-text-muted);
+    margin: 0 0 var(--spacing-sm) 0;
   }
 
   .filters {

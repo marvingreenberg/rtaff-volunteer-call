@@ -19,24 +19,54 @@ export interface VerifyRequest {
 
 // --- People ---
 
-export type SkillCategory = "skilled" | "unskilled" | "unknown";
+export type Skill = "plumbing" | "electrical" | "carpentry" | "hvac";
+export type Program = "RTX" | "ACR" | "RAMP" | "LIFT";
 export type RoleType = "staff" | "team_leader" | "volunteer";
 export type NotificationPreference = "email" | "sms" | "both";
 export type NotificationDetailLevel = "summary" | "full";
 export type SubscriptionStatus = "active" | "paused" | "unsubscribed";
+
+export const ALL_SKILLS: Skill[] = [
+  "plumbing",
+  "electrical",
+  "carpentry",
+  "hvac",
+];
+export const ALL_PROGRAMS: Program[] = ["RTX", "ACR", "RAMP", "LIFT"];
+
+export const PROGRAM_LABELS: Record<Program, string> = {
+  RTX: "RTX",
+  ACR: "AC Rescue",
+  RAMP: "Ramp",
+  LIFT: "Chairlift",
+};
+
+/** Programs other than RTX have a single-task workflow. */
+export const SINGLE_TASK_PROGRAMS: ReadonlySet<Program> = new Set([
+  "ACR",
+  "RAMP",
+  "LIFT",
+]);
+
+export interface ProgramMembership {
+  program: Program;
+  joined_at: string;
+  active: boolean;
+}
 
 export interface PersonCreate {
   first_name: string;
   last_name: string;
   email?: string;
   phone?: string;
-  skill_category?: SkillCategory;
+  skills?: Skill[];
   active?: boolean;
   notification_preference?: NotificationPreference;
   notification_detail_level?: NotificationDetailLevel;
   subscription_status?: SubscriptionStatus;
   notes?: string;
   roles?: RoleType[];
+  programs?: Program[];
 }
 
 export interface PersonUpdate {
@@ -44,7 +74,7 @@ export interface PersonUpdate {
   last_name?: string;
   email?: string;
   phone?: string;
-  skill_category?: SkillCategory;
+  skills?: Skill[];
   active?: boolean;
   notification_preference?: NotificationPreference;
   notification_detail_level?: NotificationDetailLevel;
@@ -53,6 +83,7 @@ export interface PersonUpdate {
   pause_end?: string | null;
   notes?: string;
   roles?: RoleType[];
+  programs?: Program[];
 }
 
 export interface PersonResponse {
@@ -62,7 +93,7 @@ export interface PersonResponse {
   email: string | null;
   phone: string | null;
   phone_verified: boolean;
-  skill_category: SkillCategory;
+  skills: Skill[];
   active: boolean;
   notification_preference: NotificationPreference;
   notification_detail_level: NotificationDetailLevel;
@@ -71,6 +102,10 @@ export interface PersonResponse {
   pause_end: string | null;
   notes: string | null;
   roles: RoleType[];
+  programs: ProgramMembership[];
+  /** True iff calendar_url is set on the server. The URL itself never crosses the wire. */
+  calendar_connected: boolean;
+  calendar_provider: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -79,9 +114,35 @@ export interface PersonListResponse {
   id: string;
   first_name: string;
   last_name: string;
-  skill_category: SkillCategory;
+  skills: Skill[];
   active: boolean;
   roles: RoleType[];
+  programs: Program[];
+}
+
+// --- Calendar ---
+
+export interface CalendarConnect {
+  calendar_url: string;
+  calendar_provider?: string | null;
+}
+
+export interface CalendarStatus {
+  calendar_connected: boolean;
+  calendar_provider: string | null;
+  calendar_url_added_at: string | null;
+}
+
+export interface CalendarConflict {
+  start: string;
+  end: string;
+  summary: string | null;
+}
+
+export interface TaskConflicts {
+  task_id: string;
+  has_conflict: boolean;
+  conflicts: CalendarConflict[];
 }
 
 // --- Volunteer Calls ---
@@ -91,14 +152,20 @@ export type TaskStatus = "open" | "full" | "cancelled";
 
 export interface VolunteerCallCreate {
   title: string;
+  program: Program;
   status?: CallStatus;
   notes?: string;
+  /** For ACR/RAMP/LIFT: caller can pass an inline task so the create
+   * form is one screen. RTX usually omits this and adds tasks later. */
+  initial_task?: TaskCreate | null;
 }
 
 export interface VolunteerCallUpdate {
   title?: string;
   status?: CallStatus;
   notes?: string;
+  /** Note: program is intentionally absent — once set, a call's
+   * program is immutable. */
 }
 
 export interface TaskCreate {
@@ -151,6 +218,7 @@ export interface TaskResponse {
 export interface VolunteerCallResponse {
   id: string;
   title: string;
+  program: Program;
   status: CallStatus;
   notes: string | null;
   task_count: number;
@@ -162,6 +230,7 @@ export interface VolunteerCallResponse {
 export interface VolunteerCallListResponse {
   id: string;
   title: string;
+  program: Program;
   status: CallStatus;
   task_count: number;
   created_at: string;
@@ -180,6 +249,7 @@ export interface JobListItem {
   volunteers_needed: number;
   skilled_needed: number;
   assigned_count: number;
+  program: Program;
 }
 
 // --- Availability ---
@@ -203,7 +273,7 @@ export interface AvailabilityResponse {
   volunteer_call_id: string;
   person_id: string;
   person_name: string;
-  person_skill_category: SkillCategory;
+  person_skills: Skill[];
   task_id: string | null;
   available: boolean;
   max_tasks_per_week: number | null;
@@ -231,7 +301,7 @@ export interface TeamAssignmentResponse {
   task_id: string;
   person_id: string;
   person_name: string;
-  person_skill_category: SkillCategory;
+  person_skills: Skill[];
   person_phone: string | null;
   person_email: string | null;
   role: string;
@@ -244,7 +314,7 @@ export interface TeamAssignmentResponse {
 export interface AvailableVolunteerResponse {
   person_id: string;
   person_name: string;
-  skill_category: SkillCategory;
+  skills: Skill[];
   phone: string | null;
   email: string | null;
 }
@@ -256,7 +326,7 @@ export interface TaskAssignment {
   person_id: string;
   person_name: string;
   initials: string;
-  skill_category: string;
+  skills: Skill[];
   role: string;
 }
 
@@ -264,7 +334,7 @@ export interface AvailableVolunteer {
   person_id: string;
   person_name: string;
   initials: string;
-  skill_category: string;
+  skills: Skill[];
 }
 
 export interface TaskOverviewItem {
@@ -285,7 +355,7 @@ export interface VolunteerOverviewItem {
   person_id: string;
   person_name: string;
   initials: string;
-  skill_category: string;
+  skills: Skill[];
   phone: string | null;
   available_task_ids: string[];
   max_tasks_per_week: number;

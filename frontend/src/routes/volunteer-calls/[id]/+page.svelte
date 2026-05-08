@@ -12,7 +12,8 @@
   import Breadcrumb from '$lib/components/Breadcrumb.svelte';
   import TaskEntryForm from '$lib/components/TaskEntryForm.svelte';
   import TaskRow from '$lib/components/TaskRow.svelte';
-  import { callStatusBadgeClass } from '$lib/utils/badges';
+  import { callStatusBadgeClass, programLabel } from '$lib/utils/badges';
+  import { SINGLE_TASK_PROGRAMS } from '$lib/api/types';
 
   let call = $state<VolunteerCallResponse | null>(null);
   let loading = $state(true);
@@ -29,6 +30,7 @@
   let pendingEdit: { taskId: string; value: TaskCreate | null; dirty: boolean } | null = null;
 
   let callId = $derived(page.params.id!);
+  let isSingleTaskProgram = $derived(call ? SINGLE_TASK_PROGRAMS.has(call.program) : false);
 
   onMount(loadCall);
 
@@ -180,6 +182,7 @@
     <Breadcrumb crumbs={[{label: 'Volunteering', href: '/volunteering'}, {label: 'Volunteer Calls', href: '/volunteer-calls'}, {label: call?.title || 'Call'}]} />
     <div class="call-header">
       <h1>{call.title}</h1>
+      <span class="program-tag">{programLabel(call.program)}</span>
       <span class="badge {callStatusBadgeClass(call.status)}">{call.status}</span>
     </div>
 
@@ -244,7 +247,7 @@
 
     <div class="section">
       <div class="section-header">
-        <h2>Tasks ({call.task_count})</h2>
+        <h2>{isSingleTaskProgram ? `Task (${programLabel(call.program)})` : `Tasks (${call.task_count})`}</h2>
       </div>
 
       {#if call.tasks.length > 0}
@@ -261,7 +264,7 @@
         </div>
       {/if}
 
-      {#if call.status !== 'closed'}
+      {#if call.status !== 'closed' && !isSingleTaskProgram}
         <div class="card add-form">
           <TaskEntryForm submitLabel="Add" onsubmit={handleAddTask} />
         </div>
@@ -283,6 +286,16 @@
 
   .call-header h1 {
     margin: 0;
+  }
+
+  .program-tag {
+    padding: 2px var(--spacing-sm);
+    background: var(--rt-bg-subtle, #f9f7f2);
+    color: var(--rt-text-muted, #777);
+    border: 1px solid var(--rt-gray-200);
+    border-radius: 10px;
+    font-size: var(--font-size-sm);
+    font-weight: 500;
   }
 
   .call-info {

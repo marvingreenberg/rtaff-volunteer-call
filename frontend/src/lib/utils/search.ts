@@ -25,20 +25,18 @@ function withErrorFallback(fn: FetchOptionsFn): FetchOptionsFn {
 export function searchPeople(filters?: {
   role?: string;
   active?: boolean;
-  descriptionField?: "skill_category" | "roles";
+  descriptionField?: "skills" | "roles";
 }): FetchOptionsFn {
-  const {
-    role,
-    active = true,
-    descriptionField = "skill_category",
-  } = filters || {};
+  const { role, active = true, descriptionField = "skills" } = filters || {};
   return withErrorFallback(async (query: string) => {
     const results = await people.list({ role, active, search: query });
     return results.map((p) => ({
       value: p.id,
       label: `${p.first_name} ${p.last_name}`,
       description:
-        descriptionField === "roles" ? p.roles.join(", ") : p.skill_category,
+        descriptionField === "roles"
+          ? p.roles.join(", ")
+          : p.skills.join(", ") || "no skills",
     }));
   });
 }

@@ -50,16 +50,41 @@ export function callStatusBadgeClass(status: string): string {
   }
 }
 
-/** Get CSS class for skill category badges */
+/** Get CSS class for a single skill chip. */
 export function skillBadgeClass(skill: string): string {
   switch (skill) {
-    case "skilled":
+    case "plumbing":
+    case "electrical":
+    case "carpentry":
+    case "hvac":
       return "badge-skilled";
-    case "unskilled":
-      return "badge-unskilled";
     default:
-      return "badge-unknown";
+      return "badge-default";
   }
+}
+
+const SKILL_LABELS: Record<string, string> = {
+  plumbing: "Plumbing",
+  electrical: "Electrical",
+  carpentry: "Carpentry",
+  hvac: "HVAC",
+};
+
+/** Human-readable label for a skill key. */
+export function skillLabel(skill: string): string {
+  return SKILL_LABELS[skill] || skill;
+}
+
+const PROGRAM_LABELS: Record<string, string> = {
+  RTX: "RTX",
+  ACR: "AC Rescue",
+  RAMP: "Ramp",
+  LIFT: "Chairlift",
+};
+
+/** Human-readable label for a program key. */
+export function programLabel(program: string): string {
+  return PROGRAM_LABELS[program] || program;
 }
 
 const ROLE_LABELS: Record<string, string> = {

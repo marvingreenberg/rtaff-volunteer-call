@@ -11,6 +11,7 @@
     type JobListItem,
     type AvailabilityResponse,
     type AvailabilityCreate,
+    type TaskConflicts,
   } from '$lib/api/client';
   import { formatDate } from '$lib/utils/format';
   import ItemCard from '$lib/components/ItemCard.svelte';
@@ -43,6 +44,10 @@
   let saving = $state<Record<string, boolean>>({});
   let saveMessage = $state<Record<string, string>>({});
   let loadingCalls = $state<Set<string>>(new Set());
+
+  // Calendar conflicts: {callId: {taskId: TaskConflicts}}. Empty if the
+  // user hasn't connected a calendar.
+  let callConflicts = $state<Record<string, Record<string, TaskConflicts>>>({});
 
   function formatTime(t: string | null): string {
     if (!t) return '';
@@ -90,11 +95,17 @@
     loadingCalls.add(callId);
     loadingCalls = loadingCalls;
     try {
-      const [jobList, availList] = await Promise.all([
+      const [jobList, availList, conflicts] = await Promise.all([
         volunteerCalls.listJobs(callId),
         volunteerAvailability.list(callId),
+        // Conflicts are best-effort — a backend hiccup or an unreachable
+        // calendar provider must not break the page.
+        volunteerCalls.calendarConflicts(callId).catch(() => [] as TaskConflicts[]),
       ]);
       callJobs[callId] = jobList;
+      const byTask: Record<string, TaskConflicts> = {};
+      for (const c of conflicts) byTask[c.task_id] = c;
+      callConflicts[callId] = byTask;
 
       // Filter to current user's availability records
       const myAvails = authState.user
@@ -404,6 +415,7 @@
                       {@const expanded = expandedTasks.has(job.task_id)}
                       {@const checked = selected.has(job.task_id)}
                       {@const spots = spotsRemaining(job)}
+                      {@const conflict = callConflicts[call.id]?.[job.task_id]}
                       <ItemCard {checked}>
                         <div class="task-row">
                           <label class="task-check">
@@ -417,7 +429,14 @@
                             onclick={() => toggleExpand(job.task_id)}
                             onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleExpand(job.task_id); } }}
                           >
-                            <span class="task-name">{job.short_description}</span>
+                            <span class="task-name">
+                              {job.short_description}
+                              {#if conflict?.has_conflict}
+                                <span class="conflict-flag" title={conflict.conflicts.map(c => c.summary ?? 'Calendar event').join('; ')}>
+                                  ⚠ calendar conflict
+                                </span>
+                              {/if}
+                            </span>
                             <span class="task-meta">
                               {#if job.city}{job.city} &middot; {/if}{job.date ? formatDate(job.date) : 'Unscheduled'}{#if spots > 0} &middot; {spots} spot{spots === 1 ? '' : 's'} left{/if}
                             </span>
@@ -682,6 +701,17 @@
     font-size: var(--font-size-sm);
     color: var(--rt-text-muted, #777);
     margin-top: 0.125rem;
+  }
+
+  .conflict-flag {
+    display: inline-block;
+    margin-left: var(--spacing-sm);
+    padding: 1px 6px;
+    background: var(--rt-warning-bg, #fff5e6);
+    color: var(--rt-warning-text, #b35900);
+    border-radius: 10px;
+    font-size: var(--font-size-xs);
+    font-weight: 500;
   }
 
   .expand-btn {

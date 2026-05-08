@@ -4,13 +4,17 @@
   import {
     people,
     type PersonResponse,
-    type SkillCategory,
+    type Skill,
+    type Program,
     type RoleType,
     type NotificationPreference,
     type NotificationDetailLevel,
     type SubscriptionStatus,
   } from '$lib/api/client';
+  import { ALL_PROGRAMS, ALL_SKILLS, PROGRAM_LABELS } from '$lib/api/types';
+  import { authState } from '$lib/stores/auth.svelte';
   import Breadcrumb from '$lib/components/Breadcrumb.svelte';
+  import { skillLabel } from '$lib/utils/badges';
 
   let person = $state<PersonResponse | null>(null);
   let loading = $state(true);
@@ -22,7 +26,8 @@
   let lastName = $state('');
   let email = $state('');
   let phone = $state('');
-  let skillCategory = $state<SkillCategory>('unknown');
+  let skills = $state<Skill[]>([]);
+  let programs = $state<Program[]>([]);
   let active = $state(true);
   let notificationPreference = $state<NotificationPreference>('email');
   let notificationDetailLevel = $state<NotificationDetailLevel>('summary');
@@ -31,7 +36,14 @@
   let notes = $state('');
   let roles = $state<RoleType[]>([]);
 
+  // Calendar URL is a bearer secret: it never crosses the wire from the
+  // server. We only know whether one is set (`calendar_connected`) and the
+  // provider hint. New URLs entered here are sent on save.
+  let calendarUrlInput = $state('');
+  let calendarProvider = $state('');
+
   let personId = $derived(page.params.id!);
+  let isStaff = $derived(authState.user?.roles.includes('staff') ?? false);
 
   const ROLES: { value: RoleType; label: string }[] = [
     { value: 'volunteer', label: 'Volunteer' },
@@ -51,7 +63,8 @@
       lastName = p.last_name;
       email = p.email ?? '';
       phone = p.phone ?? '';
-      skillCategory = p.skill_category;
+      skills = [...p.skills];
+      programs = p.programs.filter(m => m.active).map(m => m.program);
       active = p.active;
       notificationPreference = p.notification_preference;
       notificationDetailLevel = p.notification_detail_level;
@@ -59,6 +72,8 @@
       pauseEnd = p.pause_end ?? '';
       notes = p.notes ?? '';
       roles = [...p.roles];
+      calendarUrlInput = '';
+      calendarProvider = p.calendar_provider ?? '';
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load person';
     } finally {
@@ -71,6 +86,56 @@
       roles = roles.filter((r) => r !== role);
     } else {
       roles = [...roles, role];
+    }
+  }
+
+  function toggleSkill(skill: Skill) {
+    if (skills.includes(skill)) {
+      skills = skills.filter((s) => s !== skill);
+    } else {
+      skills = [...skills, skill];
+    }
+  }
+
+  function toggleProgram(program: Program) {
+    if (programs.includes(program)) {
+      programs = programs.filter((p) => p !== program);
+    } else {
+      programs = [...programs, program];
+    }
+  }
+
+  async function handleConnectCalendar() {
+    const url = calendarUrlInput.trim();
+    if (!url) return;
+    saving = true;
+    error = null;
+    try {
+      await people.connectCalendar(personId, {
+        calendar_url: url,
+        calendar_provider: calendarProvider.trim() || null,
+      });
+      await loadPerson();
+      savedAt = Date.now();
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to connect calendar';
+    } finally {
+      saving = false;
+    }
+  }
+
+  async function handleDisconnectCalendar() {
+    if (!confirm('Disconnect calendar? Conflicts will no longer appear.')) return;
+    saving = true;
+    error = null;
+    try {
+      await people.disconnectCalendar(personId);
+      await loadPerson();
+      savedAt = Date.now();
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to disconnect calendar';
+    } finally {
+      saving = false;
     }
   }
 
@@ -87,7 +152,7 @@
         last_name: lastName.trim(),
         email: email.trim() || undefined,
         phone: phone.trim() || undefined,
-        skill_category: skillCategory,
+        skills,
         active,
         notification_preference: notificationPreference,
         notification_detail_level: notificationDetailLevel,
@@ -95,6 +160,9 @@
         pause_end: subscriptionStatus === 'paused' ? pauseEnd || null : null,
         notes: notes.trim() || undefined,
         roles,
+        // Programs are staff-managed; non-staff editing themselves don't
+        // get to silently grant themselves new program memberships.
+        ...(isStaff ? { programs } : {}),
       });
       person = updated;
       savedAt = Date.now();
@@ -156,12 +224,17 @@
       </div>
 
       <div class="row">
-        <span class="lbl">Skill</span>
-        <select bind:value={skillCategory}>
-          <option value="unknown">Unknown</option>
-          <option value="skilled">Skilled</option>
-          <option value="unskilled">Unskilled</option>
-        </select>
+        <span class="lbl">Skills</span>
+        {#each ALL_SKILLS as skill (skill)}
+          <label class="checkbox-inline">
+            <input
+              type="checkbox"
+              checked={skills.includes(skill)}
+              onchange={() => toggleSkill(skill)}
+            />
+            {skillLabel(skill)}
+          </label>
+        {/each}
         <label class="checkbox-inline">
           <input type="checkbox" bind:checked={active} />
           Active
@@ -181,6 +254,22 @@
           </label>
         {/each}
       </div>
+
+      {#if isStaff}
+        <div class="row">
+          <span class="lbl">Programs</span>
+          {#each ALL_PROGRAMS as p (p)}
+            <label class="checkbox-inline">
+              <input
+                type="checkbox"
+                checked={programs.includes(p)}
+                onchange={() => toggleProgram(p)}
+              />
+              {PROGRAM_LABELS[p]}
+            </label>
+          {/each}
+        </div>
+      {/if}
 
       <hr class="divider" />
 
@@ -215,6 +304,50 @@
         <span class="lbl">Notes</span>
         <textarea bind:value={notes} rows="3" class="grow"></textarea>
       </div>
+
+      <hr class="divider" />
+
+      <div class="row align-top">
+        <span class="lbl">Calendar</span>
+        {#if person.calendar_connected}
+          <span class="connected-tag">
+            Connected{person.calendar_provider ? ` · ${person.calendar_provider}` : ''}
+          </span>
+          <button
+            type="button"
+            class="btn btn-secondary btn-small"
+            onclick={handleDisconnectCalendar}
+            disabled={saving}
+          >
+            Disconnect
+          </button>
+        {:else}
+          <input
+            type="url"
+            bind:value={calendarUrlInput}
+            placeholder="Paste your private iCal URL (Google: Settings ▸ My calendars ▸ Integrate calendar ▸ Secret address in iCal format)"
+            class="grow"
+          />
+          <input
+            type="text"
+            bind:value={calendarProvider}
+            placeholder="Provider (optional)"
+            class="provider-input"
+          />
+          <button
+            type="button"
+            class="btn btn-secondary btn-small"
+            onclick={handleConnectCalendar}
+            disabled={saving || !calendarUrlInput.trim()}
+          >
+            Connect
+          </button>
+        {/if}
+      </div>
+      <p class="hint">
+        Calendar URLs are treated as secrets and never shown back. Used
+        only to flag conflicts on the volunteering page.
+      </p>
 
       <div class="form-actions">
         <a class="btn btn-secondary" href="/people">Back</a>
@@ -330,7 +463,8 @@
     margin: 0;
   }
 
-  .verified-tag {
+  .verified-tag,
+  .connected-tag {
     display: inline-block;
     padding: 1px 6px;
     background: var(--rt-success-bg);
@@ -338,6 +472,22 @@
     border-radius: 10px;
     font-size: var(--font-size-xs);
     font-weight: 500;
+  }
+
+  .provider-input {
+    flex: 0 0 12em;
+  }
+
+  .btn-small {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    min-height: 32px;
+  }
+
+  .hint {
+    margin: 0 0 0 7em;
+    font-size: var(--font-size-xs);
+    color: var(--rt-text-muted);
   }
 
   .divider {

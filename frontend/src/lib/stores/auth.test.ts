@@ -33,7 +33,7 @@ describe("initFromToken", () => {
       id: "p1",
       first_name: "Jane",
       last_name: "Doe",
-      skill_category: "skilled",
+      skills: ["plumbing"],
       active: true,
       roles: ["volunteer"],
     };

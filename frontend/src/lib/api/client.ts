@@ -25,11 +25,15 @@ import type {
   SendInvitesResponse,
   AssignmentNoticesResponse,
   AssignmentOverviewResponse,
+  CalendarConnect,
+  CalendarStatus,
+  TaskConflicts,
   LoginRequest,
   LoginResponse,
   VerifyRequest,
   MyAssignment,
   NotificationResponse,
+  Program,
   UnreadCountResponse,
   DashboardResponse,
 } from "./types";
@@ -106,14 +110,15 @@ export const auth = {
 export const people = {
   list: (params?: {
     role?: string;
-    skill_category?: string;
+    skill?: string;
+    program?: Program;
     active?: boolean;
     search?: string;
   }) => {
     const query = new URLSearchParams();
     if (params?.role) query.set("role", params.role);
-    if (params?.skill_category)
-      query.set("skill_category", params.skill_category);
+    if (params?.skill) query.set("skill", params.skill);
+    if (params?.program) query.set("program", params.program);
     if (params?.active !== undefined)
       query.set("active", String(params.active));
     if (params?.search) query.set("search", params.search);
@@ -134,13 +139,25 @@ export const people = {
       method: "PUT",
       body: JSON.stringify(data),
     }),
+
+  connectCalendar: (id: string, data: CalendarConnect) =>
+    request<CalendarStatus>(`/people/${id}/calendar`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  disconnectCalendar: (id: string) =>
+    request<CalendarStatus>(`/people/${id}/calendar`, {
+      method: "DELETE",
+    }),
 };
 
 // Volunteer call endpoints
 export const volunteerCalls = {
-  list: (params?: { status?: string }) => {
+  list: (params?: { status?: string; program?: Program }) => {
     const query = new URLSearchParams();
     if (params?.status) query.set("status", params.status);
+    if (params?.program) query.set("program", params.program);
     const qs = query.toString();
     return request<VolunteerCallListResponse[]>(
       `/volunteer-calls${qs ? "?" + qs : ""}`,
@@ -196,6 +213,11 @@ export const volunteerCalls = {
     request<AssignmentOverviewResponse>(
       `/volunteer-calls/${callId}/assignment-overview`,
     ),
+
+  /** Conflict info per task using the calling user's connected calendar.
+   * Returns [] if the user has no calendar URL set. */
+  calendarConflicts: (callId: string) =>
+    request<TaskConflicts[]>(`/volunteer-calls/${callId}/calendar/conflicts`),
 };
 
 // Volunteer availability endpoints

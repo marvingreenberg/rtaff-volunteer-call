@@ -173,9 +173,9 @@
                         >
                           <span class="check" aria-hidden="true">✓</span>
                           <span class="name">{a.person_name}</span>
-                          <span class="badge {skillBadgeClass(a.skill_category)}">
-                            {a.skill_category}
-                          </span>
+                          {#each a.skills as s (s)}
+                            <span class="badge {skillBadgeClass(s)}">{s}</span>
+                          {/each}
                           <span class="action">Remove</span>
                         </button>
                       </li>
@@ -201,9 +201,9 @@
                         >
                           <span class="check empty" aria-hidden="true">☐</span>
                           <span class="name">{v.person_name}</span>
-                          <span class="badge {skillBadgeClass(v.skill_category)}">
-                            {v.skill_category}
-                          </span>
+                          {#each v.skills as s (s)}
+                            <span class="badge {skillBadgeClass(s)}">{s}</span>
+                          {/each}
                           <span class="action">Assign</span>
                         </button>
                       </li>

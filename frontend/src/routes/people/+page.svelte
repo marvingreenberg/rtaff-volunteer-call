@@ -1,8 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { people, type PersonListResponse, type SkillCategory, type RoleType } from '$lib/api/client';
+  import { people, type PersonListResponse, type Skill, type RoleType } from '$lib/api/client';
+  import { ALL_SKILLS } from '$lib/api/types';
   import Breadcrumb from '$lib/components/Breadcrumb.svelte';
-  import { roleLabel } from '$lib/utils/badges';
+  import { roleLabel, skillLabel } from '$lib/utils/badges';
 
   let personList: PersonListResponse[] = $state([]);
   let loading = $state(true);
@@ -16,7 +17,7 @@
   let newLastName = $state('');
   let newEmail = $state('');
   let newPhone = $state('');
-  let newSkillCategory = $state<SkillCategory>('unknown');
+  let newSkills: Skill[] = $state([]);
   let newRoles: RoleType[] = $state([]);
   let saving = $state(false);
 
@@ -68,6 +69,14 @@
     }
   }
 
+  function toggleSkill(skill: Skill) {
+    if (newSkills.includes(skill)) {
+      newSkills = newSkills.filter(s => s !== skill);
+    } else {
+      newSkills = [...newSkills, skill];
+    }
+  }
+
   async function handleAdd() {
     if (!newFirstName.trim() || !newLastName.trim()) return;
     saving = true;
@@ -78,14 +87,14 @@
         last_name: newLastName.trim(),
         email: newEmail.trim() || undefined,
         phone: newPhone.trim() || undefined,
-        skill_category: newSkillCategory,
+        skills: newSkills,
         roles: newRoles,
       });
       newFirstName = '';
       newLastName = '';
       newEmail = '';
       newPhone = '';
-      newSkillCategory = 'unknown';
+      newSkills = [];
       newRoles = [];
       showAddForm = false;
       await loadPeople();
@@ -159,14 +168,19 @@
             <input id="phone" type="text" bind:value={newPhone} />
           </div>
         </div>
-        <div class="form-row">
-          <div class="form-field">
-            <label for="skill">Skill Category</label>
-            <select id="skill" bind:value={newSkillCategory}>
-              <option value="unknown">Unknown</option>
-              <option value="skilled">Skilled</option>
-              <option value="unskilled">Unskilled</option>
-            </select>
+        <div class="form-field">
+          <span class="field-label">Skills</span>
+          <div class="role-checkboxes">
+            {#each ALL_SKILLS as skill (skill)}
+              <label class="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={newSkills.includes(skill)}
+                  onchange={() => toggleSkill(skill)}
+                />
+                {skillLabel(skill)}
+              </label>
+            {/each}
           </div>
         </div>
         <div class="form-field">
@@ -221,7 +235,7 @@
             {getInitials(person.first_name, person.last_name)}
           </span>
           <span class="person-name">{person.last_name}, {person.first_name}</span>
-          <span class="person-skill">{person.skill_category}</span>
+          <span class="person-skill">{person.skills.length ? person.skills.map(skillLabel).join(', ') : '—'}</span>
           <span class="person-roles">
             {#each person.roles as role (role)}
               <span class="role-badge" style="background-color: {ROLE_COLORS[role] || 'var(--rt-gray-600)'}">{roleLabel(role)}</span>
@@ -269,7 +283,7 @@
     color: var(--rt-gray-600);
   }
 
-  .form-field input, .form-field select {
+  .form-field input {
     width: 100%;
     padding: var(--spacing-sm) var(--spacing-md);
     min-height: var(--btn-min-height);

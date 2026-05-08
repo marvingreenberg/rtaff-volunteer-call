@@ -4,7 +4,7 @@
   import { people, type PersonResponse, type PersonUpdate } from '$lib/api/client';
   import { authState } from '$lib/stores/auth.svelte';
   import Breadcrumb from '$lib/components/Breadcrumb.svelte';
-  import { roleLabel } from '$lib/utils/badges';
+  import { roleLabel, skillLabel } from '$lib/utils/badges';
 
   const ROLE_COLORS: Record<string, string> = {
     staff: '#6b5b95',
@@ -63,11 +63,6 @@
     }
   }
 
-  function skillLabel(cat: string): string {
-    if (cat === 'skilled') return 'Skilled';
-    if (cat === 'general') return 'General';
-    return cat;
-  }
 </script>
 
 <svelte:head>
@@ -121,8 +116,10 @@
       </div>
 
       <div class="field">
-        <span class="field-label">Skill Category</span>
-        <span class="field-value">{skillLabel(user.skill_category)}</span>
+        <span class="field-label">Skills</span>
+        <span class="field-value">
+          {user.skills.length ? user.skills.map(skillLabel).join(', ') : '—'}
+        </span>
       </div>
 
       <div class="field">
