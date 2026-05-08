@@ -17,7 +17,7 @@
       if (isAuthPage || currentPath === '/verify') {
         const roles = authState.user.roles;
         const isVolunteerOnly = roles.length === 1 && roles[0] === 'volunteer';
-        goto(isVolunteerOnly ? '/volunteering' : '/');
+        goto(isVolunteerOnly ? '/volunteering' : '/volunteer-calls');
       }
     } else if (!isPublicPage) {
       goto('/login');
