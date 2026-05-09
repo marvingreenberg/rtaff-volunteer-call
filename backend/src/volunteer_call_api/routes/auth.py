@@ -6,12 +6,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from jinja2 import Environment, PackageLoader, select_autoescape
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from volunteer_call_api.config import settings
 from volunteer_call_api.database import get_db
 from volunteer_call_api.models.person import Person
-from volunteer_call_api.routes.people import _person_response
+from volunteer_call_api.routes.people import PERSON_LOAD_OPTIONS, _person_response
 from volunteer_call_api.schemas.auth import LoginRequest, LoginResponse, VerifyRequest
 from volunteer_call_api.schemas.person import PersonResponse
 from volunteer_call_api.services.auth import generate_access_token
@@ -88,7 +87,7 @@ async def verify_magic_link(
 ) -> PersonResponse:
     """Verify a magic link token and return person info."""
     result = await db.execute(
-        select(Person).options(selectinload(Person.roles)).where(Person.access_token == req.token)
+        select(Person).options(*PERSON_LOAD_OPTIONS).where(Person.access_token == req.token)
     )
     person = result.scalar_one_or_none()
 
@@ -108,7 +107,7 @@ async def get_current_user(
 ) -> PersonResponse:
     """Look up a person by their access token."""
     result = await db.execute(
-        select(Person).options(selectinload(Person.roles)).where(Person.access_token == token)
+        select(Person).options(*PERSON_LOAD_OPTIONS).where(Person.access_token == token)
     )
     person = result.scalar_one_or_none()
     if person is None:

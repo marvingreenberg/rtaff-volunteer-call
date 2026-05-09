@@ -62,7 +62,11 @@ def _person_response(person: Person) -> PersonResponse:
     )
 
 
-_PERSON_LOAD_OPTIONS = (
+# Eager-load every relationship that _person_response touches. Forgetting
+# one causes lazy-load-in-async → sqlalchemy MissingGreenlet at request
+# time. Always pass these options when selecting a Person you intend to
+# serialize via _person_response.
+PERSON_LOAD_OPTIONS = (
     selectinload(Person.roles),
     selectinload(Person.program_memberships),
 )
@@ -78,7 +82,7 @@ async def list_people(
     db: AsyncSession = Depends(get_db),
 ) -> list[PersonListResponse]:
     """List people with optional filters."""
-    query = select(Person).options(*_PERSON_LOAD_OPTIONS)
+    query = select(Person).options(*PERSON_LOAD_OPTIONS)
 
     if active is not None:
         query = query.where(Person.active == active)
@@ -152,7 +156,7 @@ async def create_person(body: PersonCreate, db: AsyncSession = Depends(get_db)) 
     await db.commit()
 
     result = await db.execute(
-        select(Person).options(*_PERSON_LOAD_OPTIONS).where(Person.id == person.id)
+        select(Person).options(*PERSON_LOAD_OPTIONS).where(Person.id == person.id)
     )
     person = result.scalar_one()
     return _person_response(person)
@@ -162,7 +166,7 @@ async def create_person(body: PersonCreate, db: AsyncSession = Depends(get_db)) 
 async def get_person(person_id: str, db: AsyncSession = Depends(get_db)) -> PersonResponse:
     """Get a person by ID."""
     result = await db.execute(
-        select(Person).options(*_PERSON_LOAD_OPTIONS).where(Person.id == person_id)
+        select(Person).options(*PERSON_LOAD_OPTIONS).where(Person.id == person_id)
     )
     person = result.scalar_one_or_none()
     if person is None:
@@ -176,7 +180,7 @@ async def update_person(
 ) -> PersonResponse:
     """Update a person's information, roles, and program memberships."""
     result = await db.execute(
-        select(Person).options(*_PERSON_LOAD_OPTIONS).where(Person.id == person_id)
+        select(Person).options(*PERSON_LOAD_OPTIONS).where(Person.id == person_id)
     )
     person = result.scalar_one_or_none()
     if person is None:
@@ -224,7 +228,7 @@ async def update_person(
     await db.commit()
 
     result = await db.execute(
-        select(Person).options(*_PERSON_LOAD_OPTIONS).where(Person.id == person.id)
+        select(Person).options(*PERSON_LOAD_OPTIONS).where(Person.id == person.id)
     )
     person = result.scalar_one()
     return _person_response(person)

@@ -183,6 +183,47 @@ async def test_valid_email_in_throttled_mode_sends_email_generic_message(
 
 
 @pytest.mark.asyncio
+async def test_verify_magic_link_serializes_full_person(
+    throttle_client: AsyncClient, throttle_db: AsyncSession
+) -> None:
+    """Bug it catches: auth.verify_magic_link loaded Person with
+    selectinload(Person.roles) only, but _person_response also touches
+    program_memberships. Under asyncpg this triggered MissingGreenlet at
+    request time. Under sqlite the lazy-load works silently — but the
+    serializer still must not blow up, so this test guards against
+    regressing the eager-load options."""
+    from volunteer_call_api.models.person import (
+        PersonRole,
+        Program,
+        RoleType,
+        VolunteerProgram,
+    )
+
+    person = Person(
+        first_name="Vera",
+        last_name="Verifier",
+        email="vera@example.com",
+        active=True,
+        access_token="tok-vera",
+    )
+    throttle_db.add(person)
+    await throttle_db.flush()
+    throttle_db.add(PersonRole(person_id=person.id, role=RoleType.VOLUNTEER))
+    throttle_db.add(VolunteerProgram(person_id=person.id, program=Program.RTX))
+    await throttle_db.commit()
+
+    resp = await throttle_client.post("/api/auth/verify", json={"token": "tok-vera"})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["id"] == person.id
+    # Both relationships must be present, proving they were eager-loaded.
+    assert "volunteer" in body["roles"]
+    assert any(m["program"] == "RTX" for m in body["programs"])
+    # And the bearer secret must not have leaked.
+    assert "calendar_url" not in body
+
+
+@pytest.mark.asyncio
 async def test_valid_email_normal_mode_personalized_message(
     throttle_client: AsyncClient, throttle_db: AsyncSession
 ) -> None:
