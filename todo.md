@@ -68,3 +68,12 @@
   fine — store the project TZ in settings and apply it when building task windows.
 - Multi-instance cache. `_cache` is process-local; a multi-replica Cloud Run deploy
   re-fetches per instance. Acceptable for current volume; revisit when bills show up.
+
+## Additional tasks, need some design discussion
+
+### Way to delete a call.
+    Have a "are you sure, this will delete all the info about the <N> tasks created". Have a SECOND "are you sure" prompt if people have already been notified.
+
+### Way to resend a request for a particular task, when someone becomes unavailable
+
+### Calls display always displays "Invalid Date" for the creation time.
