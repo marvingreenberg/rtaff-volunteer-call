@@ -10,6 +10,11 @@
   - `deploy.yml` — Docker build to GHCR + GCP Artifact Registry, Cloud Run deploy on `v*` tags.
   - Dependabot config for npm + uv lockfiles.
 
+### Get rid of dark mode.  Not much point.
+
+### Get rid of "spots left", and (0 assigned) in volunteer UI. the assignment is not done until later
+
+
 ### End-to-end testing
 
 - `frontend/e2e/demo-scenario.spec.ts` exists but is stale — references the old "Add Task" toggle,
@@ -52,10 +57,8 @@
 - Optimistic UI on the assign page (currently refetches `assignment-overview` after each
   click — fine at this scale but will feel sluggish at higher task/volunteer counts).
 
-### People
+### Team leads should be assignable during task creation, or assigned/updated during volunteer assignment.  The assignment cannot be complete if any projects do not have an assigned team lead.  Team lead is a property of the project.  Team lead should do completion after 3 chars.  If unique, just substitute value, if that is possible (without requiring click)
 
-- Import / export for users: bulk and per-user, after the source-of-truth volunteer adapter is decided
-  (SharePoint, external DB, manual). The People editor at `/people/[id]` is the current entry point.
 
 ### Calendar follow-ups
 
@@ -76,4 +79,11 @@
 
 ### Way to resend a request for a particular task, when someone becomes unavailable
 
-### Calls display always displays "Invalid Date" for the creation time.
+### Make color of buttons everywhere consistent.
+    Buttns are blue or gray, seemingly unrelated to whetehr thhey are active.  Ideally the buttons should somehow express the workflow.  Maybe the volunteer call button should have create, assign, notify, reopen.  Lets plan and discuss this.
+
+### People
+
+- Import / export for users: bulk and per-user, after the source-of-truth
+  volunteer adapter is decided
+  (SharePoint, external DB, manual). The People editor at `/people/[id]` is the current entry point.
