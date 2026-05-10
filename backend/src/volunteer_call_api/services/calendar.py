@@ -102,6 +102,42 @@ async def fetch_and_parse(url: str) -> list[CalendarEvent]:
         return []
 
 
+class CalendarValidationError(Exception):
+    """Raised by validate_calendar_url with a user-facing message.
+
+    Distinct from fetch_and_parse's swallow-and-return-[] behavior: the
+    conflict-rendering path stays lenient on transient errors, but at
+    connect time we want to surface the failure so the user knows their
+    URL is bad and won't silently get no warnings forever.
+    """
+
+
+async def validate_calendar_url(url: str) -> None:
+    """Fetch the URL and confirm it returns parseable iCal.
+
+    Raises CalendarValidationError(message) where `message` is suitable to
+    show to the end user. Returns None on success.
+    """
+    try:
+        async with httpx.AsyncClient(
+            timeout=FETCH_TIMEOUT_SECONDS, follow_redirects=True
+        ) as client:
+            resp = await client.get(url)
+    except (httpx.TimeoutException, httpx.ConnectError, httpx.RequestError):
+        raise CalendarValidationError("Couldn't reach this URL. Check it and try again.")
+
+    if resp.status_code >= 400:
+        raise CalendarValidationError(
+            f"The calendar host returned {resp.status_code}. "
+            "The URL may be wrong or no longer shared publicly."
+        )
+
+    try:
+        parse_ics(resp.content)
+    except (ValueError, KeyError, AttributeError, TypeError):
+        raise CalendarValidationError("That URL didn't return a valid iCal feed.")
+
+
 async def get_events_for_person(person_id: str, calendar_url: str) -> list[CalendarEvent]:
     """Cached wrapper. Fetches on cache miss / expiry."""
     key = (person_id, calendar_url)
@@ -155,8 +191,10 @@ def overlaps(
 # Re-export for tests that want to construct vDatetime values directly.
 __all__ = [
     "CalendarEvent",
+    "CalendarValidationError",
     "parse_ics",
     "fetch_and_parse",
+    "validate_calendar_url",
     "get_events_for_person",
     "invalidate_person_cache",
     "overlaps",

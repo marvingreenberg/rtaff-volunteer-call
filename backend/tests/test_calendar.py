@@ -130,6 +130,83 @@ async def test_get_events_for_person_caches_results() -> None:
 
 
 @pytest.mark.asyncio
+async def test_validate_calendar_url_raises_friendly_message_on_unreachable() -> None:
+    """Connect-time validation must surface 'couldn't reach this URL' rather
+    than silently storing a bad URL — that's the exact bug we're fixing.
+    Without this guard, a typo lets a volunteer 'connect' a URL that will
+    never produce a single conflict warning."""
+    with patch.object(cal_svc.httpx, "AsyncClient") as mock_client:
+        instance = AsyncMock()
+        instance.get.side_effect = httpx.ConnectError("boom")
+        mock_client.return_value.__aenter__.return_value = instance
+        with pytest.raises(cal_svc.CalendarValidationError) as exc:
+            await cal_svc.validate_calendar_url("https://example.invalid/calendar.ics")
+    assert "Couldn't reach" in str(exc.value)
+
+
+@pytest.mark.asyncio
+async def test_validate_calendar_url_raises_on_4xx_status() -> None:
+    """Most common real-world failure: user pastes a stale share link that's
+    been revoked, host responds with 401/403/404. Surface the status so the
+    user can troubleshoot rather than wondering why nothing flags."""
+    with patch.object(cal_svc.httpx, "AsyncClient") as mock_client:
+        response = AsyncMock()
+        response.status_code = 404
+        response.content = b""
+        instance = AsyncMock()
+        instance.get.return_value = response
+        mock_client.return_value.__aenter__.return_value = instance
+        with pytest.raises(cal_svc.CalendarValidationError) as exc:
+            await cal_svc.validate_calendar_url("https://example.invalid/calendar.ics")
+    assert "404" in str(exc.value)
+
+
+@pytest.mark.asyncio
+async def test_validate_calendar_url_raises_on_non_ical_body() -> None:
+    """User pastes the human-facing share *page* URL instead of the ICS
+    subscribe URL — server returns 200 + HTML. Without this branch the
+    connect succeeds but no events are ever found."""
+    with patch.object(cal_svc.httpx, "AsyncClient") as mock_client:
+        response = AsyncMock()
+        response.status_code = 200
+        response.content = b"<html><body>not iCal</body></html>"
+        instance = AsyncMock()
+        instance.get.return_value = response
+        mock_client.return_value.__aenter__.return_value = instance
+        with pytest.raises(cal_svc.CalendarValidationError) as exc:
+            await cal_svc.validate_calendar_url("https://example.invalid/calendar.ics")
+    assert "valid iCal" in str(exc.value)
+
+
+@pytest.mark.asyncio
+async def test_validate_calendar_url_succeeds_on_valid_ics() -> None:
+    """Pin the happy path: a real iCal payload returns None (no exception)."""
+    with patch.object(cal_svc.httpx, "AsyncClient") as mock_client:
+        response = AsyncMock()
+        response.status_code = 200
+        response.content = FIXTURE.read_bytes()
+        instance = AsyncMock()
+        instance.get.return_value = response
+        mock_client.return_value.__aenter__.return_value = instance
+        # No exception means success.
+        await cal_svc.validate_calendar_url("https://example.invalid/calendar.ics")
+
+
+@pytest.mark.asyncio
+async def test_fetch_and_parse_still_lenient_after_validation_added() -> None:
+    """Regression guard: validation lives in a separate function — the
+    read path (fetch_and_parse) must keep swallowing errors, otherwise
+    a transient calendar host outage would break the volunteering page
+    for every connected user."""
+    with patch.object(cal_svc.httpx, "AsyncClient") as mock_client:
+        instance = AsyncMock()
+        instance.get.side_effect = httpx.ConnectError("boom")
+        mock_client.return_value.__aenter__.return_value = instance
+        result = await cal_svc.fetch_and_parse("https://example.invalid/calendar.ics")
+    assert result == []  # MUST NOT raise
+
+
+@pytest.mark.asyncio
 async def test_invalidate_person_cache_forces_refetch() -> None:
     """Disconnect/reconnect must drop the cached events."""
     cal_svc._cache.clear()

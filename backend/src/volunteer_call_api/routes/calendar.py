@@ -25,9 +25,11 @@ from volunteer_call_api.schemas.person import (
     TaskConflictsResponse,
 )
 from volunteer_call_api.services.calendar import (
+    CalendarValidationError,
     get_events_for_person,
     invalidate_person_cache,
     overlaps,
+    validate_calendar_url,
 )
 
 # Mounted at /api/people; handles per-person connect/disconnect.
@@ -68,6 +70,10 @@ async def connect_calendar(
     db: AsyncSession = Depends(get_db),
 ) -> CalendarStatus:
     person = await _get_person_for_self_or_staff(person_id, user, db)
+    try:
+        await validate_calendar_url(body.calendar_url)
+    except CalendarValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
     person.calendar_url = body.calendar_url
     person.calendar_provider = body.calendar_provider
     person.calendar_url_added_at = datetime.now(timezone.utc)
