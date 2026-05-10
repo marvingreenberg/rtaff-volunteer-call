@@ -10,11 +10,6 @@
   - `deploy.yml` — Docker build to GHCR + GCP Artifact Registry, Cloud Run deploy on `v*` tags.
   - Dependabot config for npm + uv lockfiles.
 
-### Get rid of dark mode.  Not much point.
-
-### Get rid of "spots left", and (0 assigned) in volunteer UI. the assignment is not done until later
-
-
 ### End-to-end testing
 
 - `frontend/e2e/demo-scenario.spec.ts` exists but is stale — references the old "Add Task" toggle,
@@ -37,28 +32,21 @@
   - `assignment-overview` includes `available_volunteers` filtered correctly.
   - `GET /people/{id}` never serializes `calendar_url` even after PUT /calendar.
   - `GET /volunteer-calls/{id}/calendar/conflicts` enforces self-only access.
+  - `DELETE /volunteer-calls/{id}` cascades through tasks, availabilities, assignments.
+  - `PUT /people/{id}/calendar` returns 422 on unreachable / non-iCal URLs.
 
 ### Task / call UI follow-ups
 
-- **Auto-generated call titles.** The original "Variations on call kind" spec called for
-  type-driven default titles ("Chairlift call", "Ramp Install call", "AC Rescue call",
-  "Rebuilding Together 5/3-5/15"). Currently the user types the title manually for every
-  call. Wire a derived default keyed on program + (date for RTX) into the create form;
-  let the user override. Programs decision: ACR/RAMP/LIFT use a fixed phrase; RTX uses the
-  Mon-Sun span of the first task's date.
 - Address autocomplete on `TaskEntryForm` (city is hardcoded; address is plain text pending a source).
-- Reintroduce a `notes` affordance for tasks once there's a place to display them
-  (currently captured by the API but not surfaced anywhere).
-- Gray-default visual for time/number inputs (Svelte placeholder doesn't reach native inputs).
 - Under-/over-assignment policy: the assign view doesn't cap at `volunteers_needed`, and
   Send Assignment Notices doesn't gate on every task being full. Decide intended behaviour.
+- "Assignment complete" gate: per the team-lead spec, an assignment can't be complete if any
+  task has no team lead. Wire this into the Send Assignment Notices guard once the
+  under/over-assignment policy is decided.
 - Admin-on-behalf-of-volunteer availability entry was dropped with the `/availability` page;
   if needed, add a small affordance inside the assign view (per-task "Add availability" combobox).
 - Optimistic UI on the assign page (currently refetches `assignment-overview` after each
   click — fine at this scale but will feel sluggish at higher task/volunteer counts).
-
-### Team leads should be assignable during task creation, or assigned/updated during volunteer assignment.  The assignment cannot be complete if any projects do not have an assigned team lead.  Team lead is a property of the project.  Team lead should do completion after 3 chars.  If unique, just substitute value, if that is possible (without requiring click)
-
 
 ### Calendar follow-ups
 
@@ -74,10 +62,11 @@
 
 ## Additional tasks, need some design discussion
 
-### Way to delete a call.
-    Have a "are you sure, this will delete all the info about the <N> tasks created". Have a SECOND "are you sure" prompt if people have already been notified.
-
 ### Way to resend a request for a particular task, when someone becomes unavailable
+
+Spec needed: re-notify only volunteers who didn't respond for *this* task (skipping
+already-assigned and already-said-no), or re-blast the whole program? Most likely a
+button on the assign view next to under-staffed tasks.
 
 ### Make color of buttons everywhere consistent.
     Buttns are blue or gray, seemingly unrelated to whetehr thhey are active.  Ideally the buttons should somehow express the workflow.  Maybe the volunteer call button should have create, assign, notify, reopen.  Lets plan and discuss this.
