@@ -1,5 +1,7 @@
 """Volunteer call and task routes."""
 
+import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from jinja2 import Environment, PackageLoader, select_autoescape
 from sqlalchemy import select
@@ -37,9 +39,11 @@ from volunteer_call_api.schemas.volunteer_call import (
 )
 from volunteer_call_api.services.auth import generate_access_token
 from volunteer_call_api.services.notifications import (
+    EMAIL_INLINE_IMAGES,
     deliver_notification,
     generate_call_notifications,
     is_subscribed,
+    task_view,
 )
 from volunteer_call_api.services.volunteer_call_helpers import (
     _initials,
@@ -214,6 +218,11 @@ async def send_invites(call_id: str, db: AsyncSession = Depends(get_db)) -> Send
         call.status = CallStatus.OPEN
 
     task_count = len(non_cancelled)
+    invite_tasks = sorted(
+        non_cancelled,
+        key=lambda t: (t.date or datetime.date.max, t.time_start or datetime.time.max),
+    )
+    invite_task_views = [task_view(t, include_full_details=False) for t in invite_tasks]
 
     # Filter by program: only members of this call's program get the invite.
     result = await db.execute(
@@ -242,19 +251,25 @@ async def send_invites(call_id: str, db: AsyncSession = Depends(get_db)) -> Send
             v.access_token = generate_access_token()
 
         volunteering_url = f"{settings.app_base_url}/volunteering?token={v.access_token}"
+        subject = f"Volunteer Call: {call.title}"
         full_body = template.render(
+            subject=subject,
+            title=call.title,
+            subtitle=f"{task_count} task{'s' if task_count != 1 else ''} need volunteers",
             first_name=v.first_name,
             call_title=call.title,
+            tasks=invite_task_views,
             volunteering_url=volunteering_url,
         )
         summary_body = f"RT-AFF Volunteer Call: {call.title} — {task_count} task(s) available."
 
         delivered = deliver_notification(
             person=v,
-            subject=f"Volunteer Call: {call.title}",
+            subject=subject,
             full_body=full_body,
             summary_body=summary_body,
             link=f"/volunteering?token={v.access_token}",
+            inline_images=EMAIL_INLINE_IMAGES,
         )
         if delivered:
             notified += 1
