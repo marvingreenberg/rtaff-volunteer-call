@@ -3,7 +3,6 @@
 import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
-from jinja2 import Environment, PackageLoader, select_autoescape
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -38,6 +37,7 @@ from volunteer_call_api.schemas.volunteer_call import (
     VolunteerOverviewItem,
 )
 from volunteer_call_api.services.auth import generate_access_token
+from volunteer_call_api.services.email_render import jinja_env
 from volunteer_call_api.services.notifications import (
     EMAIL_INLINE_IMAGES,
     deliver_notification,
@@ -54,11 +54,6 @@ from volunteer_call_api.services.volunteer_call_helpers import (
 )
 
 router = APIRouter()
-
-jinja_env = Environment(
-    loader=PackageLoader("volunteer_call_api", "templates"),
-    autoescape=select_autoescape(["html", "xml"]),
-)
 
 
 # --- Volunteer Calls ---

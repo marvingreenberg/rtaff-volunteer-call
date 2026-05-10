@@ -3,7 +3,7 @@
 <p style="margin:0 0 14px 0;">Hi {{ first_name }},</p>
 
 <p style="margin:0 0 14px 0;">
-    <span style="background-color:#fff59d; padding:2px 4px; font-weight:700;">Thank you for volunteering!</span>
+    <span style="background-color:{{ theme.colors.highlight }}; padding:2px 4px; font-weight:700;">Thank you for volunteering!</span>
     You're confirmed for the assignment{{ 's' if tasks|length > 1 else '' }} below.
 </p>
 
@@ -14,30 +14,30 @@
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
                     <td style="background-color:#f7faf2; padding:12px 16px; border-bottom:1px solid #e5e5e5;">
-                        <div style="font-weight:700; color:#1f3a14; font-size:15px;">{{ task.date_label }}</div>
+                        <div style="font-weight:700; color:{{ theme.colors.primary_dark }}; font-size:15px;">{{ task.date_label }}</div>
                         {% if task.time_label %}
-                        <div style="color:#1f3a14; font-size:13px; margin-top:2px;">{{ task.time_label }}</div>
+                        <div style="color:{{ theme.colors.primary_dark }}; font-size:13px; margin-top:2px;">{{ task.time_label }}</div>
                         {% endif %}
                     </td>
                 </tr>
                 <tr>
                     <td style="padding:14px 16px;">
-                        <div style="font-weight:600; color:#2c2c2c; margin-bottom:8px;">{{ task.short_description }}</div>
+                        <div style="font-weight:600; color:{{ theme.colors.body_text }}; margin-bottom:8px;">{{ task.short_description }}</div>
                         {% if task.full_address %}
                         <div style="font-size:13px; color:#555; margin-bottom:6px;">
-                            <span style="color:#7a7a7a;">Address:</span><br>
+                            <span style="color:{{ theme.colors.muted_text }};">Address:</span><br>
                             {{ task.full_address|replace('\n', '<br>')|safe }}
                         </div>
                         {% endif %}
                         {% if task.team_lead %}
                         <div style="font-size:13px; color:#555; margin-top:8px;">
-                            <span style="color:#7a7a7a;">Team lead:</span>
-                            {{ task.team_lead.name }}{% if task.team_lead.phone %} &middot; {{ task.team_lead.phone }}{% endif %}{% if task.team_lead.email %} &middot; <a href="mailto:{{ task.team_lead.email }}" style="color:#2e7d32;">{{ task.team_lead.email }}</a>{% endif %}
+                            <span style="color:{{ theme.colors.muted_text }};">Team lead:</span>
+                            {{ task.team_lead.name }}{% if task.team_lead.phone %} &middot; {{ task.team_lead.phone }}{% endif %}{% if task.team_lead.email %} &middot; <a href="mailto:{{ task.team_lead.email }}" style="color:{{ theme.colors.primary_dark }};">{{ task.team_lead.email }}</a>{% endif %}
                         </div>
                         {% endif %}
                         {% if task.notes %}
                         <div style="font-size:13px; color:#555; margin-top:8px;">
-                            <span style="color:#7a7a7a;">Notes:</span> {{ task.notes }}
+                            <span style="color:{{ theme.colors.muted_text }};">Notes:</span> {{ task.notes }}
                         </div>
                         {% endif %}
                     </td>
@@ -55,7 +55,7 @@
 
 <p style="text-align:center; margin:24px 0;">
     <a href="{{ volunteering_url }}"
-       style="background-color:#7dc242; color:#ffffff; padding:14px 32px; text-decoration:none; border-radius:6px; font-size:16px; font-weight:700; display:inline-block;">
+       style="background-color:{{ theme.colors.primary }}; color:#ffffff; padding:14px 32px; text-decoration:none; border-radius:6px; font-size:16px; font-weight:700; display:inline-block;">
         View My Volunteer Page
     </a>
 </p>

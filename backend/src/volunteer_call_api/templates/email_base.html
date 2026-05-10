@@ -5,15 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ subject }}</title>
 </head>
-<body style="margin:0; padding:0; background-color:#f1efe9; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; color:#2c2c2c;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f1efe9; padding:24px 12px;">
+<body style="margin:0; padding:0; background-color:{{ theme.colors.page_background }}; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; color:{{ theme.colors.body_text }};">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:{{ theme.colors.page_background }}; padding:24px 12px;">
         <tr>
             <td align="center">
-                <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px; width:100%; background-color:#ffffff; border-left:8px solid #7dc242; border-radius:6px; overflow:hidden; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px; width:100%; background-color:{{ theme.colors.card_background }}; border-left:8px solid {{ theme.colors.primary }}; border-radius:6px; overflow:hidden; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
                     <!-- Logo header -->
                     <tr>
                         <td style="padding:28px 32px 16px 32px;">
-                            <img src="cid:rtaff-logo" alt="Rebuilding Together Arlington / Fairfax / Falls Church" width="280" style="display:block; max-width:100%; height:auto; border:0;">
+                            <img src="cid:rtaff-logo" alt="{{ theme.brand.name }}" width="280" style="display:block; max-width:100%; height:auto; border:0;">
                         </td>
                     </tr>
                     <!-- Tools accent strip -->
@@ -22,27 +22,28 @@
                             <img src="cid:tools-image" alt="" width="600" style="display:block; width:100%; max-width:600px; height:auto; border:0;">
                         </td>
                     </tr>
-                    <!-- Green title band -->
+                    <!-- Title band -->
                     <tr>
-                        <td style="background-color:#7dc242; padding:18px 32px;">
-                            <h1 style="margin:0; font-size:22px; line-height:1.25; color:#1f3a14; font-weight:700; letter-spacing:0.2px;">{{ title }}</h1>
+                        <td style="background-color:{{ theme.colors.primary }}; padding:18px 32px;">
+                            <h1 style="margin:0; font-size:22px; line-height:1.25; color:{{ theme.colors.primary_dark }}; font-weight:700; letter-spacing:0.2px;">{{ title }}</h1>
                             {% if subtitle %}
-                            <p style="margin:6px 0 0 0; font-size:14px; color:#1f3a14; opacity:0.85;">{{ subtitle }}</p>
+                            <p style="margin:6px 0 0 0; font-size:14px; color:{{ theme.colors.primary_dark }}; opacity:0.85;">{{ subtitle }}</p>
                             {% endif %}
                         </td>
                     </tr>
                     <!-- Body -->
                     <tr>
-                        <td style="padding:28px 32px 8px 32px; font-size:15px; line-height:1.55; color:#2c2c2c;">
+                        <td style="padding:28px 32px 8px 32px; font-size:15px; line-height:1.55; color:{{ theme.colors.body_text }};">
                             {% block body %}{% endblock %}
                         </td>
                     </tr>
                     <!-- Footer -->
                     <tr>
-                        <td style="padding:20px 32px 28px 32px; border-top:1px solid #eee; font-size:12px; line-height:1.5; color:#7a7a7a;">
+                        <td style="padding:20px 32px 28px 32px; border-top:1px solid #eee; font-size:12px; line-height:1.5; color:{{ theme.colors.muted_text }};">
                             {% block footer %}
-                            <p style="margin:0 0 6px 0;">This link is personal to you &mdash; please don't share it.</p>
-                            <p style="margin:0;">Questions? Reply to this email or call the RT-AFF office.</p>
+                            {% for line in theme.footer.lines %}
+                            <p style="margin:0 0 6px 0;">{{ line }}</p>
+                            {% endfor %}
                             {% endblock %}
                         </td>
                     </tr>

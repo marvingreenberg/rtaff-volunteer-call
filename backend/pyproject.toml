@@ -57,7 +57,12 @@ dev = [
 where = ["src"]
 
 [tool.setuptools.package-data]
-volunteer_call_api = ["templates/*.html", "templates/assets/*"]
+volunteer_call_api = [
+    "templates/*.html",
+    "templates/*.toml",
+    "templates/*.md",
+    "templates/assets/*",
+]
 
 [tool.black]
 line-length = 100

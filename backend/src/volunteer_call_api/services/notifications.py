@@ -4,7 +4,6 @@ import datetime
 import logging
 from typing import Any
 
-from jinja2 import Environment, PackageLoader, select_autoescape
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -20,15 +19,10 @@ from volunteer_call_api.models.team_assignment import TeamAssignment
 from volunteer_call_api.models.volunteer_availability import VolunteerAvailability
 from volunteer_call_api.models.volunteer_call import Task, VolunteerCall
 from volunteer_call_api.services.email import send_email
+from volunteer_call_api.services.email_render import jinja_env as _jinja_env
 from volunteer_call_api.services.sms import send_sms
 
 logger = logging.getLogger(__name__)
-
-
-_jinja_env = Environment(
-    loader=PackageLoader("volunteer_call_api", "templates"),
-    autoescape=select_autoescape(["html", "xml"]),
-)
 
 
 # CIDs of inline images referenced by email_base.html.

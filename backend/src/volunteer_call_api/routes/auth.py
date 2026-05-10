@@ -3,7 +3,6 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from jinja2 import Environment, PackageLoader, select_autoescape
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,18 +14,15 @@ from volunteer_call_api.schemas.auth import LoginRequest, LoginResponse, VerifyR
 from volunteer_call_api.schemas.person import PersonResponse
 from volunteer_call_api.services.auth import generate_access_token
 from volunteer_call_api.services.email import send_email
+from volunteer_call_api.services.email_render import jinja_env
 from volunteer_call_api.services.login_throttle import login_throttle
+from volunteer_call_api.services.notifications import EMAIL_INLINE_IMAGES
 
 logger = logging.getLogger(__name__)
 
 GENERIC_LOGIN_MSG = "If {email} is registered, a login link has been sent."
 
 router = APIRouter()
-
-jinja_env = Environment(
-    loader=PackageLoader("volunteer_call_api", "templates"),
-    autoescape=select_autoescape(["html", "xml"]),
-)
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -70,10 +66,22 @@ async def request_magic_link(
 
     template = jinja_env.get_template("magic_link_login.html")
     login_url = f"{settings.app_base_url}/verify?token={person.access_token}"
-    html_body = template.render(first_name=person.first_name, login_url=login_url)
+    subject = "Log in to RT-AFF"
+    html_body = template.render(
+        subject=subject,
+        title="Log in to RT-AFF",
+        subtitle="Tap the button below to sign in",
+        first_name=person.first_name,
+        login_url=login_url,
+    )
 
     assert person.email is not None
-    send_email(to=person.email, subject="Log in to RT-AFF", html_body=html_body)
+    send_email(
+        to=person.email,
+        subject=subject,
+        html_body=html_body,
+        inline_images=EMAIL_INLINE_IMAGES,
+    )
 
     if throttled:
         return LoginResponse(message=generic_msg)

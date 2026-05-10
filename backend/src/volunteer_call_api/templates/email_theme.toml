@@ -1,0 +1,33 @@
+# Email theme — edit this file to change colors, organization name, and footer
+# copy across all templated emails (volunteer call, assignment notice, magic
+# link, thank-you). No code changes or restarts needed beyond the next email
+# being sent. See README.md in this directory for which fields go where.
+
+[brand]
+# Organization name shown on the logo image's alt text. (For visually-impaired
+# recipients and for cases where images are blocked by the mail client.)
+name = "Rebuilding Together Arlington / Fairfax / Falls Church"
+short_name = "RT-AFF"
+
+[colors]
+# Page background behind the email card.
+page_background = "#f1efe9"
+# Card background (the main content area).
+card_background = "#ffffff"
+# Left accent stripe and primary green for buttons/title band.
+primary = "#7dc242"
+# Darker green used for text on the title band.
+primary_dark = "#1f3a14"
+# Body text color.
+body_text = "#2c2c2c"
+# Muted/secondary text (footer, labels).
+muted_text = "#7a7a7a"
+# Yellow used to highlight key sentences in the body.
+highlight = "#fff59d"
+
+[footer]
+# Lines shown in the footer of every email. Each entry is one line.
+# Personal-link warning is rendered in volunteer/login emails automatically.
+lines = [
+    "Questions? Reply to this email or call the RT-AFF office.",
+]
