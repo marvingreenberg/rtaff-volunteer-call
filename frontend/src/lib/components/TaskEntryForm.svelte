@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from "svelte";
   import AutocompleteInput from "./AutocompleteInput.svelte";
+  import TeamLeadAutocomplete from "./TeamLeadAutocomplete.svelte";
   import { matchCities } from "$lib/constants/cities";
   import type { TaskCreate } from "$lib/api/client";
 
@@ -13,6 +14,9 @@
     city?: string | null;
     volunteers_needed?: number;
     skilled_needed?: number;
+    notes?: string | null;
+    team_lead_id?: string | null;
+    team_lead_name?: string | null;
   };
 
   type Props = {
@@ -122,6 +126,11 @@
   let shortDescription = $state(
     untrack(() => initial?.short_description ?? ""),
   );
+  let notes = $state(untrack(() => initial?.notes ?? ""));
+  let teamLeadId = $state<string | null>(
+    untrack(() => initial?.team_lead_id ?? null),
+  );
+  let teamLeadLabel = $state(untrack(() => initial?.team_lead_name ?? ""));
   let saving = $state(false);
 
   // Parse the MM/DD text into an ISO date. For edit mode, preserve the
@@ -160,6 +169,8 @@
     volunteersNeeded,
     skilledNeeded,
     shortDescription,
+    notes,
+    teamLeadId,
   }));
 
   let dirty = $derived(
@@ -169,7 +180,9 @@
       city !== initialRaw.city ||
       volunteersNeeded !== initialRaw.volunteersNeeded ||
       skilledNeeded !== initialRaw.skilledNeeded ||
-      shortDescription !== initialRaw.shortDescription,
+      shortDescription !== initialRaw.shortDescription ||
+      notes !== initialRaw.notes ||
+      teamLeadId !== initialRaw.teamLeadId,
   );
 
   let currentPayload = $derived<TaskCreate | null>(
@@ -183,6 +196,8 @@
           city: city.trim() || null,
           volunteers_needed: volunteersNeeded ?? DEFAULT_VOLUNTEERS,
           skilled_needed: skilledNeeded ?? DEFAULT_SKILLED,
+          notes: notes.trim() || null,
+          team_lead_id: teamLeadId,
         }
       : null,
   );
@@ -195,6 +210,11 @@
     return matchCities(q).map((c) => ({ value: c, label: c }));
   }
 
+  function handleTeamLeadSelect(id: string | null, label: string) {
+    teamLeadId = id;
+    teamLeadLabel = label;
+  }
+
   function resetToDefaults() {
     dateText = "";
     timeText = DEFAULT_TIME_DISPLAY;
@@ -203,6 +223,9 @@
     volunteersNeeded = DEFAULT_VOLUNTEERS;
     skilledNeeded = DEFAULT_SKILLED;
     shortDescription = "";
+    notes = "";
+    teamLeadId = null;
+    teamLeadLabel = "";
   }
 
   async function handleSubmit(e: Event) {
@@ -245,6 +268,7 @@
         aria-label="Task date, MM slash DD"
         inputmode="numeric"
         autocomplete="off"
+        data-empty={!dateText.trim()}
         class:invalid={dateMissing}
         aria-invalid={dateMissing}
       />
@@ -271,6 +295,7 @@
         title="Start time — e.g. 9am, 9:30am, 1pm, or 13:30"
         aria-label="Start time"
         autocomplete="off"
+        data-empty={!timeText.trim() || timeText === DEFAULT_TIME_DISPLAY}
       />
     </div>
   </div>
@@ -329,11 +354,21 @@
   <div class="form-row inline-row">
     <label class="inline-num" title="Number of volunteers needed">
       <span># Volunteers</span>
-      <input type="number" min="1" bind:value={volunteersNeeded} />
+      <input
+        type="number"
+        min="1"
+        bind:value={volunteersNeeded}
+        data-default={volunteersNeeded === DEFAULT_VOLUNTEERS}
+      />
     </label>
     <label class="inline-num" title="Number of skilled volunteers needed">
       <span># Skilled</span>
-      <input type="number" min="0" bind:value={skilledNeeded} />
+      <input
+        type="number"
+        min="0"
+        bind:value={skilledNeeded}
+        data-default={skilledNeeded === DEFAULT_SKILLED}
+      />
     </label>
   </div>
 
@@ -347,6 +382,28 @@
       rows="2"
       class:invalid={descriptionMissing}
       aria-invalid={descriptionMissing}
+    ></textarea>
+  </div>
+
+  <div class="form-row">
+    <div class="field">
+      <TeamLeadAutocomplete
+        initialId={teamLeadId}
+        initialLabel={teamLeadLabel}
+        placeholder="Team lead (start typing — auto-fills on unique match)"
+        onselect={handleTeamLeadSelect}
+      />
+    </div>
+  </div>
+
+  <div class="form-row">
+    <textarea
+      class="description notes"
+      bind:value={notes}
+      placeholder="Notes for the team (parking, what to bring, access info)"
+      title="Notes shown to assigned volunteers and the team lead"
+      aria-label="Task notes"
+      rows="2"
     ></textarea>
   </div>
 
@@ -393,6 +450,18 @@
     outline: none;
     border-color: var(--color-primary, #3a6db5);
     box-shadow: 0 0 0 2px rgba(58, 109, 181, 0.2);
+  }
+
+  /* Empty/default-value inputs render in muted gray so a still-default
+     value is visually distinct from one the user has actively confirmed.
+     Native `placeholder` styling doesn't reach inputs that have a
+     pre-filled value (e.g. the default time "9:00 AM"), so we mark the
+     inputs themselves and the inputs that look empty stay muted. */
+  .field input[data-empty="true"] {
+    color: var(--rt-text-muted, #777);
+  }
+  .inline-num input[data-default="true"] {
+    color: var(--rt-text-muted, #777);
   }
 
   /* Inputs with a leading icon — pad the text away from the glyph. */

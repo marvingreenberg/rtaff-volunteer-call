@@ -34,11 +34,6 @@
     applySettings();
   }
 
-  function toggleTheme() {
-    settingsState.theme = settingsState.theme === 'light' ? 'dark' : 'light';
-    applySettings();
-  }
-
   function handleClickOutside(e: MouseEvent) {
     const target = e.target as HTMLElement;
     if (!target.closest('.avatar-menu-wrapper')) open = false;
@@ -124,15 +119,6 @@
           {/each}
         </div>
 
-        <label class="theme-toggle">
-          <input
-            type="checkbox"
-            aria-label="Dark mode"
-            checked={settingsState.theme === 'dark'}
-            onchange={toggleTheme}
-          />
-          <span>Dark mode</span>
-        </label>
       </div>
 
       <div class="drawer-divider"></div>
@@ -313,22 +299,6 @@
     opacity: 0;
     width: 0;
     height: 0;
-  }
-
-  .theme-toggle {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    min-height: var(--btn-min-height);
-    cursor: pointer;
-    font-size: var(--font-size-sm);
-    color: var(--rt-text);
-  }
-
-  .theme-toggle input {
-    width: 18px;
-    height: 18px;
-    cursor: pointer;
   }
 
   .drawer-logout {

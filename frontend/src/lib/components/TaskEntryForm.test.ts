@@ -126,6 +126,8 @@ describe("TaskEntryForm", () => {
       city: "Arlington",
       volunteers_needed: 4,
       skilled_needed: 0,
+      notes: null,
+      team_lead_id: null,
     });
   });
 

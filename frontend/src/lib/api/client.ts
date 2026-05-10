@@ -178,6 +178,9 @@ export const volunteerCalls = {
       body: JSON.stringify(data),
     }),
 
+  delete: (id: string) =>
+    request<void>(`/volunteer-calls/${id}`, { method: "DELETE" }),
+
   addTask: (callId: string, data: TaskCreate) =>
     request<TaskResponse>(`/volunteer-calls/${callId}/tasks`, {
       method: "POST",

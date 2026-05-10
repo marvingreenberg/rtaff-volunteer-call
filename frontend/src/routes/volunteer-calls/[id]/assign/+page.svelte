@@ -10,6 +10,7 @@
     type TaskAssignment,
   } from "$lib/api/client";
   import Breadcrumb from "$lib/components/Breadcrumb.svelte";
+  import TeamLeadAutocomplete from "$lib/components/TeamLeadAutocomplete.svelte";
   import { skillBadgeClass } from "$lib/utils/badges";
   import { formatDate, volunteersLabel } from "$lib/utils/format";
 
@@ -98,6 +99,20 @@
     }
   }
 
+  async function setTeamLead(taskId: string, leadId: string | null) {
+    if (busyTaskIds.has(taskId)) return;
+    setBusy(taskId, true);
+    error = null;
+    try {
+      await volunteerCalls.updateTask(callId, taskId, { team_lead_id: leadId });
+      await refreshTask(taskId);
+    } catch (e) {
+      error = e instanceof Error ? e.message : "Failed to update team lead";
+    } finally {
+      setBusy(taskId, false);
+    }
+  }
+
   function isFull(t: TaskOverviewItem): boolean {
     return t.assignments.length >= t.volunteers_needed;
   }
@@ -154,6 +169,26 @@
                 {#if full}<span class="full-tag">Full</span>{/if}
               </span>
             </header>
+
+            <div class="task-meta">
+              <div class="meta-row">
+                <span class="meta-label">Team lead</span>
+                <div class="meta-value">
+                  <TeamLeadAutocomplete
+                    initialId={task.team_lead_id}
+                    initialLabel={task.team_lead_name}
+                    placeholder="Type 3+ chars to find a team lead"
+                    onselect={(id) => setTeamLead(task.task_id, id)}
+                  />
+                </div>
+              </div>
+              {#if task.notes}
+                <div class="meta-row">
+                  <span class="meta-label">Notes</span>
+                  <span class="meta-value notes">{task.notes}</span>
+                </div>
+              {/if}
+            </div>
 
             <div class="lists">
               <div class="list-block">
@@ -229,6 +264,37 @@
     display: flex;
     flex-direction: column;
     gap: var(--spacing-md);
+  }
+
+  .task-meta {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-sm) 0;
+    border-bottom: 1px solid var(--rt-gray-200, #e4dfda);
+    margin-bottom: var(--spacing-sm);
+  }
+
+  .meta-row {
+    display: grid;
+    grid-template-columns: 7em minmax(0, 1fr);
+    gap: var(--spacing-sm);
+    align-items: center;
+    font-size: var(--font-size-sm);
+  }
+
+  .meta-label {
+    color: var(--rt-text-muted, #777);
+    font-weight: 500;
+  }
+
+  .meta-value {
+    min-width: 0;
+  }
+
+  .meta-value.notes {
+    white-space: pre-wrap;
+    color: var(--rt-text-light, #555);
   }
 
   .task-card {

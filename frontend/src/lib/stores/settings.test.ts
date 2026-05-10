@@ -6,14 +6,12 @@ beforeEach(() => {
   document.documentElement.removeAttribute("data-density");
   document.documentElement.removeAttribute("data-theme");
   settingsState.density = "standard";
-  settingsState.theme = "light";
   settingsState.listView = "pill";
 });
 
 describe("settingsState", () => {
-  it("has standard/light/pill defaults", () => {
+  it("has standard/pill defaults", () => {
     expect(settingsState.density).toBe("standard");
-    expect(settingsState.theme).toBe("light");
     expect(settingsState.listView).toBe("pill");
   });
 });
@@ -25,28 +23,24 @@ describe("applySettings", () => {
     expect(document.documentElement.getAttribute("data-density")).toBe("large");
   });
 
-  it("sets data-theme attribute on html element", () => {
-    settingsState.theme = "dark";
-    applySettings();
-    expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
-  });
-
   it("persists density to localStorage", () => {
     settingsState.density = "compact";
     applySettings();
     expect(localStorage.getItem("volunteer_call_density")).toBe("compact");
   });
 
-  it("persists theme to localStorage", () => {
-    settingsState.theme = "dark";
-    applySettings();
-    expect(localStorage.getItem("volunteer_call_theme")).toBe("dark");
-  });
-
   it("persists listView to localStorage", () => {
     settingsState.listView = "table";
     applySettings();
     expect(localStorage.getItem("volunteer_call_list_view")).toBe("table");
+  });
+
+  it("does not write a data-theme attribute (dark mode removed)", () => {
+    // Catches a regression where the dark-mode toggle is reintroduced and
+    // forgets to be opt-in — leaving everyone in dark mode by default.
+    settingsState.density = "standard";
+    applySettings();
+    expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
   });
 });
 
@@ -57,22 +51,10 @@ describe("loadSettings", () => {
     expect(settingsState.density).toBe("large");
   });
 
-  it("reads theme from localStorage", () => {
-    localStorage.setItem("volunteer_call_theme", "dark");
-    loadSettings();
-    expect(settingsState.theme).toBe("dark");
-  });
-
   it("ignores invalid density localStorage values", () => {
     localStorage.setItem("volunteer_call_density", "huge");
     loadSettings();
     expect(settingsState.density).toBe("standard");
-  });
-
-  it("ignores invalid theme localStorage values", () => {
-    localStorage.setItem("volunteer_call_theme", "neon");
-    loadSettings();
-    expect(settingsState.theme).toBe("light");
   });
 
   it("reads listView from localStorage", () => {
@@ -87,13 +69,22 @@ describe("loadSettings", () => {
     expect(settingsState.listView).toBe("pill");
   });
 
-  it("applies settings to DOM after loading", () => {
-    localStorage.setItem("volunteer_call_density", "compact");
+  it("clears any pre-existing dark-theme persistence on load", () => {
+    // Prior versions stored theme=dark in localStorage. After the dark-mode
+    // removal, users coming back must not stay stuck in dark mode that no
+    // longer has any matching CSS — they would see broken/un-themed colors.
     localStorage.setItem("volunteer_call_theme", "dark");
+    document.documentElement.setAttribute("data-theme", "dark");
+    loadSettings();
+    expect(localStorage.getItem("volunteer_call_theme")).toBeNull();
+    expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
+  });
+
+  it("applies density to DOM after loading", () => {
+    localStorage.setItem("volunteer_call_density", "compact");
     loadSettings();
     expect(document.documentElement.getAttribute("data-density")).toBe(
       "compact",
     );
-    expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
   });
 });

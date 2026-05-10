@@ -102,6 +102,7 @@ class JobListItem(BaseModel):
     skilled_needed: int
     assigned_count: int
     program: Program
+    notes: str | None
 
 
 class TaskAssignment(BaseModel):
@@ -132,6 +133,9 @@ class TaskOverviewItem(BaseModel):
     volunteers_needed: int
     skilled_needed: int
     status: str
+    notes: str | None = None
+    team_lead_id: str | None = None
+    team_lead_name: str | None = None
     assignments: list[TaskAssignment] = []
     available_volunteers: list[AvailableVolunteer] = []
 

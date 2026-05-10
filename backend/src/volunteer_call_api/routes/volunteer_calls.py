@@ -151,6 +151,20 @@ async def update_volunteer_call(
     return call_response(call)
 
 
+@router.delete("/{call_id}", status_code=204)
+async def delete_volunteer_call(call_id: str, db: AsyncSession = Depends(get_db)) -> None:
+    """Hard delete a call and everything reachable from it.
+
+    Tasks, availabilities, and assignments cascade via ORM relationship config.
+    The frontend gates this behind an admin-confirm dialog (and a second one
+    when the call has already gone past Draft, which means notifications
+    were sent).
+    """
+    call = await get_call_or_404(call_id, db)
+    await db.delete(call)
+    await db.commit()
+
+
 # --- Jobs (volunteer-facing) ---
 
 
@@ -179,6 +193,7 @@ async def list_jobs(call_id: str, db: AsyncSession = Depends(get_db)) -> list[Jo
             skilled_needed=t.skilled_needed,
             assigned_count=len(t.assignments),
             program=call.program,
+            notes=t.notes,
         )
         for t in tasks
     ]
@@ -314,7 +329,10 @@ async def assignment_overview(
     tasks_q = (
         select(Task)
         .where(Task.volunteer_call_id == call_id)
-        .options(selectinload(Task.assignments).selectinload(TeamAssignment.person))
+        .options(
+            selectinload(Task.assignments).selectinload(TeamAssignment.person),
+            selectinload(Task.team_lead),
+        )
         .order_by(Task.date)
     )
     tasks_result = await db.execute(tasks_q)
@@ -361,6 +379,11 @@ async def assignment_overview(
                 volunteers_needed=t.volunteers_needed,
                 skilled_needed=t.skilled_needed,
                 status=t.status.value,
+                notes=t.notes,
+                team_lead_id=t.team_lead_id,
+                team_lead_name=(
+                    f"{t.team_lead.first_name} {t.team_lead.last_name}" if t.team_lead else None
+                ),
                 assignments=[
                     TaskAssignment(
                         assignment_id=a.id,

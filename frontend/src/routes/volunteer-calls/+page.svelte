@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { volunteerCalls, type VolunteerCallListResponse, type VolunteerCallCreate, type Program, type TaskCreate } from '$lib/api/client';
-  import { ALL_PROGRAMS, PROGRAM_LABELS, SINGLE_TASK_PROGRAMS } from '$lib/api/types';
+  import { ALL_PROGRAMS, PROGRAM_LABELS, SINGLE_TASK_PROGRAMS, suggestCallTitle } from '$lib/api/types';
   import Breadcrumb from '$lib/components/Breadcrumb.svelte';
   import TaskEntryForm from '$lib/components/TaskEntryForm.svelte';
   import { callStatusBadgeClass, programLabel } from '$lib/utils/badges';
@@ -17,8 +17,28 @@
 
   let newCall: VolunteerCallCreate = $state({ title: '', program: 'RTX' });
   let newCallTask: TaskCreate | null = $state(null);
+  // Track whether the user has hand-edited the title; once they have, we
+  // stop overwriting it from the program/date suggestion. Without this, a
+  // user typing a custom name would lose it when picking a date.
+  let titleManuallyEdited = $state(false);
 
   let isSingleTaskProgram = $derived(SINGLE_TASK_PROGRAMS.has(newCall.program));
+
+  // Auto-suggest a default title when the user hasn't typed one yet. RTX
+  // needs a task date; single-task programs use a fixed phrase.
+  $effect(() => {
+    if (titleManuallyEdited) return;
+    const suggested = suggestCallTitle(newCall.program, newCallTask?.date ?? null);
+    if (suggested && newCall.title !== suggested) {
+      newCall = { ...newCall, title: suggested };
+    }
+  });
+
+  function handleTitleInput(e: Event) {
+    const v = (e.currentTarget as HTMLInputElement).value;
+    titleManuallyEdited = true;
+    newCall = { ...newCall, title: v };
+  }
 
   onMount(loadCalls);
 
@@ -50,6 +70,7 @@
       const created = await volunteerCalls.create(payload);
       newCall = { title: '', program: 'RTX' };
       newCallTask = null;
+      titleManuallyEdited = false;
       showAddForm = false;
       // Single-task programs jump straight to the detail page so the user
       // can review the auto-created task; RTX keeps the list view.
@@ -116,7 +137,13 @@
         <div class="form-row">
           <label class="form-field">
             Title *
-            <input type="text" bind:value={newCall.title} required placeholder="e.g., Spring NRD 2026" />
+            <input
+              type="text"
+              value={newCall.title}
+              oninput={handleTitleInput}
+              required
+              placeholder="e.g., Spring NRD 2026"
+            />
           </label>
         </div>
         <div class="form-row">

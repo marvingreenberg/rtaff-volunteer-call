@@ -68,10 +68,6 @@
     return formatTime(start) || formatTime(end);
   }
 
-  function spotsRemaining(job: JobListItem): number {
-    return Math.max(0, job.volunteers_needed - job.assigned_count);
-  }
-
   onMount(async () => {
     const token = page.url.searchParams.get('token');
     await initFromToken(token);
@@ -271,13 +267,6 @@
       getValue: (item) => formatTimeRange(item.time_start as string | null, item.time_end as string | null),
       hideOnNarrow: true,
     },
-    {
-      key: 'spots',
-      label: 'Spots',
-      getValue: (item) => spotsRemaining(item as unknown as JobListItem),
-      align: 'right',
-      hideOnNarrow: true,
-    },
   ];
 
   let jobSortKey = $state('');
@@ -423,7 +412,6 @@
                         <td>{job.city || ''}</td>
                         <td>{job.date ? formatDate(job.date) : 'Unscheduled'}</td>
                         <td class="hide-narrow">{formatTimeRange(job.time_start, job.time_end)}</td>
-                        <td class="align-right hide-narrow">{spotsRemaining(job)}</td>
                       </tr>
                     {/snippet}
                   </DataTable>
@@ -432,7 +420,6 @@
                     {#each jobs as job (job.task_id)}
                       {@const expanded = expandedTasks.has(job.task_id)}
                       {@const checked = selected.has(job.task_id)}
-                      {@const spots = spotsRemaining(job)}
                       {@const conflict = callConflicts[call.id]?.[job.task_id]}
                       <ItemCard {checked}>
                         <div class="task-row">
@@ -456,7 +443,7 @@
                               {/if}
                             </span>
                             <span class="task-meta">
-                              {#if job.city}{job.city} &middot; {/if}{job.date ? formatDate(job.date) : 'Unscheduled'}{#if spots > 0} &middot; {spots} spot{spots === 1 ? '' : 's'} left{/if}
+                              {#if job.city}{job.city} &middot; {/if}{job.date ? formatDate(job.date) : 'Unscheduled'}
                             </span>
                           </div>
                           <button
@@ -479,12 +466,18 @@
                             {/if}
                             <div class="detail-row">
                               <span class="detail-label">Volunteers needed:</span>
-                              <span>{job.volunteers_needed} ({job.assigned_count} assigned)</span>
+                              <span>{job.volunteers_needed}</span>
                             </div>
                             {#if job.skilled_needed > 0}
                               <div class="detail-row">
                                 <span class="detail-label">Skilled needed:</span>
                                 <span>{job.skilled_needed}</span>
+                              </div>
+                            {/if}
+                            {#if job.notes}
+                              <div class="detail-row notes-row">
+                                <span class="detail-label">Notes:</span>
+                                <span>{job.notes}</span>
                               </div>
                             {/if}
                           </div>
@@ -769,6 +762,10 @@
   .detail-label {
     font-weight: 500;
     margin-right: var(--spacing-xs);
+  }
+
+  .notes-row {
+    white-space: pre-wrap;
   }
 
   .success-banner {

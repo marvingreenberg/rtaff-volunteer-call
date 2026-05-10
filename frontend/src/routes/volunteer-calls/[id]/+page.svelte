@@ -165,6 +165,31 @@
       error = e instanceof Error ? e.message : 'Failed to reopen call';
     }
   }
+
+  async function handleDeleteCall() {
+    if (!call) return;
+    const taskCount = call.tasks.length;
+    const ok = window.confirm(
+      `Delete this call? This will remove the call and all info about its ${taskCount} task${taskCount === 1 ? '' : 's'}. This cannot be undone.`,
+    );
+    if (!ok) return;
+    // Second prompt — once invites have been sent (i.e. status is past
+    // Draft), volunteers have already been asked to commit time. Make the
+    // admin confirm twice so a stray click can't blow that away.
+    if (call.status !== 'draft') {
+      const ok2 = window.confirm(
+        'Volunteers have already been notified about this call. Are you sure you want to delete it?',
+      );
+      if (!ok2) return;
+    }
+    error = null;
+    try {
+      await volunteerCalls.delete(callId);
+      await goto('/volunteer-calls');
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to delete call';
+    }
+  }
 </script>
 
 <svelte:head>
@@ -229,6 +254,9 @@
           Reopen
         </button>
       {/if}
+      <button class="btn btn-danger" onclick={handleDeleteCall}>
+        Delete Call
+      </button>
     </div>
 
     {#if sendInvitesResult}

@@ -48,6 +48,42 @@ export const SINGLE_TASK_PROGRAMS: ReadonlySet<Program> = new Set([
   "LIFT",
 ]);
 
+/** Default call titles for the single-task programs — admins can edit. */
+const SINGLE_TASK_PROGRAM_TITLES: Record<Program, string> = {
+  RTX: "",
+  ACR: "AC Rescue call",
+  RAMP: "Ramp Install call",
+  LIFT: "Chairlift call",
+};
+
+/**
+ * Suggest a default call title from program + (for RTX) the first task's
+ * date. Returns an empty string when not enough info is known so the input
+ * is not over-eager about supplying a placeholder name.
+ */
+export function suggestCallTitle(
+  program: Program,
+  firstTaskDate: string | null,
+): string {
+  if (program === "RTX") {
+    if (!firstTaskDate) return "";
+    const m = firstTaskDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return "";
+    // Anchor to local-noon to avoid a TZ-driven day rollback on parse.
+    const d = new Date(firstTaskDate + "T12:00:00");
+    if (isNaN(d.getTime())) return "";
+    // Mon..Sun window containing the task date.
+    const dow = d.getDay(); // 0=Sun..6=Sat
+    const offsetToMon = dow === 0 ? -6 : 1 - dow;
+    const mon = new Date(d);
+    mon.setDate(d.getDate() + offsetToMon);
+    const sun = new Date(mon);
+    sun.setDate(mon.getDate() + 6);
+    return `Rebuilding Together ${mon.getMonth() + 1}/${mon.getDate()}-${sun.getMonth() + 1}/${sun.getDate()}`;
+  }
+  return SINGLE_TASK_PROGRAM_TITLES[program];
+}
+
 export interface ProgramMembership {
   program: Program;
   joined_at: string;
@@ -178,7 +214,7 @@ export interface TaskCreate {
   team_lead_id?: string | null;
   volunteers_needed?: number;
   skilled_needed?: number;
-  notes?: string;
+  notes?: string | null;
 }
 
 export interface TaskUpdate {
@@ -192,7 +228,7 @@ export interface TaskUpdate {
   volunteers_needed?: number;
   skilled_needed?: number;
   status?: TaskStatus;
-  notes?: string;
+  notes?: string | null;
 }
 
 export interface TaskResponse {
@@ -250,6 +286,7 @@ export interface JobListItem {
   skilled_needed: number;
   assigned_count: number;
   program: Program;
+  notes: string | null;
 }
 
 // --- Availability ---
@@ -347,6 +384,9 @@ export interface TaskOverviewItem {
   volunteers_needed: number;
   skilled_needed: number;
   status: string;
+  notes: string | null;
+  team_lead_id: string | null;
+  team_lead_name: string | null;
   assignments: TaskAssignment[];
   available_volunteers: AvailableVolunteer[];
 }
