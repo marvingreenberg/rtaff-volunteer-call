@@ -29,7 +29,7 @@ function makeTask(overrides: Partial<TaskResponse> = {}): TaskResponse {
 }
 
 describe("TaskRow", () => {
-  it("renders MM/DD date format in the summary", () => {
+  it("renders weekday + month + day in the summary", () => {
     render(TaskRow, {
       props: {
         task: makeTask({ date: "2026-07-01" }),
@@ -39,7 +39,7 @@ describe("TaskRow", () => {
         ondelete: vi.fn(),
       },
     });
-    expect(screen.getByText("07/01")).toBeInTheDocument();
+    expect(screen.getByText("Wednesday, July 1")).toBeInTheDocument();
   });
 
   it("shows volunteer count without slash when skilled is 0", () => {

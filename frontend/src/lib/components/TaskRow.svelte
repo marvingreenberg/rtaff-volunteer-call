@@ -1,6 +1,6 @@
 <script lang="ts">
   import TaskEntryForm from "./TaskEntryForm.svelte";
-  import { formatMonthDay, volunteersLabel } from "$lib/utils/task-format";
+  import { formatDate, volunteersLabel } from "$lib/utils/format";
   import type { TaskCreate, TaskResponse } from "$lib/api/client";
 
   type Props = {
@@ -29,7 +29,7 @@
     onclick={ontoggle}
   >
     <span class="caret" aria-hidden="true">{expanded ? "▾" : "▸"}</span>
-    <span class="date">{formatMonthDay(task.date)}</span>
+    <span class="date">{task.date ? formatDate(task.date) : "—"}</span>
     <span class="volunteers">
       {volunteersLabel(task.volunteers_needed, task.skilled_needed)}
     </span>

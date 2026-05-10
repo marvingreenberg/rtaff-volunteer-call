@@ -132,6 +132,14 @@ def test_format_date_handles_missing() -> None:
     assert "May" in _format_date(datetime.date(2026, 5, 16))
 
 
+def test_format_date_canonical_shape_matches_frontend() -> None:
+    """Backend/email and frontend (lib/utils/format.ts) must produce the same
+    'Weekday, Month Day' shape for the same date — otherwise volunteers see
+    one format in the email and a different one on the website. 2026-05-11
+    was a Monday; if this assertion ever fails the format silently drifted."""
+    assert _format_date(datetime.date(2026, 5, 11)) == "Monday, May 11"
+
+
 def test_format_time_range_endpoints() -> None:
     assert _format_time_range(None, None) is None
     assert _format_time_range(datetime.time(9, 0), None) == "9:00 AM"

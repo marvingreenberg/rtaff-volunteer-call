@@ -11,7 +11,7 @@
   } from "$lib/api/client";
   import Breadcrumb from "$lib/components/Breadcrumb.svelte";
   import { skillBadgeClass } from "$lib/utils/badges";
-  import { formatMonthDay, volunteersLabel } from "$lib/utils/task-format";
+  import { formatDate, volunteersLabel } from "$lib/utils/format";
 
   let overview = $state<AssignmentOverviewResponse | null>(null);
   let loading = $state(true);
@@ -143,7 +143,7 @@
           {@const full = isFull(task)}
           <section class="task-card" class:full>
             <header class="card-header">
-              <span class="date">{formatMonthDay(task.date)}</span>
+              <span class="date">{task.date ? formatDate(task.date) : "—"}</span>
               <span class="counts">
                 {volunteersLabel(task.volunteers_needed, task.skilled_needed)}
               </span>

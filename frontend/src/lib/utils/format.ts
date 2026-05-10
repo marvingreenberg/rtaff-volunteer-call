@@ -1,29 +1,19 @@
-/** Format a date string for display (short format: "Jan 15, 2025") */
-export function formatDate(d: string | null): string {
+/**
+ * Canonical date display: "Monday, May 11".
+ *
+ * One formatter used everywhere in the UI (and matched by `_format_date`
+ * in backend/services/notifications.py for emails). Accepts:
+ *  - ISO date strings ("2025-05-11"), parsed as local-noon to dodge timezone
+ *    rollover so a date never displays as the day before.
+ *  - Full ISO timestamps ("2025-05-11T10:30:00Z"), parsed natively.
+ */
+export function formatDate(d: string | null | undefined): string {
   if (!d) return "";
-  return new Date(d + "T00:00:00").toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-/** Format a date with weekday ("Mon, Jan 15, 2025") */
-export function formatDateFull(d: string | null): string {
-  if (!d) return "";
-  return new Date(d + "T00:00:00").toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-/** Format a date short, no year ("Jan 15") */
-export function formatDateShort(d: string | null): string {
-  if (!d) return "";
-  return new Date(d + "T00:00:00").toLocaleDateString("en-US", {
-    month: "short",
+  const dateObj = d.includes("T") ? new Date(d) : new Date(d + "T12:00:00");
+  if (isNaN(dateObj.getTime())) return "";
+  return dateObj.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
     day: "numeric",
   });
 }
@@ -52,4 +42,12 @@ export function groupByArea<T extends { area: string }>(
 /** Format a number as currency ("$12.50") */
 export function formatCurrency(amount: number): string {
   return "$" + Number(amount).toFixed(2);
+}
+
+/**
+ * Compact "(N)" or "(N/M)" volunteer-needed label. The slashed form only
+ * appears when the skilled count is positive.
+ */
+export function volunteersLabel(needed: number, skilled: number): string {
+  return skilled > 0 ? `(${needed}/${skilled})` : `(${needed})`;
 }
