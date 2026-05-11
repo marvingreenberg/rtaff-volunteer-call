@@ -161,8 +161,6 @@
               {programLabel(newCall.program)} calls have a single task — fill it in here.
             </p>
             <TaskEntryForm
-              submitLabel=""
-              onsubmit={() => undefined}
               onchange={(value) => (newCallTask = value)}
             />
           </div>

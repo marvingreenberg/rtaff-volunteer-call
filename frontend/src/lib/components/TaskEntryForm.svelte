@@ -407,7 +407,7 @@
     ></textarea>
   </div>
 
-  {#if mode === "add" && valid}
+  {#if mode === "add" && valid && onsubmit}
     <div class="form-actions">
       <button type="submit" class="btn btn-primary" disabled={saving}>
         {saving ? "Saving..." : submitLabel}

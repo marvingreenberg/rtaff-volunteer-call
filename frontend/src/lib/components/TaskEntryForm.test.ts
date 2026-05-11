@@ -140,6 +140,38 @@ describe("TaskEntryForm", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("does not render a submit button when used as an embedded form (no onsubmit)", async () => {
+    // Single-task program call creation embeds TaskEntryForm without an
+    // onsubmit; the parent submits via its own "Create Call" button. The
+    // form previously rendered an orphan empty-label submit button anyway,
+    // visible as a blue square at the corner of the form. Pin the fix.
+    const { container } = render(TaskEntryForm, {
+      props: { onchange: vi.fn() },
+    });
+    const date = container.querySelector(
+      'input[placeholder="MM/DD"]',
+    ) as HTMLInputElement;
+    const address = container.querySelector(
+      'input[placeholder="Address"]',
+    ) as HTMLInputElement;
+    const cityInput = container.querySelector(
+      'input[placeholder="City"]',
+    ) as HTMLInputElement;
+    const description = container.querySelector(
+      "textarea",
+    ) as HTMLTextAreaElement;
+    // Fill enough to make the form `valid` — that's the exact state where
+    // the orphan submit button used to appear.
+    await fireEvent.input(date, { target: { value: "07/01" } });
+    await fireEvent.input(address, { target: { value: "1 Main St" } });
+    await fireEvent.input(cityInput, { target: { value: "Arlington" } });
+    await fireEvent.input(description, { target: { value: "AC fix" } });
+
+    expect(
+      container.querySelector('button[type="submit"]'),
+    ).not.toBeInTheDocument();
+  });
+
   it("populates from initial values for edit mode", () => {
     const { container } = render(TaskEntryForm, {
       props: {
