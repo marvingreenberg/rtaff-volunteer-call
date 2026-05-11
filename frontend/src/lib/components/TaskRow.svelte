@@ -3,21 +3,64 @@
   import { formatDate, volunteersLabel } from "$lib/utils/format";
   import type { TaskCreate, TaskResponse } from "$lib/api/client";
 
+  type TeamLead = { id: string; first_name: string; last_name: string };
+
   type Props = {
     task: TaskResponse;
     expanded: boolean;
+    teamLeads?: TeamLead[];
     ontoggle: () => void;
-    onchange: (taskId: string, value: TaskCreate | null, dirty: boolean) => void;
     onupdate: (taskId: string, value: TaskCreate) => Promise<void> | void;
     ondelete: (taskId: string) => void;
   };
 
-  let { task, expanded, ontoggle, onchange, onupdate, ondelete }: Props =
-    $props();
+  let {
+    task,
+    expanded,
+    teamLeads = [],
+    ontoggle,
+    onupdate,
+    ondelete,
+  }: Props = $props();
+
+  // Track the form's most recent payload + dirty flag so the Update button
+  // in the summary row can enable/disable correctly and the click handler
+  // has something to send. Cleared when the row collapses so reopening the
+  // row starts fresh.
+  let pendingPayload = $state<TaskCreate | null>(null);
+  let dirty = $state(false);
+  let saving = $state(false);
+
+  function handleFormChange(value: TaskCreate | null, isDirty: boolean) {
+    pendingPayload = value;
+    dirty = isDirty;
+  }
+
+  $effect(() => {
+    if (!expanded) {
+      pendingPayload = null;
+      dirty = false;
+    }
+  });
+
+  let canUpdate = $derived(expanded && !!pendingPayload && dirty);
+
+  async function handleUpdateClick(e: MouseEvent) {
+    e.stopPropagation();
+    if (!canUpdate || !pendingPayload || saving) return;
+    saving = true;
+    try {
+      await onupdate(task.id, pendingPayload);
+    } finally {
+      saving = false;
+    }
+  }
 
   function handleDeleteClick(e: MouseEvent) {
     e.stopPropagation();
-    const dateText = task.date ? `on ${formatDate(task.date)}` : task.short_description;
+    const dateText = task.date
+      ? `on ${formatDate(task.date)}`
+      : task.short_description;
     if (window.confirm(`Delete task ${dateText}?`)) {
       ondelete(task.id);
     }
@@ -40,14 +83,25 @@
       <span class="city">{task.city ?? ""}</span>
       <span class="description">{task.short_description}</span>
     </button>
+    {#if expanded}
+      <button
+        type="button"
+        class="action-btn"
+        disabled={!canUpdate || saving}
+        onclick={handleUpdateClick}
+        aria-label="Update task"
+      >
+        {saving ? "Saving..." : "Update"}
+      </button>
+    {/if}
     <button
       type="button"
-      class="delete-x"
+      class="trash-btn"
       onclick={handleDeleteClick}
       aria-label="Delete task"
       title="Delete task"
     >
-      ×
+      🗑️
     </button>
   </div>
 
@@ -56,8 +110,8 @@
       <TaskEntryForm
         initial={task}
         mode="edit"
-        onchange={(value, dirty) => onchange(task.id, value, dirty)}
-        onupdate={(value) => onupdate(task.id, value)}
+        {teamLeads}
+        onchange={handleFormChange}
       />
     </div>
   {/if}
@@ -104,19 +158,44 @@
     background: var(--rt-gray-100, #f5f3ef);
   }
 
-  .delete-x {
-    background: none;
+  .action-btn {
+    align-self: center;
+    margin-right: var(--spacing-sm);
+    padding: var(--spacing-xs) var(--spacing-md);
+    background: var(--color-primary, #3a6db5);
+    color: white;
     border: none;
-    padding: 0 var(--spacing-md);
-    color: var(--rt-text-muted, #888);
-    font-size: 1.4em;
-    line-height: 1;
+    border-radius: var(--card-radius);
+    font: inherit;
+    font-weight: 600;
     cursor: pointer;
+    min-height: 32px;
     flex-shrink: 0;
   }
 
-  .delete-x:hover {
-    color: var(--rt-danger-text, #b00020);
+  .action-btn:disabled {
+    background: var(--rt-gray-200, #e4dfda);
+    color: var(--rt-text-muted, #888);
+    cursor: not-allowed;
+  }
+
+  .action-btn:not(:disabled):hover {
+    opacity: 0.9;
+  }
+
+  .trash-btn {
+    background: none;
+    border: none;
+    padding: 0 var(--spacing-md);
+    font-size: 1.2em;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+    color: var(--rt-text-muted, #888);
+  }
+
+  .trash-btn:hover {
+    background: var(--rt-danger-bg, #fdecea);
   }
 
   .caret {
@@ -152,7 +231,5 @@
 
   .form-wrapper {
     padding: var(--spacing-md);
-    /* No top border or background change — the form sits on the same green
-       canvas as the summary. */
   }
 </style>

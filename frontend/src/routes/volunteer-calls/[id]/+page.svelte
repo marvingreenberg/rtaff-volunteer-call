@@ -1,8 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/state';
+  import { goto } from '$app/navigation';
   import {
     volunteerCalls,
+    people,
     type VolunteerCallResponse,
     type TaskCreate,
   } from '$lib/api/client';
@@ -12,21 +14,42 @@
   import { callStatusBadgeClass, programLabel } from '$lib/utils/badges';
   import { SINGLE_TASK_PROGRAMS } from '$lib/api/types';
 
+  type TeamLead = { id: string; first_name: string; last_name: string };
+
   let call = $state<VolunteerCallResponse | null>(null);
   let loading = $state(true);
   let error: string | null = $state(null);
+  let teamLeads = $state<TeamLead[]>([]);
 
-  // The currently-open task row (at most one). Collapsing without clicking
-  // Update silently discards in-flight edits — Update is explicit.
+  // The currently-open existing-task row (at most one). Collapsing without
+  // clicking Update silently discards in-flight edits.
   let expandedTaskId: string | null = $state(null);
-  // Whether the "- Add task to Project -" affordance has been expanded into
-  // the entry form.
+
+  // Whether the "- Add new task -" affordance has been expanded into the
+  // entry form. The form is contained in a TaskRow-shaped expando with its
+  // own Add + trash buttons in the header strip.
   let addOpen = $state(false);
+  let addPayload = $state<TaskCreate | null>(null);
+  let addSaving = $state(false);
 
   let callId = $derived(page.params.id!);
   let isSingleTaskProgram = $derived(call ? SINGLE_TASK_PROGRAMS.has(call.program) : false);
 
-  onMount(loadCall);
+  onMount(async () => {
+    await loadCall();
+    // Fetch team-lead candidates once for the whole page; pass into every
+    // TaskRow + the new-task form rather than re-fetching per row.
+    try {
+      const leads = await people.list({ role: 'team_leader', active: true });
+      teamLeads = leads.map((p) => ({
+        id: p.id,
+        first_name: p.first_name,
+        last_name: p.last_name,
+      }));
+    } catch {
+      // Non-fatal — the team-lead select will simply be empty.
+    }
+  });
 
   async function loadCall() {
     loading = true;
@@ -38,11 +61,6 @@
     } finally {
       loading = false;
     }
-  }
-
-  function handleRowChange(_taskId: string, _value: TaskCreate | null, _dirty: boolean) {
-    // Edit-mode autosave is gone — the row's TaskEntryForm fires onchange
-    // for free; we ignore it. Saving happens through onupdate.
   }
 
   async function handleRowUpdate(taskId: string, value: TaskCreate) {
@@ -60,16 +78,29 @@
     expandedTaskId = expandedTaskId === taskId ? null : taskId;
   }
 
-  async function handleAddTask(data: TaskCreate) {
+  function handleAddChange(value: TaskCreate | null) {
+    addPayload = value;
+  }
+
+  async function handleAddSubmit() {
+    if (!addPayload || addSaving) return;
+    addSaving = true;
     error = null;
     try {
-      await volunteerCalls.addTask(callId, data);
+      await volunteerCalls.addTask(callId, addPayload);
       addOpen = false;
+      addPayload = null;
       await loadCall();
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to add task';
-      throw e;
+    } finally {
+      addSaving = false;
     }
+  }
+
+  function handleAddCancel() {
+    addOpen = false;
+    addPayload = null;
   }
 
   async function handleDeleteTask(taskId: string) {
@@ -81,6 +112,10 @@
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to delete task';
     }
+  }
+
+  function handleNoMore() {
+    goto('/volunteer-calls');
   }
 </script>
 
@@ -122,9 +157,9 @@
           {#each call.tasks as task (task.id)}
             <TaskRow
               {task}
+              {teamLeads}
               expanded={expandedTaskId === task.id}
               ontoggle={() => handleToggleRow(task.id)}
-              onchange={handleRowChange}
               onupdate={handleRowUpdate}
               ondelete={handleDeleteTask}
             />
@@ -135,15 +170,42 @@
       {#if call.status !== 'closed' && !isSingleTaskProgram}
         {#if addOpen}
           <div class="task-row task-row-add expanded">
+            <div class="summary-row">
+              <span class="new-task-label">New task</span>
+              <button
+                type="button"
+                class="action-btn"
+                disabled={!addPayload || addSaving}
+                onclick={handleAddSubmit}
+              >
+                {addSaving ? 'Saving...' : 'Add'}
+              </button>
+              <button
+                type="button"
+                class="trash-btn"
+                onclick={handleAddCancel}
+                aria-label="Discard new task"
+                title="Discard new task"
+              >
+                🗑️
+              </button>
+            </div>
             <div class="form-wrapper">
-              <TaskEntryForm submitLabel="Done" onsubmit={handleAddTask} />
+              <TaskEntryForm {teamLeads} onchange={handleAddChange} />
             </div>
           </div>
-        {:else}
-          <button type="button" class="add-task-label" onclick={() => (addOpen = true)}>
-            - Add task to Project -
-          </button>
         {/if}
+
+        <div class="task-links">
+          <button type="button" class="task-link" onclick={() => (addOpen = true)} disabled={addOpen}>
+            - Add new task -
+          </button>
+          {#if call.tasks.length > 0}
+            <button type="button" class="task-link done-link" onclick={handleNoMore}>
+              - No more Tasks/Updates -
+            </button>
+          {/if}
+        </div>
       {:else if call.tasks.length === 0}
         <p class="empty">No tasks yet.</p>
       {/if}
@@ -208,12 +270,87 @@
     flex-direction: column;
   }
 
-  /* "- Add task to Project -" affordance. Renders as a green italic label
-     that behaves like a button. */
-  .add-task-label {
-    display: block;
+  /* New-task affordance: visual shell matches TaskRow.expanded. The header
+     strip mirrors TaskRow's summary-row layout so the Add + trash buttons
+     line up where the Update + trash live for existing rows. */
+  .task-row-add {
+    border: 1px solid var(--rt-success-text, #2f7a45);
+    border-radius: var(--card-radius);
+    background: var(--rt-success-bg, #e6f4ea);
     margin-top: var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
+    overflow: hidden;
+  }
+
+  .summary-row {
+    display: flex;
+    align-items: stretch;
     padding: var(--spacing-sm) var(--spacing-md);
+  }
+
+  .new-task-label {
+    flex: 1;
+    min-width: 0;
+    align-self: center;
+    font-weight: 600;
+    color: var(--rt-text-muted, #777);
+    font-style: italic;
+  }
+
+  .action-btn {
+    align-self: center;
+    margin-right: var(--spacing-sm);
+    padding: var(--spacing-xs) var(--spacing-md);
+    background: var(--color-primary, #3a6db5);
+    color: white;
+    border: none;
+    border-radius: var(--card-radius);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    min-height: 32px;
+    flex-shrink: 0;
+  }
+
+  .action-btn:disabled {
+    background: var(--rt-gray-200, #e4dfda);
+    color: var(--rt-text-muted, #888);
+    cursor: not-allowed;
+  }
+
+  .action-btn:not(:disabled):hover {
+    opacity: 0.9;
+  }
+
+  .trash-btn {
+    background: none;
+    border: none;
+    padding: 0 var(--spacing-sm);
+    font-size: 1.2em;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+    color: var(--rt-text-muted, #888);
+    align-self: center;
+  }
+
+  .trash-btn:hover {
+    background: var(--rt-danger-bg, #fdecea);
+  }
+
+  .form-wrapper {
+    padding: var(--spacing-md);
+  }
+
+  /* "- Add new task -" / "- No more Tasks/Updates -" link pair. */
+  .task-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-lg);
+    margin-top: var(--spacing-md);
+  }
+
+  .task-link {
     background: none;
     border: none;
     color: var(--rt-success-text, #2f7a45);
@@ -222,25 +359,17 @@
     font-weight: 600;
     text-decoration: underline;
     cursor: pointer;
+    padding: var(--spacing-sm) var(--spacing-md);
     text-align: left;
   }
 
-  .add-task-label:hover {
+  .task-link:disabled {
+    color: var(--rt-text-muted, #888);
+    cursor: default;
+  }
+
+  .task-link:not(:disabled):hover {
     color: var(--color-primary, #3a6db5);
-  }
-
-  /* The expanded add card reuses the same green panel styling as TaskRow's
-     expanded state. */
-  .task-row-add {
-    border: 1px solid var(--rt-success-text, #2f7a45);
-    border-radius: var(--card-radius);
-    background: var(--rt-success-bg, #e6f4ea);
-    margin-top: var(--spacing-md);
-    overflow: hidden;
-  }
-
-  .task-row-add .form-wrapper {
-    padding: var(--spacing-md);
   }
 
   .badge-draft {
@@ -273,7 +402,6 @@
       flex-direction: column;
       align-items: flex-start;
     }
-
     .section-header {
       flex-direction: column;
       align-items: flex-start;

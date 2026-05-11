@@ -3,6 +3,7 @@
   import { page } from "$app/state";
   import {
     volunteerCalls,
+    people,
     teamAssignments,
     type AssignmentOverviewResponse,
     type TaskOverviewItem,
@@ -10,14 +11,16 @@
     type TaskAssignment,
   } from "$lib/api/client";
   import Breadcrumb from "$lib/components/Breadcrumb.svelte";
-  import TeamLeadAutocomplete from "$lib/components/TeamLeadAutocomplete.svelte";
   import { skillBadgeClass } from "$lib/utils/badges";
   import { formatDate, volunteersLabel } from "$lib/utils/format";
+
+  type TeamLead = { id: string; first_name: string; last_name: string };
 
   let overview = $state<AssignmentOverviewResponse | null>(null);
   let loading = $state(true);
   let error: string | null = $state(null);
   let busyTaskIds = $state<Set<string>>(new Set());
+  let teamLeads = $state<TeamLead[]>([]);
 
   let callId = $derived(page.params.id!);
 
@@ -34,7 +37,19 @@
     return { needed, assigned, full };
   });
 
-  onMount(load);
+  onMount(async () => {
+    await load();
+    try {
+      const leads = await people.list({ role: "team_leader", active: true });
+      teamLeads = leads.map((p) => ({
+        id: p.id,
+        first_name: p.first_name,
+        last_name: p.last_name,
+      }));
+    } catch {
+      // Non-fatal — the team-lead select will simply be empty.
+    }
+  });
 
   async function load() {
     loading = true;
@@ -174,12 +189,22 @@
               <div class="meta-row">
                 <span class="meta-label">Team lead</span>
                 <div class="meta-value">
-                  <TeamLeadAutocomplete
-                    initialId={task.team_lead_id}
-                    initialLabel={task.team_lead_name}
-                    placeholder="Type 3+ chars to find a team lead"
-                    onselect={(id) => setTeamLead(task.task_id, id)}
-                  />
+                  <select
+                    value={task.team_lead_id ?? ""}
+                    aria-label="Team lead"
+                    disabled={busyTaskIds.has(task.task_id)}
+                    onchange={(e) => {
+                      const v = (e.currentTarget as HTMLSelectElement).value;
+                      setTeamLead(task.task_id, v || null);
+                    }}
+                  >
+                    <option value="">— None —</option>
+                    {#each teamLeads as lead (lead.id)}
+                      <option value={lead.id}>
+                        {lead.first_name} {lead.last_name}
+                      </option>
+                    {/each}
+                  </select>
                 </div>
               </div>
               {#if task.notes}

@@ -3,8 +3,6 @@ import { render, screen, fireEvent } from "@testing-library/svelte";
 import TaskRow from "./TaskRow.svelte";
 import type { TaskResponse } from "$lib/api/client";
 
-Element.prototype.scrollIntoView = vi.fn();
-
 function makeTask(overrides: Partial<TaskResponse> = {}): TaskResponse {
   return {
     id: "task-1",
@@ -32,8 +30,8 @@ function makeProps(overrides: Record<string, unknown> = {}) {
   return {
     task: makeTask(),
     expanded: false,
+    teamLeads: [],
     ontoggle: vi.fn(),
-    onchange: vi.fn(),
     onupdate: vi.fn(),
     ondelete: vi.fn(),
     ...overrides,
@@ -48,68 +46,69 @@ describe("TaskRow", () => {
     expect(screen.getByText("Wednesday, July 1")).toBeInTheDocument();
   });
 
-  it("shows volunteer count without slash when skilled is 0", () => {
-    render(TaskRow, {
-      props: makeProps({
-        task: makeTask({ volunteers_needed: 4, skilled_needed: 0 }),
-      }),
-    });
-    expect(screen.getByText("(4)")).toBeInTheDocument();
+  it("shows the trash glyph (not an ×)", () => {
+    // User explicitly asked for a trash can, not an X. Pin both directions
+    // so a stylistic regression to "×" gets caught.
+    render(TaskRow, { props: makeProps() });
+    const trash = screen.getByRole("button", { name: /delete task/i });
+    expect(trash.textContent?.trim()).toBe("🗑️");
+    expect(trash.textContent?.trim()).not.toBe("×");
   });
 
-  it("shows volunteer/skilled count with slash when skilled > 0", () => {
-    render(TaskRow, {
-      props: makeProps({
-        task: makeTask({ volunteers_needed: 4, skilled_needed: 1 }),
-      }),
-    });
-    expect(screen.getByText("(4/1)")).toBeInTheDocument();
-  });
-
-  it("renders the form only when expanded is true", () => {
-    const { container, rerender } = render(TaskRow, {
-      props: makeProps(),
-    });
-    expect(container.querySelector("form")).not.toBeInTheDocument();
+  it("only renders the Update button when expanded", () => {
+    const { rerender } = render(TaskRow, { props: makeProps() });
+    expect(
+      screen.queryByRole("button", { name: /update task/i }),
+    ).not.toBeInTheDocument();
     rerender(makeProps({ expanded: true }));
-    expect(container.querySelector("form")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /update task/i }),
+    ).toBeInTheDocument();
   });
 
-  it("calls ontoggle when the summary is clicked", async () => {
-    const ontoggle = vi.fn();
-    render(TaskRow, { props: makeProps({ ontoggle }) });
-    await fireEvent.click(screen.getByRole("button", { expanded: false }));
-    expect(ontoggle).toHaveBeenCalledTimes(1);
-  });
-
-  it("forwards form changes via onchange with the task id", async () => {
-    const onchange = vi.fn();
+  it("Update is disabled until the form is dirty AND valid", async () => {
+    // Without dirty-gating, Update would be active the moment the row
+    // opens (since the task is already valid). Without valid-gating, the
+    // user could wipe a required field and still click Update, which would
+    // silently fail or persist garbage.
     const { container } = render(TaskRow, {
-      props: makeProps({ expanded: true, onchange }),
+      props: makeProps({ expanded: true }),
     });
-
-    expect(onchange).toHaveBeenCalled();
-    expect(onchange.mock.calls[0][0]).toBe("task-1");
-    expect(onchange.mock.calls[0][2]).toBe(false);
+    const update = screen.getByRole("button", { name: /update task/i });
+    expect(update).toBeDisabled();
 
     const description = container.querySelector(
       "textarea",
     ) as HTMLTextAreaElement;
-    await fireEvent.input(description, { target: { value: "Updated copy" } });
+    await fireEvent.input(description, { target: { value: "Roof rebuild" } });
+    expect(update).not.toBeDisabled();
 
-    const lastCall = onchange.mock.calls[onchange.mock.calls.length - 1];
-    expect(lastCall[0]).toBe("task-1");
-    expect(lastCall[1]).toMatchObject({
-      short_description: "Updated copy",
-      city: "Alexandria",
-    });
-    expect(lastCall[2]).toBe(true);
+    // Wipe a required field → Update goes back to disabled.
+    await fireEvent.input(description, { target: { value: "" } });
+    expect(update).toBeDisabled();
   });
 
-  it("clicking the delete X does not toggle the row expand", async () => {
-    // Regression: previously the delete control was inside the form panel.
-    // The new X lives in the summary row alongside the toggle button, so
-    // its click must stop propagation to avoid expanding/collapsing the row.
+  it("clicking Update fires onupdate(taskId, payload)", async () => {
+    const onupdate = vi.fn();
+    const { container } = render(TaskRow, {
+      props: makeProps({ expanded: true, onupdate }),
+    });
+    const description = container.querySelector(
+      "textarea",
+    ) as HTMLTextAreaElement;
+    await fireEvent.input(description, { target: { value: "Rewired text" } });
+    await fireEvent.click(screen.getByRole("button", { name: /update task/i }));
+    expect(onupdate).toHaveBeenCalledTimes(1);
+    expect(onupdate.mock.calls[0][0]).toBe("task-1");
+    expect(onupdate.mock.calls[0][1]).toMatchObject({
+      short_description: "Rewired text",
+    });
+  });
+
+  it("clicking the trash does not toggle the row expand", async () => {
+    // The trash sits in the summary row alongside the toggle button; its
+    // click handler stops propagation so trash-confirmed-cancel doesn't
+    // accidentally fold/unfold the row.
     const ontoggle = vi.fn();
     const ondelete = vi.fn();
     const confirmSpy = vi
@@ -122,7 +121,7 @@ describe("TaskRow", () => {
     confirmSpy.mockRestore();
   });
 
-  it("delete X confirm uses the formatted task date in its prompt", async () => {
+  it("trash confirm uses the formatted task date in its prompt", async () => {
     const ondelete = vi.fn();
     let promptedText = "";
     const confirmSpy = vi.spyOn(window, "confirm").mockImplementation((msg) => {
@@ -152,27 +151,23 @@ describe("TaskRow", () => {
     confirmSpy.mockRestore();
   });
 
-  it("forwards Update click via onupdate with the task id and payload", async () => {
-    // Without this wiring, clicking Update in the embedded TaskEntryForm
-    // would have no effect — the row is the bridge between the form and
-    // the parent route's save handler.
+  it("collapsing the row clears in-flight edits (Update becomes disabled on reopen)", async () => {
+    // Closing without clicking Update discards the changes — pin that
+    // the pending payload + dirty flag don't survive a collapse/reopen.
     const onupdate = vi.fn();
-    const { container } = render(TaskRow, {
+    const { container, rerender } = render(TaskRow, {
       props: makeProps({ expanded: true, onupdate }),
     });
-
     const description = container.querySelector(
       "textarea",
     ) as HTMLTextAreaElement;
-    await fireEvent.input(description, { target: { value: "Rewired text" } });
+    await fireEvent.input(description, { target: { value: "Changed" } });
+    expect(
+      screen.getByRole("button", { name: /update task/i }),
+    ).not.toBeDisabled();
 
-    const updateBtn = screen.getByRole("button", { name: /^Update / });
-    await fireEvent.click(updateBtn);
-
-    expect(onupdate).toHaveBeenCalledTimes(1);
-    expect(onupdate.mock.calls[0][0]).toBe("task-1");
-    expect(onupdate.mock.calls[0][1]).toMatchObject({
-      short_description: "Rewired text",
-    });
+    rerender(makeProps({ expanded: false, onupdate }));
+    rerender(makeProps({ expanded: true, onupdate }));
+    expect(screen.getByRole("button", { name: /update task/i })).toBeDisabled();
   });
 });

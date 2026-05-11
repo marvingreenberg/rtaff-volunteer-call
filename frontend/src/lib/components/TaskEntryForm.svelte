@@ -1,9 +1,6 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import AutocompleteInput from "./AutocompleteInput.svelte";
-  import TeamLeadAutocomplete from "./TeamLeadAutocomplete.svelte";
-  import { matchCities } from "$lib/constants/cities";
-  import { formatDate } from "$lib/utils/format";
+  import { CITIES } from "$lib/constants/cities";
   import type { TaskCreate } from "$lib/api/client";
 
   // Structural shape — accepts both TaskCreate and TaskResponse.
@@ -20,21 +17,19 @@
     team_lead_name?: string | null;
   };
 
+  type TeamLead = { id: string; first_name: string; last_name: string };
+
   type Props = {
     initial?: InitialTask;
     mode?: "add" | "edit";
-    submitLabel?: string;
-    onsubmit?: (value: TaskCreate) => Promise<void> | void;
-    onupdate?: (value: TaskCreate) => Promise<void> | void;
+    teamLeads?: TeamLead[];
     onchange?: (value: TaskCreate | null, dirty: boolean) => void;
   };
 
   let {
     initial,
-    mode = "add",
-    submitLabel = "Done",
-    onsubmit,
-    onupdate,
+    mode: _mode = "add",
+    teamLeads = [],
     onchange,
   }: Props = $props();
 
@@ -45,8 +40,6 @@
   // Parse free-form time entry. Accepts:
   //   - "9am", "9 am", "9:30am", "9:30 PM"  (12-hour with am/pm)
   //   - "9:00", "13:30"                      (24-hour, colon required)
-  // Returns "HH:MM" 24-hour string, or null if unparseable. Empty input is
-  // explicitly null (time is optional).
   function parseTime(text: string): string | null {
     const t = text.trim().toLowerCase();
     if (!t) return null;
@@ -61,8 +54,6 @@
       if (ampm === "pm" && h < 12) h += 12;
       if (ampm === "am" && h === 12) h = 0;
     } else {
-      // No am/pm — require minutes (a colon) so we don't ambiguously
-      // accept "9" as either 9 AM or 9 PM.
       if (m[2] === undefined) return null;
       if (h > 23) return null;
     }
@@ -86,9 +77,7 @@
     return m ? `${m[1]}/${m[2]}` : "";
   }
 
-  function parseMonthDay(
-    text: string,
-  ): { mm: string; dd: string } | null {
+  function parseMonthDay(text: string): { mm: string; dd: string } | null {
     const m = text.trim().match(/^(\d{1,2})[/\-.](\d{1,2})$/);
     if (!m) return null;
     const month = parseInt(m[1], 10);
@@ -100,9 +89,6 @@
     };
   }
 
-  // Pick the year that places MM/DD on or after today: roll into next year
-  // if the date would otherwise be in the past. Volunteer calls are
-  // forward-looking, so this is the right default.
   function smartYear(mm: string, dd: string): number {
     const now = new Date();
     const yearTry = now.getFullYear();
@@ -133,12 +119,7 @@
   let teamLeadId = $state<string | null>(
     untrack(() => initial?.team_lead_id ?? null),
   );
-  let teamLeadLabel = $state(untrack(() => initial?.team_lead_name ?? ""));
-  let saving = $state(false);
 
-  // Parse the MM/DD text into an ISO date. For edit mode, preserve the
-  // original year as long as the displayed MM/DD hasn't changed; otherwise
-  // attach the current year.
   let parsedDate = $derived.by(() => {
     const md = parseMonthDay(dateText);
     if (!md) return null;
@@ -162,8 +143,6 @@
     !dateMissing && !addressMissing && !cityMissing && !descriptionMissing,
   );
 
-  // Snapshot of the raw fields at mount; used to detect whether the user
-  // has touched anything (so the parent only autosaves on real changes).
   const initialRaw = untrack(() => ({
     dateText,
     timeText,
@@ -209,52 +188,6 @@
     onchange?.(currentPayload, dirty);
   });
 
-  async function fetchCities(q: string) {
-    return matchCities(q).map((c) => ({ value: c, label: c }));
-  }
-
-  function handleTeamLeadSelect(id: string | null, label: string) {
-    teamLeadId = id;
-    teamLeadLabel = label;
-  }
-
-  function resetToDefaults() {
-    dateText = "";
-    timeText = DEFAULT_TIME_DISPLAY;
-    address = "";
-    city = "";
-    volunteersNeeded = DEFAULT_VOLUNTEERS;
-    skilledNeeded = DEFAULT_SKILLED;
-    shortDescription = "";
-    notes = "";
-    teamLeadId = null;
-    teamLeadLabel = "";
-  }
-
-  async function handleSubmit(e: Event) {
-    e.preventDefault();
-    if (saving) return;
-    if (mode === "edit") {
-      if (!currentPayload || !dirty || !onupdate) return;
-      saving = true;
-      try {
-        await onupdate(currentPayload);
-      } finally {
-        saving = false;
-      }
-      return;
-    }
-    if (!currentPayload || !onsubmit) return;
-    saving = true;
-    try {
-      await onsubmit(currentPayload);
-      // Add mode clears back to defaults for the next entry.
-      resetToDefaults();
-    } finally {
-      saving = false;
-    }
-  }
-
   // Auto-insert "/" once the user has typed a third digit into MM/DD with
   // no separator yet. Only fires on direct keystrokes (insertText) so paste
   // and deletion leave the buffer alone.
@@ -265,30 +198,9 @@
     const m = dateText.match(/^(\d{2})(\d+)$/);
     if (m) dateText = `${m[1]}/${m[2]}`;
   }
-
-  // Label for the edit-mode action button: "Update Tuesday, May 12".
-  let updateLabel = $derived(
-    parsedDate ? `Update ${formatDate(parsedDate)}` : "Update",
-  );
-  let showAddButton = $derived(mode === "add" && !!onsubmit && valid);
-  let showUpdateButton = $derived(
-    mode === "edit" && !!onupdate && dirty && valid,
-  );
 </script>
 
-<form class="task-entry-form" onsubmit={handleSubmit}>
-  {#if showAddButton || showUpdateButton}
-    <div class="form-actions top-actions">
-      <button type="submit" class="btn btn-primary" disabled={saving}>
-        {#if showUpdateButton}
-          {saving ? "Saving..." : updateLabel}
-        {:else}
-          {saving ? "Saving..." : submitLabel}
-        {/if}
-      </button>
-    </div>
-  {/if}
-
+<div class="task-entry-form">
   <div class="form-row">
     <div class="field icon-field">
       <span class="leading-icon" aria-hidden="true">
@@ -373,7 +285,7 @@
         aria-invalid={addressMissing}
       />
     </div>
-    <div class="field icon-field" class:invalid={cityMissing}>
+    <div class="field icon-field">
       <span class="leading-icon" aria-hidden="true">
         <!-- Buildings -->
         <svg
@@ -389,12 +301,18 @@
           <rect x="15" y="13" width="6" height="8" />
         </svg>
       </span>
-      <AutocompleteInput
-        bind:inputValue={city}
-        placeholder="City"
-        fetchOptions={fetchCities}
-        minChars={3}
-      />
+      <select
+        bind:value={city}
+        aria-label="City"
+        class:invalid={cityMissing}
+        aria-invalid={cityMissing}
+        data-empty={!city}
+      >
+        <option value="">City</option>
+        {#each CITIES as c (c)}
+          <option value={c}>{c}</option>
+        {/each}
+      </select>
     </div>
   </div>
 
@@ -434,12 +352,16 @@
 
   <div class="form-row">
     <div class="field">
-      <TeamLeadAutocomplete
-        initialId={teamLeadId}
-        initialLabel={teamLeadLabel}
-        placeholder="Team lead (start typing — auto-fills on unique match)"
-        onselect={handleTeamLeadSelect}
-      />
+      <select
+        bind:value={teamLeadId}
+        aria-label="Team lead"
+        data-empty={teamLeadId === null}
+      >
+        <option value={null}>Team lead (optional)</option>
+        {#each teamLeads as lead (lead.id)}
+          <option value={lead.id}>{lead.first_name} {lead.last_name}</option>
+        {/each}
+      </select>
     </div>
   </div>
 
@@ -453,8 +375,7 @@
       rows="2"
     ></textarea>
   </div>
-
-</form>
+</div>
 
 <style>
   .task-entry-form {
@@ -473,7 +394,8 @@
     min-width: 0;
   }
 
-  .field input {
+  .field input,
+  .field select {
     width: 100%;
     padding: var(--spacing-sm) var(--spacing-md);
     min-height: var(--btn-min-height);
@@ -486,18 +408,17 @@
     box-sizing: border-box;
   }
 
-  .field input:focus {
+  .field input:focus,
+  .field select:focus {
     outline: none;
     border-color: var(--color-primary, #3a6db5);
     box-shadow: 0 0 0 2px rgba(58, 109, 181, 0.2);
   }
 
   /* Empty/default-value inputs render in muted gray so a still-default
-     value is visually distinct from one the user has actively confirmed.
-     Native `placeholder` styling doesn't reach inputs that have a
-     pre-filled value (e.g. the default time "9:00 AM"), so we mark the
-     inputs themselves and the inputs that look empty stay muted. */
-  .field input[data-empty="true"] {
+     value is visually distinct from one the user has actively confirmed. */
+  .field input[data-empty="true"],
+  .field select[data-empty="true"] {
     color: var(--rt-text-muted, #777);
   }
   .inline-num input[data-default="true"] {
@@ -528,11 +449,10 @@
   }
 
   .icon-field input,
-  .icon-field :global(.autocomplete-input) {
+  .icon-field select {
     padding-left: calc(var(--spacing-sm) * 2 + 18px);
   }
 
-  /* # Volunteers / # Skilled: label inline with a compact input. */
   .inline-row {
     align-items: center;
     gap: var(--spacing-lg);
@@ -577,8 +497,6 @@
     color: var(--color-text);
     box-sizing: border-box;
     resize: vertical;
-    /* Modern browsers grow the textarea to fit its content; Firefox/Safari
-       fall back to the rows attribute. */
     field-sizing: content;
     min-height: calc(var(--btn-min-height) + 0.5em);
   }
@@ -589,23 +507,10 @@
     box-shadow: 0 0 0 2px rgba(58, 109, 181, 0.2);
   }
 
-  /* Red border for missing required fields. Cleared as soon as the user
-     enters anything. */
   input.invalid,
+  select.invalid,
   textarea.invalid {
     border-color: var(--rt-error, #c53030);
-  }
-
-  /* Reach inside the AutocompleteInput component to color its native input. */
-  .icon-field.invalid :global(.autocomplete-input) {
-    border-color: var(--rt-error, #c53030);
-  }
-
-  .form-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: var(--spacing-sm);
-    min-height: var(--btn-min-height);
   }
 
   @media (max-width: 600px) {
