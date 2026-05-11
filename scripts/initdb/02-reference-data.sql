@@ -12,13 +12,19 @@ INSERT INTO person_roles (person_id, role) VALUES
 -- Team leaders
 INSERT INTO people (id, first_name, last_name, email, phone, skills, active) VALUES
     ('00000000-0000-0000-0000-000000000010', 'Tom', 'Builder', 'tom.builder@example.com', '703-555-0201', '{carpentry}', true),
-    ('00000000-0000-0000-0000-000000000011', 'Lisa', 'Carpenter', 'lisa.carpenter@example.com', '703-555-0202', '{carpentry,electrical}', true);
+    ('00000000-0000-0000-0000-000000000011', 'Lisa', 'Carpenter', 'lisa.carpenter@example.com', '703-555-0202', '{carpentry,electrical}', true),
+    -- Carmen is the all-programs team lead: belongs to RTX *and* the
+    -- single-task programs (ACR, RAMP, LIFT) so the team-lead pulldown
+    -- has a candidate for every program out of the box.
+    ('00000000-0000-0000-0000-000000000012', 'Carmen', 'Lead', 'carmen.lead@example.com', '703-555-0203', '{carpentry,electrical,plumbing,hvac}', true);
 
 INSERT INTO person_roles (person_id, role) VALUES
     ('00000000-0000-0000-0000-000000000010', 'team_leader'),
     ('00000000-0000-0000-0000-000000000010', 'volunteer'),
     ('00000000-0000-0000-0000-000000000011', 'team_leader'),
-    ('00000000-0000-0000-0000-000000000011', 'volunteer');
+    ('00000000-0000-0000-0000-000000000011', 'volunteer'),
+    ('00000000-0000-0000-0000-000000000012', 'team_leader'),
+    ('00000000-0000-0000-0000-000000000012', 'volunteer');
 
 -- Volunteers
 INSERT INTO people (id, first_name, last_name, email, phone, skills, active) VALUES
@@ -43,6 +49,12 @@ INSERT INTO person_roles (person_id, role) VALUES
 INSERT INTO volunteer_programs (person_id, program) VALUES
     ('00000000-0000-0000-0000-000000000010', 'RTX'),
     ('00000000-0000-0000-0000-000000000011', 'RTX'),
+    -- Carmen is a member of every program so the single-task program
+    -- workflows have a default team-lead candidate.
+    ('00000000-0000-0000-0000-000000000012', 'RTX'),
+    ('00000000-0000-0000-0000-000000000012', 'ACR'),
+    ('00000000-0000-0000-0000-000000000012', 'RAMP'),
+    ('00000000-0000-0000-0000-000000000012', 'LIFT'),
     ('00000000-0000-0000-0000-000000000020', 'RTX'),
     ('00000000-0000-0000-0000-000000000021', 'RTX'),
     ('00000000-0000-0000-0000-000000000022', 'RTX'),

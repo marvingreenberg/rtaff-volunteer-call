@@ -1,12 +1,14 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { volunteerCalls, type VolunteerCallListResponse, type VolunteerCallCreate, type Program, type TaskCreate } from '$lib/api/client';
+  import { volunteerCalls, people, type VolunteerCallListResponse, type VolunteerCallCreate, type Program, type TaskCreate } from '$lib/api/client';
   import { ALL_PROGRAMS, PROGRAM_LABELS, SINGLE_TASK_PROGRAMS, suggestCallTitle } from '$lib/api/types';
   import Breadcrumb from '$lib/components/Breadcrumb.svelte';
   import TaskEntryForm from '$lib/components/TaskEntryForm.svelte';
   import { callStatusBadgeClass, programLabel } from '$lib/utils/badges';
   import { formatDate } from '$lib/utils/format';
+
+  type TeamLead = { id: string; first_name: string; last_name: string };
 
   let calls: VolunteerCallListResponse[] = $state([]);
   let loading = $state(true);
@@ -22,7 +24,43 @@
   // user typing a custom name would lose it when picking a date.
   let titleManuallyEdited = $state(false);
 
+  // Team-lead candidates for the currently-selected program. Refetched on
+  // program change so the embedded TaskEntryForm only sees people who can
+  // actually lead a task for *this* program (not all team leaders in the
+  // org). Empty until the first fetch resolves.
+  let teamLeads = $state<TeamLead[]>([]);
+  let teamLeadsForProgram = $state<Program | null>(null);
+
   let isSingleTaskProgram = $derived(SINGLE_TASK_PROGRAMS.has(newCall.program));
+
+  // Single-task programs preload the task entry; teamLeads must be loaded
+  // before the form mounts so the select has the right options. RTX
+  // doesn't need them here (tasks are added on the detail page where the
+  // per-page fetch already happens), but loading anyway keeps the code
+  // path uniform.
+  $effect(() => {
+    if (teamLeadsForProgram === newCall.program) return;
+    const program = newCall.program;
+    teamLeadsForProgram = program;
+    void (async () => {
+      try {
+        const list = await people.list({
+          role: 'team_leader',
+          active: true,
+          program,
+        });
+        if (teamLeadsForProgram !== program) return; // raced past us
+        teamLeads = list.map((p) => ({
+          id: p.id,
+          first_name: p.first_name,
+          last_name: p.last_name,
+        }));
+      } catch {
+        // Non-fatal — the team-lead select just stays empty.
+        teamLeads = [];
+      }
+    })();
+  });
 
   // Auto-suggest a default title when the user hasn't typed one yet. RTX
   // anchors to the next two-week cycle from today; single-task programs
@@ -161,6 +199,7 @@
               {programLabel(newCall.program)} calls have a single task — fill it in here.
             </p>
             <TaskEntryForm
+              {teamLeads}
               onchange={(value) => (newCallTask = value)}
             />
           </div>
