@@ -456,7 +456,7 @@ async def assignment_overview(
                 initials=_initials(p.first_name, p.last_name),
                 skills=list(p.skills),
                 phone=p.phone,
-                max_tasks_per_week=av.max_tasks_per_week or 1,
+                max_tasks_per_week=av.max_tasks_per_week or 2,
             )
         if av.task_id and av.available:
             vol_map[p.id].available_task_ids.append(av.task_id)

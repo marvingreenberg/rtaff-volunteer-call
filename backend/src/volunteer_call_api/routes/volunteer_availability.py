@@ -32,6 +32,7 @@ def _availability_response(avail: VolunteerAvailability) -> AvailabilityResponse
         task_id=avail.task_id,
         available=avail.available,
         max_tasks_per_week=avail.max_tasks_per_week,
+        max_tasks_per_week_2=avail.max_tasks_per_week_2,
         notes=avail.notes,
         created_at=avail.created_at,
         updated_at=avail.updated_at,
@@ -58,6 +59,7 @@ async def submit_availability(
         task_id=body.task_id,
         available=body.available,
         max_tasks_per_week=body.max_tasks_per_week,
+        max_tasks_per_week_2=body.max_tasks_per_week_2,
         notes=body.notes,
     )
     db.add(avail)
@@ -104,7 +106,11 @@ async def update_availability(
     avail = result.scalar_one_or_none()
     if avail is None:
         raise HTTPException(status_code=404, detail="Availability not found")
-    apply_partial_update(avail, body, ["available", "max_tasks_per_week", "notes"])
+    apply_partial_update(
+        avail,
+        body,
+        ["available", "max_tasks_per_week", "max_tasks_per_week_2", "notes"],
+    )
     await db.commit()
     await db.refresh(avail)
     result = await db.execute(

@@ -28,7 +28,12 @@ class VolunteerAvailability(Base, TimestampMixin):
         UUID(as_uuid=False), ForeignKey("tasks.id"), nullable=True
     )
     available: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    max_tasks_per_week: Mapped[int | None] = mapped_column(Integer, default=1)
+    # Per-week caps for a 2-week call cycle. Week 1 = ISO week of the
+    # earliest task; Week 2 = the following ISO week. Both are stored
+    # even when the UI hides Week 2 (because no tasks fall in it) so
+    # the value isn't lost on a re-render.
+    max_tasks_per_week: Mapped[int | None] = mapped_column(Integer, default=2)
+    max_tasks_per_week_2: Mapped[int | None] = mapped_column(Integer, default=2)
     notes: Mapped[str | None] = mapped_column(Text)
 
     volunteer_call: Mapped["VolunteerCall"] = relationship(back_populates="availabilities")

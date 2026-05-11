@@ -105,7 +105,14 @@ CREATE TABLE volunteer_availability (
     person_id UUID NOT NULL REFERENCES people(id) ON DELETE CASCADE,
     task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
     available BOOLEAN NOT NULL DEFAULT TRUE,
-    max_tasks_per_week INTEGER DEFAULT 1,
+    -- Per-week caps. Default 2 in both because most volunteers can field
+    -- one repair Saturday + one weeknight per week. Week 1 is the ISO
+    -- week containing the call's earliest task date; Week 2 is the
+    -- following ISO week. UI hides Week 2 when no tasks fall in it,
+    -- but the value is always persisted so toggling visibility doesn't
+    -- lose data.
+    max_tasks_per_week INTEGER DEFAULT 2,
+    max_tasks_per_week_2 INTEGER DEFAULT 2,
     notes TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),

@@ -14,6 +14,7 @@
     type TaskConflicts,
   } from '$lib/api/client';
   import { formatDate } from '$lib/utils/format';
+  import { tasksSpanMultipleWeeks } from '$lib/utils/task-weeks';
   import ItemCard from '$lib/components/ItemCard.svelte';
   import ListViewToggle from '$lib/components/ListViewToggle.svelte';
   import DataTable from '$lib/components/DataTable.svelte';
@@ -22,11 +23,10 @@
   import { truncateText } from '$lib/components/data-table';
   import type { Column, SortDir } from '$lib/components/data-table';
 
-  const MAX_WEEK_OPTIONS = [
-    { label: '1', value: 1 },
-    { label: '2', value: 2 },
-    { label: 'Any', value: 5 },
-  ];
+  // Per-week task-cap options. 1-5 with no "Any" pseudo-value — the
+  // pulldown is short enough to scan without a special case.
+  const MAX_WEEK_OPTIONS = [1, 2, 3, 4, 5];
+  const DEFAULT_MAX_PER_WEEK = 2;
 
   let assignments = $state<MyAssignment[]>([]);
   let openCalls = $state<VolunteerCallListResponse[]>([]);
@@ -41,6 +41,7 @@
   let callLevelAvail = $state<Record<string, AvailabilityResponse | null>>({});
   let checkedTasks = $state<Record<string, Set<string>>>({});
   let maxPerWeek = $state<Record<string, number>>({});
+  let maxPerWeek2 = $state<Record<string, number>>({});
   let expandedTasks = $state<Set<string>>(new Set());
   let saving = $state<Record<string, boolean>>({});
   let saveMessage = $state<Record<string, string>>({});
@@ -134,11 +135,20 @@
       }
       checkedTasks[callId] = checked;
 
-      // max_tasks_per_week from call-level availability, or any task-level record
-      const mpw = callLevel?.max_tasks_per_week
+      // Per-week caps. Use the call-level availability when present,
+      // else any task-level record, else the default. Both values are
+      // always saved on submit even when the Week 2 pulldown is hidden,
+      // so a stored value can survive a re-render that drops Week 2.
+      const mpw =
+        callLevel?.max_tasks_per_week
         ?? myAvails.find((a) => a.max_tasks_per_week !== null)?.max_tasks_per_week
-        ?? 1;
+        ?? DEFAULT_MAX_PER_WEEK;
+      const mpw2 =
+        callLevel?.max_tasks_per_week_2
+        ?? myAvails.find((a) => a.max_tasks_per_week_2 !== null)?.max_tasks_per_week_2
+        ?? DEFAULT_MAX_PER_WEEK;
       maxPerWeek[callId] = mpw;
+      maxPerWeek2[callId] = mpw2;
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load call data';
     } finally {
@@ -172,6 +182,11 @@
     saveMessage[callId] = '';
   }
 
+  function setMaxPerWeek2(callId: string, value: number) {
+    maxPerWeek2[callId] = value;
+    saveMessage[callId] = '';
+  }
+
   async function submitAvailability(callId: string) {
     if (!authState.user) return;
     saving[callId] = true;
@@ -182,7 +197,11 @@
     const jobs = callJobs[callId] || [];
     const selected = checkedTasks[callId] || new Set();
     const existingAvails = callAvail[callId] || {};
-    const mpw = maxPerWeek[callId] ?? 1;
+    const mpw = maxPerWeek[callId] ?? DEFAULT_MAX_PER_WEEK;
+    // Always persist Week 2 even when the UI hides it (no week-2 tasks in
+    // the call). Hiding is a display decision; the stored value is the
+    // volunteer's preference and shouldn't be lost on a re-render.
+    const mpw2 = maxPerWeek2[callId] ?? DEFAULT_MAX_PER_WEEK;
 
     try {
       // Submit or update per-task availability
@@ -194,11 +213,16 @@
 
         if (existing) {
           // Update existing availability if the state changed
-          if (existing.available !== isAvailable || existing.max_tasks_per_week !== mpw) {
+          if (
+            existing.available !== isAvailable ||
+            existing.max_tasks_per_week !== mpw ||
+            existing.max_tasks_per_week_2 !== mpw2
+          ) {
             promises.push(
               volunteerAvailability.update(callId, existing.id, {
                 available: isAvailable,
                 max_tasks_per_week: mpw,
+                max_tasks_per_week_2: mpw2,
               }),
             );
           }
@@ -209,6 +233,7 @@
             task_id: job.task_id,
             available: true,
             max_tasks_per_week: mpw,
+            max_tasks_per_week_2: mpw2,
           };
           promises.push(volunteerAvailability.submit(callId, data));
         }
@@ -217,10 +242,14 @@
       // If no per-task records but we need to save max_tasks_per_week at call level
       const existingCallLevel = callLevelAvail[callId];
       if (existingCallLevel) {
-        if (existingCallLevel.max_tasks_per_week !== mpw) {
+        if (
+          existingCallLevel.max_tasks_per_week !== mpw ||
+          existingCallLevel.max_tasks_per_week_2 !== mpw2
+        ) {
           promises.push(
             volunteerAvailability.update(callId, existingCallLevel.id, {
               max_tasks_per_week: mpw,
+              max_tasks_per_week_2: mpw2,
             }),
           );
         }
@@ -231,6 +260,7 @@
             person_id: authState.user!.id,
             available: false,
             max_tasks_per_week: mpw,
+            max_tasks_per_week_2: mpw2,
           }),
         );
       }
@@ -365,23 +395,41 @@
             {:else}
               {@const jobs = callJobs[call.id] || []}
               {@const selected = checkedTasks[call.id] || new Set()}
-              {@const mpw = maxPerWeek[call.id] ?? 1}
+              {@const mpw = maxPerWeek[call.id] ?? DEFAULT_MAX_PER_WEEK}
+              {@const mpw2 = maxPerWeek2[call.id] ?? DEFAULT_MAX_PER_WEEK}
+              {@const showWeek2 = tasksSpanMultipleWeeks(jobs)}
 
               {#if jobs.length === 0}
                 <p class="empty-text">No tasks posted yet for this call.</p>
               {:else}
                 <div class="max-week-row">
-                  <span class="max-week-label">Max tasks/week:</span>
-                  <div class="toggle-group">
-                    {#each MAX_WEEK_OPTIONS as opt (opt.value)}
-                      <button
-                        type="button"
-                        class="toggle-btn"
-                        class:active={mpw === opt.value}
-                        onclick={() => setMaxPerWeek(call.id, opt.value)}
-                      >{opt.label}</button>
-                    {/each}
-                  </div>
+                  <span class="max-week-label">Maximum tasks:</span>
+                  <label class="week-pick">
+                    <span class="week-pick-label">{showWeek2 ? 'Week 1' : 'per week'}</span>
+                    <select
+                      value={mpw}
+                      onchange={(e) => setMaxPerWeek(call.id, parseInt((e.currentTarget as HTMLSelectElement).value, 10))}
+                      aria-label={showWeek2 ? 'Maximum tasks, week 1' : 'Maximum tasks per week'}
+                    >
+                      {#each MAX_WEEK_OPTIONS as n (n)}
+                        <option value={n}>{n}</option>
+                      {/each}
+                    </select>
+                  </label>
+                  {#if showWeek2}
+                    <label class="week-pick">
+                      <span class="week-pick-label">Week 2</span>
+                      <select
+                        value={mpw2}
+                        onchange={(e) => setMaxPerWeek2(call.id, parseInt((e.currentTarget as HTMLSelectElement).value, 10))}
+                        aria-label="Maximum tasks, week 2"
+                      >
+                        {#each MAX_WEEK_OPTIONS as n (n)}
+                          <option value={n}>{n}</option>
+                        {/each}
+                      </select>
+                    </label>
+                  {/if}
                 </div>
 
                 <div class="list-header-row">
@@ -608,12 +656,14 @@
     color: var(--rt-text-muted, #777);
   }
 
-  /* Max tasks/week toggle */
+  /* Maximum-tasks row: a compact single-line picker with per-week
+     pulldowns. Week 2 is appended only when the call's tasks actually
+     span into a second ISO week. */
   .max-week-row {
     display: flex;
     align-items: center;
-    gap: var(--spacing-md);
-    margin-bottom: var(--spacing-md);
+    gap: var(--spacing-sm) var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
     flex-wrap: wrap;
   }
 
@@ -622,34 +672,24 @@
     font-size: var(--font-size-sm);
   }
 
-  .toggle-group {
-    display: flex;
+  .week-pick {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+  }
+
+  .week-pick-label {
+    color: var(--rt-text-muted, #777);
+  }
+
+  .week-pick select {
+    padding: 2px var(--spacing-sm);
     border: 1px solid var(--rt-gray-200, #e4dfda);
-    border-radius: var(--card-radius);
-    overflow: hidden;
-  }
-
-  .toggle-btn {
-    min-height: var(--btn-min-height);
-    min-width: 56px;
-    padding: var(--spacing-sm) var(--spacing-md);
-    border: none;
-    background: var(--rt-white, white);
-    cursor: pointer;
-    font-size: var(--btn-font-size);
-    font-family: inherit;
-    font-weight: 500;
-    color: var(--rt-text-light, #555);
-    border-right: 1px solid var(--rt-gray-200, #e4dfda);
-  }
-
-  .toggle-btn:last-child {
-    border-right: none;
-  }
-
-  .toggle-btn.active {
-    background: var(--color-primary, #3a6db5);
-    color: white;
+    border-radius: var(--card-radius, 8px);
+    font: inherit;
+    background: var(--rt-white, #fff);
+    min-height: 28px;
   }
 
   .list-header-row {

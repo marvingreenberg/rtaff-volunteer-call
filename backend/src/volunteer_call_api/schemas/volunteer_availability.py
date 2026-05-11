@@ -11,7 +11,8 @@ class AvailabilityCreate(BaseModel):
     person_id: str
     task_id: str | None = None
     available: bool = True
-    max_tasks_per_week: int = 1
+    max_tasks_per_week: int = 2
+    max_tasks_per_week_2: int = 2
     notes: str | None = None
 
 
@@ -20,13 +21,15 @@ class AvailabilityBatchCreate(BaseModel):
 
     person_id: str
     task_availabilities: list[dict[str, bool]]  # [{task_id: str, available: bool}]
-    max_tasks_per_week: int = 1
+    max_tasks_per_week: int = 2
+    max_tasks_per_week_2: int = 2
     notes: str | None = None
 
 
 class AvailabilityUpdate(BaseModel):
     available: bool | None = None
     max_tasks_per_week: int | None = None
+    max_tasks_per_week_2: int | None = None
     notes: str | None = None
 
 
@@ -39,6 +42,7 @@ class AvailabilityResponse(BaseModel):
     task_id: str | None
     available: bool
     max_tasks_per_week: int | None
+    max_tasks_per_week_2: int | None
     notes: str | None
     created_at: datetime.datetime
     updated_at: datetime.datetime

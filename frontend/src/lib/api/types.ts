@@ -336,12 +336,14 @@ export interface AvailabilityCreate {
   task_id?: string | null;
   available?: boolean;
   max_tasks_per_week?: number;
+  max_tasks_per_week_2?: number;
   notes?: string;
 }
 
 export interface AvailabilityUpdate {
   available?: boolean;
   max_tasks_per_week?: number;
+  max_tasks_per_week_2?: number;
   notes?: string;
 }
 
@@ -354,6 +356,7 @@ export interface AvailabilityResponse {
   task_id: string | null;
   available: boolean;
   max_tasks_per_week: number | null;
+  max_tasks_per_week_2: number | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
