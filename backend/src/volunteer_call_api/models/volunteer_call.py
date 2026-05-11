@@ -3,7 +3,7 @@
 import datetime
 import enum
 
-from sqlalchemy import Boolean, Date, Enum, ForeignKey, Integer, String, Text, Time
+from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Integer, String, Text, Time
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -12,9 +12,19 @@ from volunteer_call_api.models.person import Program
 
 
 class CallStatus(enum.Enum):
-    DRAFT = "draft"
+    """Volunteer call lifecycle.
+
+    open      — created; tasks can still be added.
+    waiting   — invites sent; volunteers are responding.
+    assigned  — admin clicked Done Assigning. Notices may or may not have
+                gone out yet (toggled by assignments_sent_at).
+    archived  — call closed out.
+    """
+
     OPEN = "open"
-    CLOSED = "closed"
+    WAITING = "waiting"
+    ASSIGNED = "assigned"
+    ARCHIVED = "archived"
 
 
 class TaskStatus(enum.Enum):
@@ -37,11 +47,16 @@ class VolunteerCall(Base, TimestampMixin):
     status: Mapped[CallStatus] = mapped_column(
         Enum(CallStatus, values_callable=lambda e: [x.value for x in e]),
         nullable=False,
-        default=CallStatus.DRAFT,
+        default=CallStatus.OPEN,
     )
     notes: Mapped[str | None] = mapped_column(Text)
     created_by_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False), ForeignKey("people.id"), nullable=True
+    )
+    # Stamped on Send Assignments. Absence (NULL) == admin has clicked Done
+    # Assigning (status == ASSIGNED) but not yet sent notification emails.
+    assignments_sent_at: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
 
     tasks: Mapped[list["Task"]] = relationship(

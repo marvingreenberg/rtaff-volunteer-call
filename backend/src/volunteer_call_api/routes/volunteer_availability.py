@@ -45,7 +45,9 @@ async def submit_availability(
     call = await get_one_or_404(
         db, select(VolunteerCall).where(VolunteerCall.id == call_id), "Volunteer call not found"
     )
-    if call.status != CallStatus.OPEN:
+    # Volunteers can only submit availability after invites have been sent
+    # (status=WAITING) and before the admin closes assigning (assigned/archived).
+    if call.status != CallStatus.WAITING:
         raise HTTPException(status_code=400, detail="Call is not open for availability")
     person_result = await db.execute(select(Person).where(Person.id == body.person_id))
     if person_result.scalar_one_or_none() is None:

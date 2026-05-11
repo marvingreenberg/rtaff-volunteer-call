@@ -163,8 +163,10 @@
     saving = true;
     error = null;
     try {
-      await volunteerCalls.update(callId, { status: "closed" });
-      await volunteerCalls.sendAssignmentNotices(callId);
+      // Transition WAITING → ASSIGNED. The actual Send Assignments step
+      // (which emails volunteers) is a separate row button on the list
+      // page; admins explicitly fire it from there once ready.
+      await volunteerCalls.doneAssigning(callId);
       await goto("/volunteer-calls");
     } catch (e) {
       error = e instanceof Error ? e.message : "Failed to complete assignment";
@@ -229,7 +231,7 @@
           onclick={handleSave}
           aria-label="Complete assignment"
         >
-          {saving ? "Saving..." : "Save"}
+          {saving ? "Saving..." : "Done Assigning"}
         </button>
       </div>
     </div>

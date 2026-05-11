@@ -6,7 +6,7 @@
   import Breadcrumb from '$lib/components/Breadcrumb.svelte';
   import TaskEntryForm from '$lib/components/TaskEntryForm.svelte';
   import { callStatusBadgeClass, programLabel } from '$lib/utils/badges';
-  import { formatDate } from '$lib/utils/format';
+  import { rowAction, type RowAction } from '$lib/utils/call-row-action';
 
   type TeamLead = { id: string; first_name: string; last_name: string };
 
@@ -133,6 +133,80 @@
   function handleFilterChange() {
     loadCalls();
   }
+
+  // Row-level action state.
+  let busyCallIds = $state<Set<string>>(new Set());
+  let rowMessage = $state('');
+
+  function setBusy(id: string, busy: boolean) {
+    const next = new Set(busyCallIds);
+    if (busy) next.add(id);
+    else next.delete(id);
+    busyCallIds = next;
+  }
+
+  async function handleRowAction(
+    call: VolunteerCallListResponse,
+    action: RowAction,
+  ) {
+    if (busyCallIds.has(call.id)) return;
+    setBusy(call.id, true);
+    error = null;
+    rowMessage = '';
+    try {
+      if (action === 'send_invites') {
+        const res = await volunteerCalls.sendInvites(call.id);
+        rowMessage =
+          `Called: ${res.volunteers_notified} notification` +
+          (res.volunteers_notified === 1 ? '' : 's') +
+          ` sent.`;
+      } else if (action === 'assign') {
+        await goto(`/volunteer-calls/${call.id}/assign`);
+        return; // navigation; nothing else to do.
+      } else if (action === 'send_assignments') {
+        const res = await volunteerCalls.sendAssignmentNotices(call.id);
+        rowMessage =
+          `${res.assignment_emails} assignment / ${res.thanks_emails} thank-you email` +
+          (res.assignment_emails + res.thanks_emails === 1 ? '' : 's') +
+          ` sent.`;
+      } else if (action === 'archive') {
+        await volunteerCalls.archive(call.id);
+        rowMessage = `Call "${call.title}" archived.`;
+      }
+      await loadCalls();
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Action failed';
+    } finally {
+      setBusy(call.id, false);
+    }
+  }
+
+  async function handleDeleteCall(call: VolunteerCallListResponse) {
+    if (busyCallIds.has(call.id)) return;
+    const ok = window.confirm(
+      `Delete call "${call.title}" and all its tasks? This cannot be undone.`,
+    );
+    if (!ok) return;
+    // Second confirm if the call is past Open — the user already has
+    // sent invites or assignments out to volunteers.
+    if (call.status !== 'open') {
+      const ok2 = window.confirm(
+        'Volunteers have already been notified about this call. Are you sure you want to delete it?',
+      );
+      if (!ok2) return;
+    }
+    setBusy(call.id, true);
+    error = null;
+    rowMessage = '';
+    try {
+      await volunteerCalls.delete(call.id);
+      await loadCalls();
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to delete call';
+    } finally {
+      setBusy(call.id, false);
+    }
+  }
 </script>
 
 <svelte:head>
@@ -215,11 +289,16 @@
   <div class="filters">
     <select bind:value={statusFilter} onchange={handleFilterChange}>
       <option value="">All Statuses</option>
-      <option value="draft">Draft</option>
       <option value="open">Open</option>
-      <option value="closed">Closed</option>
+      <option value="waiting">Waiting</option>
+      <option value="assigned">Assigned</option>
+      <option value="archived">Archived</option>
     </select>
   </div>
+
+  {#if rowMessage}
+    <div class="result-banner">{rowMessage}</div>
+  {/if}
 
   {#if loading}
     <p class="loading">Loading calls...</p>
@@ -233,11 +312,14 @@
           <th>Program</th>
           <th>Tasks</th>
           <th>Status</th>
-          <th>Created</th>
+          <th>Action</th>
+          <th aria-label="Delete"></th>
         </tr>
       </thead>
       <tbody>
         {#each calls as call (call.id)}
+          {@const action = rowAction(call)}
+          {@const busy = busyCallIds.has(call.id)}
           <tr>
             <td>
               <a href="/volunteer-calls/{call.id}" class="row-link">{call.title}</a>
@@ -247,7 +329,29 @@
             <td>
               <span class="badge {callStatusBadgeClass(call.status)}">{call.status}</span>
             </td>
-            <td>{formatDate(call.created_at)}</td>
+            <td class="action-cell">
+              {#if action.action}
+                <button
+                  type="button"
+                  class="btn btn-primary action-btn"
+                  disabled={busy}
+                  onclick={() => handleRowAction(call, action.action!)}
+                >
+                  {busy ? '...' : action.label}
+                </button>
+              {/if}
+            </td>
+            <td class="trash-cell">
+              <button
+                type="button"
+                class="trash-btn"
+                onclick={() => handleDeleteCall(call)}
+                aria-label="Delete call {call.title}"
+                title="Delete call"
+              >
+                🗑️
+              </button>
+            </td>
           </tr>
         {/each}
       </tbody>
@@ -331,17 +435,62 @@
     font-weight: 600;
   }
 
+  .action-cell {
+    white-space: nowrap;
+  }
+
+  .action-btn {
+    padding: var(--spacing-xs) var(--spacing-md);
+    font-size: var(--font-size-sm);
+    min-height: 32px;
+  }
+
+  .trash-cell {
+    width: 44px;
+    text-align: right;
+  }
+
+  .trash-btn {
+    background: none;
+    border: none;
+    padding: 0 var(--spacing-sm);
+    font-size: 1.2em;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--rt-text-muted, #888);
+  }
+
+  .trash-btn:hover {
+    background: var(--rt-danger-bg, #fdecea);
+  }
+
+  .result-banner {
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--rt-success-bg);
+    color: var(--rt-success-text);
+    border-radius: var(--card-radius);
+    margin-bottom: var(--spacing-md);
+  }
+
+  /* Status badges. Re-uses the success/error pair already defined for
+     draft/open/closed callStatusBadgeClass mapping (now mapped to
+     open/waiting/assigned/archived). */
   .badge-draft {
     background: var(--rt-gray-100, #f5f3ef);
     color: var(--rt-text-muted, #777);
   }
 
   .badge-open {
+    background: var(--rt-info-bg, #e7f1fb);
+    color: var(--rt-info-text, #2c5aa0);
+  }
+
+  .badge-full {
     background: var(--rt-success-bg);
     color: var(--rt-success-text);
   }
 
-  .badge-closed {
+  .badge-cancelled {
     background: var(--rt-error-bg, #fce8e8);
     color: var(--rt-error, #c53030);
   }

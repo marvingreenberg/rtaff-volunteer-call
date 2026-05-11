@@ -30,15 +30,21 @@ export function projectStatusBorderColor(status: string): string {
   return colors[status] || "var(--rt-gray-300)";
 }
 
-/** Get CSS class for volunteer call/slot status badges */
+/** Get CSS class for volunteer call/slot status badges. Re-uses the
+ * existing draft/open/full/cancelled palette colors rather than minting
+ * new ones: open→gray, waiting→blue, assigned→green, archived→red-ish.
+ */
 export function callStatusBadgeClass(status: string): string {
   switch (status) {
-    case "draft":
-      return "badge-draft";
     case "open":
+      return "badge-draft";
+    case "waiting":
       return "badge-open";
-    case "closed":
-      return "badge-closed";
+    case "assigned":
+      return "badge-full";
+    case "archived":
+      return "badge-cancelled";
+    // Slot/task badges share this helper today.
     case "scheduled":
       return "badge-scheduled";
     case "confirmed":

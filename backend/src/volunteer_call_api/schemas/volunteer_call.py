@@ -60,7 +60,7 @@ class TaskResponse(BaseModel):
 class VolunteerCallCreate(BaseModel):
     title: str
     program: Program
-    status: CallStatus = CallStatus.DRAFT
+    status: CallStatus = CallStatus.OPEN
     notes: str | None = None
     # Convenience for single-task programs (ACR / RAMP / LIFT): caller can
     # supply task fields inline and the server creates one task with the call.
@@ -83,6 +83,7 @@ class VolunteerCallResponse(BaseModel):
     notes: str | None
     task_count: int = 0
     tasks: list[TaskResponse] = []
+    assignments_sent_at: datetime.datetime | None = None
     created_at: datetime.datetime
     updated_at: datetime.datetime
 
@@ -178,6 +179,7 @@ class VolunteerCallListResponse(BaseModel):
     program: Program
     status: CallStatus
     task_count: int = 0
+    assignments_sent_at: datetime.datetime | None = None
     created_at: datetime.datetime
     updated_at: datetime.datetime
 

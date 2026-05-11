@@ -127,7 +127,9 @@ async def update_volunteer_call(
 ) -> VolunteerCallResponse:
     call = await get_call_or_404(call_id, db)
 
-    if body.status == CallStatus.OPEN:
+    # PUT is the admin override path; the canonical workflow uses the
+    # dedicated send-invites / done-assigning / archive endpoints.
+    if body.status == CallStatus.WAITING:
         non_cancelled = [t for t in call.tasks if t.status != TaskStatus.CANCELLED]
         unscheduled = [t for t in non_cancelled if t.date is None]
         if unscheduled:
@@ -135,11 +137,6 @@ async def update_volunteer_call(
                 status_code=400,
                 detail=f"Cannot open call: {len(unscheduled)} task(s) have no date set",
             )
-
-    # Note: status transitions no longer fire notifications. Closing the call
-    # is a UI action ("Assign Volunteers") that locks volunteer responses;
-    # the assignment/thank-you emails are sent via the explicit
-    # /send-assignment-notices endpoint when the admin is ready.
 
     for field in ["title", "status", "notes"]:
         value = getattr(body, field)
@@ -206,26 +203,25 @@ async def list_jobs(call_id: str, db: AsyncSession = Depends(get_db)) -> list[Jo
 async def send_invites(call_id: str, db: AsyncSession = Depends(get_db)) -> SendInvitesResponse:
     """Send invitations to all active, subscribed volunteers via their preferred channel.
 
-    If the call is in Draft, validate that every non-cancelled task has a date,
-    then transition the call to Open as part of the same action. Sending invites
-    is the canonical Draft→Open trigger; admins do not toggle Open separately.
+    Canonical OPEN → WAITING transition. Re-sending while already WAITING is
+    allowed (idempotent enough). Rejects from ASSIGNED / ARCHIVED.
     """
     call = await get_call_or_404(call_id, db)
-    if call.status == CallStatus.CLOSED:
+    if call.status not in (CallStatus.OPEN, CallStatus.WAITING):
         raise HTTPException(
             status_code=400,
-            detail="Cannot send invites for a closed call",
+            detail="Cannot send invites once assignment is complete",
         )
 
     non_cancelled = [t for t in call.tasks if t.status != TaskStatus.CANCELLED]
-    if call.status == CallStatus.DRAFT:
+    if call.status == CallStatus.OPEN:
         unscheduled = [t for t in non_cancelled if t.date is None]
         if unscheduled:
             raise HTTPException(
                 status_code=400,
                 detail=f"Cannot send invites: {len(unscheduled)} task(s) have no date set",
             )
-        call.status = CallStatus.OPEN
+        call.status = CallStatus.WAITING
 
     task_count = len(non_cancelled)
     invite_tasks = sorted(
@@ -297,24 +293,60 @@ async def send_invites(call_id: str, db: AsyncSession = Depends(get_db)) -> Send
 async def send_assignment_notices(
     call_id: str, db: AsyncSession = Depends(get_db)
 ) -> AssignmentNoticesResponse:
-    """Dispatch assignment + thank-you emails for a closed call.
+    """Dispatch assignment + thank-you emails for an ASSIGNED call.
 
-    Independent of any status transition: an admin clicks this when assignments
-    are settled. Idempotent in the sense that re-clicking re-sends to everyone
-    (caller is responsible for confirming intent on the UI side).
+    Stamps assignments_sent_at on success. Does not change the call status;
+    the row's "Send Assignments" button switches to "Archive" via the
+    timestamp's presence rather than a fifth status.
     """
     call = await get_call_or_404(call_id, db)
-    if call.status != CallStatus.CLOSED:
+    if call.status != CallStatus.ASSIGNED:
         raise HTTPException(
             status_code=400,
-            detail="Cannot send assignment notices: call is not closed",
+            detail="Cannot send assignment notices: assignment is not complete",
         )
     assigned, thanks = await generate_call_notifications(call_id, db)
+    call.assignments_sent_at = datetime.datetime.now(datetime.timezone.utc)
     await db.commit()
     return AssignmentNoticesResponse(
         assignment_emails=assigned,
         thanks_emails=thanks,
     )
+
+
+@router.post("/{call_id}/done-assigning", response_model=VolunteerCallResponse)
+async def done_assigning(call_id: str, db: AsyncSession = Depends(get_db)) -> VolunteerCallResponse:
+    """Transition WAITING → ASSIGNED. Called by the /assign page's Save button.
+
+    The Phase 4 policy and team-lead gates are enforced UI-side; this endpoint
+    only validates the status. Reject when the call has already advanced past
+    WAITING (or never reached it).
+    """
+    call = await get_call_or_404(call_id, db)
+    if call.status != CallStatus.WAITING:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot finish assigning: call is not in the assigning state",
+        )
+    call.status = CallStatus.ASSIGNED
+    await db.commit()
+    call = await get_call_or_404(call_id, db)
+    return call_response(call)
+
+
+@router.post("/{call_id}/archive", response_model=VolunteerCallResponse)
+async def archive_call(call_id: str, db: AsyncSession = Depends(get_db)) -> VolunteerCallResponse:
+    """Transition ASSIGNED → ARCHIVED. Called by the list page's Archive button."""
+    call = await get_call_or_404(call_id, db)
+    if call.status != CallStatus.ASSIGNED:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot archive: call is not in the assigned state",
+        )
+    call.status = CallStatus.ARCHIVED
+    await db.commit()
+    call = await get_call_or_404(call_id, db)
+    return call_response(call)
 
 
 # --- Assignment Overview ---

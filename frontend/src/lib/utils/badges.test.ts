@@ -31,10 +31,16 @@ describe("projectStatusBorderColor", () => {
 });
 
 describe("callStatusBadgeClass", () => {
-  it("maps call statuses", () => {
-    expect(callStatusBadgeClass("draft")).toBe("badge-draft");
-    expect(callStatusBadgeClass("open")).toBe("badge-open");
-    expect(callStatusBadgeClass("closed")).toBe("badge-closed");
+  it("maps call statuses to reused badge palette classes", () => {
+    // Each lifecycle step reuses an existing palette color rather than
+    // minting a new one — open=gray (draft-shade), waiting=blue
+    // (info-shade), assigned=green (full-shade), archived=red
+    // (cancelled-shade). Pin the exact mapping so a future palette
+    // refactor doesn't silently re-color a step.
+    expect(callStatusBadgeClass("open")).toBe("badge-draft");
+    expect(callStatusBadgeClass("waiting")).toBe("badge-open");
+    expect(callStatusBadgeClass("assigned")).toBe("badge-full");
+    expect(callStatusBadgeClass("archived")).toBe("badge-cancelled");
   });
 
   it("returns default for unknown", () => {

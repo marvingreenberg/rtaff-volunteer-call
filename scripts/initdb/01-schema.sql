@@ -7,7 +7,12 @@ CREATE TYPE roletype AS ENUM ('staff', 'team_leader', 'volunteer');
 CREATE TYPE notificationpreference AS ENUM ('email', 'sms', 'both');
 CREATE TYPE notificationdetaillevel AS ENUM ('summary', 'full');
 CREATE TYPE subscriptionstatus AS ENUM ('active', 'paused', 'unsubscribed');
-CREATE TYPE callstatus AS ENUM ('draft', 'open', 'closed');
+-- Volunteer call lifecycle:
+--   open      — created; tasks may still be added
+--   waiting   — invites sent; volunteers are responding
+--   assigned  — admin clicked Done Assigning; emails may or may not have gone out yet
+--   archived  — closed out
+CREATE TYPE callstatus AS ENUM ('open', 'waiting', 'assigned', 'archived');
 CREATE TYPE taskstatus AS ENUM ('open', 'full', 'cancelled');
 CREATE TYPE assignmentrole AS ENUM ('team_leader', 'volunteer');
 CREATE TYPE notificationtype AS ENUM ('call_invite', 'assignment', 'call_thanks', 'assignment_update');
@@ -64,9 +69,12 @@ CREATE TABLE volunteer_calls (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     title VARCHAR(200) NOT NULL,
     program program NOT NULL,
-    status callstatus NOT NULL DEFAULT 'draft',
+    status callstatus NOT NULL DEFAULT 'open',
     notes TEXT,
     created_by_id UUID REFERENCES people(id),
+    -- Stamped when an admin clicks Send Assignments on the list page;
+    -- absence == "Done Assigning was clicked but notices haven't been sent yet".
+    assignments_sent_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

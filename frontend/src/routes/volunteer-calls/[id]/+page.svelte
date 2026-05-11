@@ -167,7 +167,7 @@
         </div>
       {/if}
 
-      {#if call.status !== 'closed' && !isSingleTaskProgram}
+      {#if (call.status === 'open' || call.status === 'waiting') && !isSingleTaskProgram}
         {#if addOpen}
           <div class="task-row task-row-add expanded">
             <div class="summary-row">

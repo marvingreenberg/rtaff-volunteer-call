@@ -181,6 +181,16 @@ export const volunteerCalls = {
   delete: (id: string) =>
     request<void>(`/volunteer-calls/${id}`, { method: "DELETE" }),
 
+  doneAssigning: (id: string) =>
+    request<VolunteerCallResponse>(`/volunteer-calls/${id}/done-assigning`, {
+      method: "POST",
+    }),
+
+  archive: (id: string) =>
+    request<VolunteerCallResponse>(`/volunteer-calls/${id}/archive`, {
+      method: "POST",
+    }),
+
   addTask: (callId: string, data: TaskCreate) =>
     request<TaskResponse>(`/volunteer-calls/${callId}/tasks`, {
       method: "POST",

@@ -54,6 +54,7 @@ def call_response(call: VolunteerCall) -> VolunteerCallResponse:
         notes=call.notes,
         task_count=len(tasks),
         tasks=tasks,
+        assignments_sent_at=call.assignments_sent_at,
         created_at=call.created_at,
         updated_at=call.updated_at,
     )
@@ -66,6 +67,7 @@ def call_list_response(call: VolunteerCall) -> VolunteerCallListResponse:
         program=call.program,
         status=call.status,
         task_count=len(call.tasks),
+        assignments_sent_at=call.assignments_sent_at,
         created_at=call.created_at,
         updated_at=call.updated_at,
     )

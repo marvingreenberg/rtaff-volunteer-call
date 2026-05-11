@@ -207,7 +207,7 @@ export interface TaskConflicts {
 
 // --- Volunteer Calls ---
 
-export type CallStatus = "draft" | "open" | "closed";
+export type CallStatus = "open" | "waiting" | "assigned" | "archived";
 export type TaskStatus = "open" | "full" | "cancelled";
 
 /**
@@ -296,6 +296,8 @@ export interface VolunteerCallResponse {
   notes: string | null;
   task_count: number;
   tasks: TaskResponse[];
+  /** Stamped when Send Assignments fires; null until then. */
+  assignments_sent_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -306,6 +308,7 @@ export interface VolunteerCallListResponse {
   program: Program;
   status: CallStatus;
   task_count: number;
+  assignments_sent_at: string | null;
   created_at: string;
   updated_at: string;
 }
