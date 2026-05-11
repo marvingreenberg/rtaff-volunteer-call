@@ -47,4 +47,23 @@ describe("suggestCallTitle", () => {
       "RTX Call April 27 - May 8",
     );
   });
+
+  it("RTX correctly rolls through month boundaries on the end date", () => {
+    // Monday 2026-05-25 → start 5/25; +11 = 6/5 (May has 31 days, so
+    // setDate(25 + 11) = setDate(36) overflows into June 5). Catches a
+    // regression if month-end is computed naively (e.g. clamping to the
+    // last day of the start month).
+    expect(suggestCallTitle("RTX", new Date(2026, 4, 25))).toBe(
+      "RTX Call May 25 - June 5",
+    );
+  });
+
+  it("RTX rolls through the year boundary correctly", () => {
+    // Monday 2025-12-29 → start 12/29; +11 = 1/9/2026. Catches a
+    // regression where the year wrap silently produces a January date in
+    // 2025 (because the underlying Date math forgot to bump the year).
+    expect(suggestCallTitle("RTX", new Date(2025, 11, 29))).toBe(
+      "RTX Call December 29 - January 9",
+    );
+  });
 });
