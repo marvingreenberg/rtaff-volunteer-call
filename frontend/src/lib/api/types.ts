@@ -56,30 +56,54 @@ const SINGLE_TASK_PROGRAM_TITLES: Record<Program, string> = {
   LIFT: "Chairlift call",
 };
 
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
 /**
- * Suggest a default call title from program + (for RTX) the first task's
- * date. Returns an empty string when not enough info is known so the input
- * is not over-eager about supplying a placeholder name.
+ * Suggest a default call title from program (and, for RTX, today's date —
+ * used to anchor the next two-week RTX cycle). Returns an empty string only
+ * when the date-based computation can't run.
+ *
+ * RTX format: "RTX Call <Month> <Day> - [<Month> ]<Day>". The window starts
+ * on the upcoming Monday (today if today is a Monday) and ends 11 days
+ * later (the 2nd Friday). The closing month name is omitted when both ends
+ * fall in the same month, since "May 11 - 22" reads cleaner than "May 11 -
+ * May 22"; month-crossings like "April 27 - May 8" keep both names so the
+ * end date isn't ambiguous.
+ *
+ * `today` is injectable so tests aren't tied to wall-clock time.
  */
 export function suggestCallTitle(
   program: Program,
-  firstTaskDate: string | null,
+  today: Date = new Date(),
 ): string {
   if (program === "RTX") {
-    if (!firstTaskDate) return "";
-    const m = firstTaskDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (!m) return "";
-    // Anchor to local-noon to avoid a TZ-driven day rollback on parse.
-    const d = new Date(firstTaskDate + "T12:00:00");
-    if (isNaN(d.getTime())) return "";
-    // Mon..Sun window containing the task date.
-    const dow = d.getDay(); // 0=Sun..6=Sat
-    const offsetToMon = dow === 0 ? -6 : 1 - dow;
-    const mon = new Date(d);
-    mon.setDate(d.getDate() + offsetToMon);
-    const sun = new Date(mon);
-    sun.setDate(mon.getDate() + 6);
-    return `Rebuilding Together ${mon.getMonth() + 1}/${mon.getDate()}-${sun.getMonth() + 1}/${sun.getDate()}`;
+    const dow = today.getDay(); // 0=Sun..6=Sat
+    const offsetToMon = dow === 0 ? 1 : dow === 1 ? 0 : 8 - dow;
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + offsetToMon);
+    const friday = new Date(monday);
+    friday.setDate(monday.getDate() + 11);
+    const startMonth = MONTH_NAMES[monday.getMonth()];
+    const endMonth = MONTH_NAMES[friday.getMonth()];
+    const start = `${startMonth} ${monday.getDate()}`;
+    const end =
+      startMonth === endMonth
+        ? `${friday.getDate()}`
+        : `${endMonth} ${friday.getDate()}`;
+    return `RTX Call ${start} - ${end}`;
   }
   return SINGLE_TASK_PROGRAM_TITLES[program];
 }

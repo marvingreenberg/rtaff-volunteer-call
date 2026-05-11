@@ -25,10 +25,11 @@
   let isSingleTaskProgram = $derived(SINGLE_TASK_PROGRAMS.has(newCall.program));
 
   // Auto-suggest a default title when the user hasn't typed one yet. RTX
-  // needs a task date; single-task programs use a fixed phrase.
+  // anchors to the next two-week cycle from today; single-task programs
+  // use a fixed phrase.
   $effect(() => {
     if (titleManuallyEdited) return;
-    const suggested = suggestCallTitle(newCall.program, newCallTask?.date ?? null);
+    const suggested = suggestCallTitle(newCall.program);
     if (suggested && newCall.title !== suggested) {
       newCall = { ...newCall, title: suggested };
     }

@@ -5,43 +5,46 @@ describe("suggestCallTitle", () => {
   it("returns the fixed phrase for the single-task programs", () => {
     // Catches a regression where the per-program label table drifts from
     // what RT-AFF actually calls these calls in conversation.
-    expect(suggestCallTitle("ACR", null)).toBe("AC Rescue call");
-    expect(suggestCallTitle("RAMP", null)).toBe("Ramp Install call");
-    expect(suggestCallTitle("LIFT", null)).toBe("Chairlift call");
+    expect(suggestCallTitle("ACR")).toBe("AC Rescue call");
+    expect(suggestCallTitle("RAMP")).toBe("Ramp Install call");
+    expect(suggestCallTitle("LIFT")).toBe("Chairlift call");
   });
 
-  it("returns empty for RTX with no task date yet", () => {
-    // The form depends on this returning empty so it doesn't show a half-
-    // baked title (e.g. "Rebuilding Together /-/") before the user picks a
-    // date.
-    expect(suggestCallTitle("RTX", null)).toBe("");
-    expect(suggestCallTitle("RTX", "")).toBe("");
-    expect(suggestCallTitle("RTX", "not-a-date")).toBe("");
-  });
-
-  it("RTX wraps the task date into the Mon-Sun span containing it", () => {
-    // 2026-05-13 is a Wednesday — the containing Mon..Sun is 5/11..5/17.
-    // Pinning the exact string protects the date arithmetic from off-by-
-    // one bugs (Sunday-anchored vs Monday-anchored, or a TZ rollback that
-    // would silently produce the prior week).
-    expect(suggestCallTitle("RTX", "2026-05-13")).toBe(
-      "Rebuilding Together 5/11-5/17",
-    );
-    // Boundary: a Monday should map to the same week (not the previous one).
-    expect(suggestCallTitle("RTX", "2026-05-11")).toBe(
-      "Rebuilding Together 5/11-5/17",
-    );
-    // Boundary: a Sunday should map to the week starting the previous
-    // Monday (Sun-rollover bug catcher: 2026-05-17 is a Sunday).
-    expect(suggestCallTitle("RTX", "2026-05-17")).toBe(
-      "Rebuilding Together 5/11-5/17",
+  it("RTX anchors to next-Monday + 11 days (2nd Friday) when today is mid-week", () => {
+    // Wednesday 2026-05-13 → next Monday 5/18, +11 days = Friday 5/29.
+    // Both fall in May, so the end month name is omitted ("May 18 - 29").
+    // Pinning the exact string catches off-by-one bugs in the +11 math
+    // and the same-month-omission rule.
+    expect(suggestCallTitle("RTX", new Date(2026, 4, 13))).toBe(
+      "RTX Call May 18 - 29",
     );
   });
 
-  it("RTX month roll-over still produces the correct Mon-Sun pair", () => {
-    // 2026-04-30 is a Thursday; week is 4/27..5/3 (crosses month boundary).
-    expect(suggestCallTitle("RTX", "2026-04-30")).toBe(
-      "Rebuilding Together 4/27-5/3",
+  it("RTX treats today-is-Monday as the start (no skip to next week)", () => {
+    // Monday 2026-05-11 → Monday is today; +11 days = Friday 5/22.
+    // Catches the "off by 7 days" bug where today-is-Monday silently
+    // bumps the cycle forward a week.
+    expect(suggestCallTitle("RTX", new Date(2026, 4, 11))).toBe(
+      "RTX Call May 11 - 22",
+    );
+  });
+
+  it("RTX from a Sunday picks the *next* Monday (not the prior one)", () => {
+    // Sunday 2026-05-10 → next Monday 5/11; +11 = Friday 5/22.
+    // Catches the dow=0 edge: a naive (1 - dow) formula would resolve to
+    // Monday of the *previous* week (5/4).
+    expect(suggestCallTitle("RTX", new Date(2026, 4, 10))).toBe(
+      "RTX Call May 11 - 22",
+    );
+  });
+
+  it("RTX keeps both month names when the cycle crosses a month boundary", () => {
+    // Wednesday 2026-04-22 → Monday 4/27; +11 = Friday 5/8.
+    // Different months, so the closing date keeps its month name to stay
+    // unambiguous. Catches a regression where same-month-omission also
+    // strips the cross-month case.
+    expect(suggestCallTitle("RTX", new Date(2026, 3, 22))).toBe(
+      "RTX Call April 27 - May 8",
     );
   });
 });
