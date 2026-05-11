@@ -51,16 +51,62 @@ run_sql_file() {
 }
 
 do_seed() {
-    echo "Seeding database..."
-    docker exec "$CONTAINER" psql -U "$DB_USER" -d postgres \
-        -c "DROP DATABASE IF EXISTS $DB_NAME;" \
-        -c "CREATE DATABASE $DB_NAME OWNER $DB_USER;"
-    for f in "$INITDB_DIR"/0*.sql; do
-        echo "  Running $(basename "$f")..."
-        run_sql_file "$f"
-    done
+    # If SEED env var is set (typically via `make dev-db-reset SEED=...`)
+    # apply that single .sql file instead of the default initdb sequence.
+    # Writes the current initdb checksum either way so `do_start`'s
+    # auto-reseed-on-changed-files detection doesn't fire on the next
+    # start and stomp the just-loaded data.
+    local snapshot="${SEED:-}"
+    if [ -n "$snapshot" ]; then
+        if [ ! -f "$snapshot" ]; then
+            echo "ERROR: snapshot file not found: $snapshot"
+            exit 1
+        fi
+        echo "Seeding database from snapshot: $snapshot"
+        docker exec "$CONTAINER" psql -U "$DB_USER" -d postgres \
+            -c "DROP DATABASE IF EXISTS $DB_NAME;" \
+            -c "CREATE DATABASE $DB_NAME OWNER $DB_USER;"
+        run_sql_file "$snapshot"
+    else
+        echo "Seeding database..."
+        docker exec "$CONTAINER" psql -U "$DB_USER" -d postgres \
+            -c "DROP DATABASE IF EXISTS $DB_NAME;" \
+            -c "CREATE DATABASE $DB_NAME OWNER $DB_USER;"
+        for f in "$INITDB_DIR"/0*.sql; do
+            echo "  Running $(basename "$f")..."
+            run_sql_file "$f"
+        done
+    fi
     compute_checksum > "$CHECKSUM_FILE"
     echo "Seed complete."
+}
+
+do_snapshot() {
+    local out="${1:-}"
+    if [ -z "$out" ]; then
+        echo "Usage: $0 snapshot <output-file-path>"
+        exit 1
+    fi
+    if ! container_running; then
+        echo "ERROR: $CONTAINER is not running. Start it with 'make dev' first."
+        exit 1
+    fi
+    local dir
+    dir="$(dirname "$out")"
+    [ "$dir" != "." ] && mkdir -p "$dir"
+    # Write through a temp file so a failed pg_dump doesn't leave a
+    # half-written snapshot. --clean / --if-exists make the output
+    # replayable; --no-owner / --no-privileges strip role + grant
+    # metadata that would only be valid on the original DB.
+    local tmp="${out}.tmp"
+    echo "Dumping $DB_NAME → $out ..."
+    docker exec "$CONTAINER" pg_dump \
+        -U "$DB_USER" \
+        -d "$DB_NAME" \
+        --clean --if-exists --no-owner --no-privileges \
+        > "$tmp"
+    mv "$tmp" "$out"
+    echo "Snapshot written: $out ($(wc -c <"$out") bytes)"
 }
 
 do_start() {
@@ -137,14 +183,17 @@ do_status() {
 }
 
 case "${1:-}" in
-    start)  do_start ;;
-    stop)   do_stop "${2:-}" ;;
-    seed)   do_seed ;;
-    reset)  do_reset ;;
-    watch)  do_watch ;;
-    status) do_status ;;
+    start)    do_start ;;
+    stop)     do_stop "${2:-}" ;;
+    seed)     do_seed ;;
+    reset)    do_reset ;;
+    watch)    do_watch ;;
+    status)   do_status ;;
+    snapshot) do_snapshot "${2:-}" ;;
     *)
-        echo "Usage: $0 {start|stop|seed|reset|watch|status}"
+        echo "Usage: $0 {start|stop|seed|reset|watch|status|snapshot <path>}"
+        echo "Env:   SEED=<path>  pass to 'reset' or 'seed' to load that .sql"
+        echo "                    file instead of the default initdb sequence."
         exit 1
         ;;
 esac

@@ -15,7 +15,7 @@ DEMO_MODE ?= false
 export DEMO_MODE
 
 .PHONY: help check-prereqs setup setup-backend setup-frontend \
-        dev dev-db-reset mailpit \
+        dev dev-db-reset db-snapshot mailpit \
         test test-backend test-frontend types \
         lint lint-be lint-fe format format-be format-fe \
         build clean
@@ -31,6 +31,9 @@ help:
 	@echo "Development:"
 	@echo "  dev            - Start Mailpit + DB + backend + frontend (Ctrl+C stops all)"
 	@echo "  dev-db-reset   - Destroy DB volume and start fresh"
+	@echo "                   (override seed with SEED=path/to/file.sql)"
+	@echo "  db-snapshot    - Dump current DB to a .sql file"
+	@echo "                   (FILE=path/to/output.sql; pair with dev-db-reset SEED=...)"
 	@echo "  mailpit        - Start Mailpit email viewer (UI at http://localhost:$(MAILPIT_UI_PORT))"
 	@echo ""
 	@echo "Testing:"
@@ -54,7 +57,14 @@ setup-frontend:
 	cd frontend && pnpm install
 
 dev-db-reset:
-	@scripts/dev-db.sh reset
+	@SEED="$(SEED)" scripts/dev-db.sh reset
+
+db-snapshot:
+	@if [ -z "$(FILE)" ]; then \
+	  echo "Usage: make db-snapshot FILE=path/to/output.sql"; \
+	  exit 2; \
+	fi
+	@scripts/dev-db.sh snapshot "$(FILE)"
 
 mailpit:
 	@scripts/dev-mailpit.sh start

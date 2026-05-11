@@ -398,10 +398,14 @@
   }
 
   .single-task-block {
+    /* Same green palette as an expanded TaskRow + the
+       /volunteer-calls/[id] new-task panel (--rt-success-bg /
+       --rt-success-text), so single-task program create forms read
+       visually as "this is the task you're editing", not a sub-section. */
     margin: var(--spacing-md) 0;
     padding: var(--spacing-md);
-    background: var(--rt-bg-subtle, #f9f7f2);
-    border: 1px solid var(--rt-gray-200);
+    background: var(--rt-success-bg, #e6f4ea);
+    border: 1px solid var(--rt-success-text, #2f7a45);
     border-radius: var(--card-radius);
   }
 
