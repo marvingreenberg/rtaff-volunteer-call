@@ -76,7 +76,10 @@
     try {
       const [a, c] = await Promise.all([
         volunteering.myAssignments(),
-        volunteerCalls.list({ status: 'open' }),
+        // Volunteer-facing visibility: a call is in `waiting` once admin
+        // has sent invites (OPEN → WAITING) and stays visible until Done
+        // Assigning flips it to ASSIGNED.
+        volunteerCalls.list({ status: 'waiting' }),
       ]);
       assignments = a;
       openCalls = c;
@@ -338,7 +341,7 @@
     <div class="alert alert-error">{error}</div>
   {:else}
     <section class="section">
-      <h2>Open Volunteer Calls</h2>
+      <h2>Volunteer Calls <em class="section-sub">waiting for volunteers</em></h2>
       {#if authState.user}
         <CalendarConnectPanel
           personId={authState.user.id}
@@ -348,7 +351,7 @@
         />
       {/if}
       {#if openCalls.length === 0}
-        <p class="empty-text">No open volunteer calls right now.</p>
+        <p class="empty-text">No volunteer calls are looking for volunteers right now.</p>
       {:else}
         {#each openCalls as call (call.id)}
           <div class="call-section">
@@ -562,6 +565,13 @@
     margin-bottom: var(--spacing-md, 1rem);
     border-bottom: 1px solid var(--rt-gray-200, #e4dfda);
     padding-bottom: var(--spacing-sm);
+  }
+
+  .section-sub {
+    font-style: italic;
+    font-weight: 400;
+    color: var(--rt-text-muted, #777);
+    font-size: 0.95rem;
   }
 
   .loading-text, .empty-text {
