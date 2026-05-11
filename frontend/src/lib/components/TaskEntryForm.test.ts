@@ -410,4 +410,127 @@ describe("TaskEntryForm", () => {
       expect.objectContaining({ date: `${PINNED_YEAR}-05-05` }),
     );
   });
+
+  it("auto-inserts '/' once a third digit is typed into MM/DD", async () => {
+    // Mirrors the user's spec: typing "0512" should display "05/12" without
+    // the user having to type the slash. Implementation listens for
+    // insertText events of digits and rewrites \d{3,} → MM/rest.
+    const { container } = render(TaskEntryForm, {
+      props: { onsubmit: vi.fn() },
+    });
+    const date = container.querySelector(
+      'input[placeholder="MM/DD"]',
+    ) as HTMLInputElement;
+
+    // Two digits — no slash yet.
+    await fireEvent.input(date, {
+      target: { value: "05" },
+      inputType: "insertText",
+      data: "5",
+    });
+    expect(date.value).toBe("05");
+
+    // Third digit — slash gets inserted.
+    await fireEvent.input(date, {
+      target: { value: "051" },
+      inputType: "insertText",
+      data: "1",
+    });
+    expect(date.value).toBe("05/1");
+  });
+
+  it("does not auto-insert '/' on paste or on deletion", async () => {
+    // Pasting a full string or deleting a character shouldn't trigger the
+    // rewrite — only direct keystrokes should.
+    const { container } = render(TaskEntryForm, {
+      props: { onsubmit: vi.fn() },
+    });
+    const date = container.querySelector(
+      'input[placeholder="MM/DD"]',
+    ) as HTMLInputElement;
+
+    await fireEvent.input(date, {
+      target: { value: "0512" },
+      inputType: "insertFromPaste",
+      data: "0512",
+    });
+    expect(date.value).toBe("0512");
+
+    await fireEvent.input(date, {
+      target: { value: "051" },
+      inputType: "deleteContentBackward",
+      data: null,
+    });
+    expect(date.value).toBe("051");
+  });
+
+  it("shows the Update <date> button only when an edit is dirty and valid", async () => {
+    // Without dirty-gating, the Update button would appear on first render
+    // of an edit form (since the form is valid by definition). Without
+    // valid-gating, the button would appear even when the user wiped a
+    // required field.
+    const { container } = render(TaskEntryForm, {
+      props: {
+        mode: "edit",
+        onupdate: vi.fn(),
+        initial: {
+          short_description: "Roof patch",
+          date: "2026-08-15",
+          address: "456 Pine Ave",
+          city: "Vienna",
+        },
+      },
+    });
+    expect(
+      container.querySelector('button[type="submit"]'),
+    ).not.toBeInTheDocument();
+
+    const description = container.querySelector(
+      "textarea",
+    ) as HTMLTextAreaElement;
+    await fireEvent.input(description, { target: { value: "Roof rebuild" } });
+    expect(
+      container.querySelector('button[type="submit"]'),
+    ).toBeInTheDocument();
+    expect(
+      container.querySelector('button[type="submit"]')!.textContent,
+    ).toContain("Update Saturday, August 15");
+
+    await fireEvent.input(description, { target: { value: "" } });
+    expect(
+      container.querySelector('button[type="submit"]'),
+    ).not.toBeInTheDocument();
+  });
+
+  it("calls onupdate with the current payload when Update is clicked", async () => {
+    const onupdate = vi.fn();
+    const { container } = render(TaskEntryForm, {
+      props: {
+        mode: "edit",
+        onupdate,
+        initial: {
+          short_description: "Roof patch",
+          date: "2026-08-15",
+          address: "456 Pine Ave",
+          city: "Vienna",
+          volunteers_needed: 4,
+          skilled_needed: 0,
+        },
+      },
+    });
+    const description = container.querySelector(
+      "textarea",
+    ) as HTMLTextAreaElement;
+    await fireEvent.input(description, { target: { value: "New scope" } });
+    const updateBtn = container.querySelector(
+      'button[type="submit"]',
+    ) as HTMLButtonElement;
+    await fireEvent.click(updateBtn);
+    expect(onupdate).toHaveBeenCalledTimes(1);
+    expect(onupdate.mock.calls[0][0]).toMatchObject({
+      short_description: "New scope",
+      date: "2026-08-15",
+      city: "Vienna",
+    });
+  });
 });

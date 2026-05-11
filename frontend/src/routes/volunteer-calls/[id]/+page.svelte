@@ -1,13 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/state';
-  import { goto } from '$app/navigation';
   import {
     volunteerCalls,
     type VolunteerCallResponse,
     type TaskCreate,
-    type SendInvitesResponse,
-    type AssignmentNoticesResponse,
   } from '$lib/api/client';
   import Breadcrumb from '$lib/components/Breadcrumb.svelte';
   import TaskEntryForm from '$lib/components/TaskEntryForm.svelte';
@@ -18,16 +15,13 @@
   let call = $state<VolunteerCallResponse | null>(null);
   let loading = $state(true);
   let error: string | null = $state(null);
-  let sendingInvites = $state(false);
-  let sendInvitesResult: SendInvitesResponse | null = $state(null);
-  let sendingNotices = $state(false);
-  let assignmentNoticesResult: AssignmentNoticesResponse | null = $state(null);
 
-  // At most one task row is open. Editing a row's fields populates
-  // pendingEdit; the row collapsing (or any call-state action) flushes it
-  // through handleSaveTask.
+  // The currently-open task row (at most one). Collapsing without clicking
+  // Update silently discards in-flight edits — Update is explicit.
   let expandedTaskId: string | null = $state(null);
-  let pendingEdit: { taskId: string; value: TaskCreate | null; dirty: boolean } | null = null;
+  // Whether the "- Add task to Project -" affordance has been expanded into
+  // the entry form.
+  let addOpen = $state(false);
 
   let callId = $derived(page.params.id!);
   let isSingleTaskProgram = $derived(call ? SINGLE_TASK_PROGRAMS.has(call.program) : false);
@@ -46,39 +40,31 @@
     }
   }
 
-  // Persist the current pending edit, if any, then collapse the open row.
-  // Invalid (null value) or untouched edits are dropped.
-  async function flushAndCollapse() {
-    const edit = pendingEdit;
-    pendingEdit = null;
-    if (edit && edit.dirty && edit.value) {
-      try {
-        await volunteerCalls.updateTask(callId, edit.taskId, edit.value);
-      } catch (e) {
-        error = e instanceof Error ? e.message : 'Failed to save task';
-      }
-    }
-    expandedTaskId = null;
+  function handleRowChange(_taskId: string, _value: TaskCreate | null, _dirty: boolean) {
+    // Edit-mode autosave is gone — the row's TaskEntryForm fires onchange
+    // for free; we ignore it. Saving happens through onupdate.
   }
 
-  function handleRowChange(taskId: string, value: TaskCreate | null, dirty: boolean) {
-    pendingEdit = { taskId, value, dirty };
+  async function handleRowUpdate(taskId: string, value: TaskCreate) {
+    error = null;
+    try {
+      await volunteerCalls.updateTask(callId, taskId, value);
+      expandedTaskId = null;
+      await loadCall();
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to save task';
+    }
   }
 
-  async function handleToggleRow(taskId: string) {
-    if (expandedTaskId === taskId) {
-      await flushAndCollapse();
-    } else {
-      await flushAndCollapse();
-      expandedTaskId = taskId;
-    }
-    await loadCall();
+  function handleToggleRow(taskId: string) {
+    expandedTaskId = expandedTaskId === taskId ? null : taskId;
   }
 
   async function handleAddTask(data: TaskCreate) {
     error = null;
     try {
       await volunteerCalls.addTask(callId, data);
+      addOpen = false;
       await loadCall();
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to add task';
@@ -89,105 +75,11 @@
   async function handleDeleteTask(taskId: string) {
     error = null;
     try {
-      // Drop any pending autosave for the row about to vanish.
-      if (pendingEdit?.taskId === taskId) pendingEdit = null;
       if (expandedTaskId === taskId) expandedTaskId = null;
       await volunteerCalls.deleteTask(callId, taskId);
       await loadCall();
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to delete task';
-    }
-  }
-
-  async function handleSendInvites(confirmReSend = false) {
-    if (call?.status === 'open' && !confirmReSend) {
-      const ok = window.confirm(
-        'Re-send invitations to all subscribed volunteers? They will get the email again.',
-      );
-      if (!ok) return;
-    }
-    sendingInvites = true;
-    sendInvitesResult = null;
-    assignmentNoticesResult = null;
-    error = null;
-    await flushAndCollapse();
-    try {
-      sendInvitesResult = await volunteerCalls.sendInvites(callId);
-      // Send-invites flips Draft→Open server-side; reload so the badge and
-      // button cluster reflect the new status without a manual refresh.
-      await loadCall();
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to send invites';
-    } finally {
-      sendingInvites = false;
-    }
-  }
-
-  async function handleAssignVolunteers() {
-    if (!call) return;
-    error = null;
-    await flushAndCollapse();
-    try {
-      if (call.status === 'open') {
-        call = await volunteerCalls.update(callId, { status: 'closed' });
-      }
-      await goto(`/volunteer-calls/${callId}/assign`);
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to start assigning';
-    }
-  }
-
-  async function handleSendAssignmentNotices() {
-    const ok = window.confirm(
-      'Send assignment + thank-you emails to volunteers who responded?',
-    );
-    if (!ok) return;
-    sendingNotices = true;
-    assignmentNoticesResult = null;
-    sendInvitesResult = null;
-    error = null;
-    try {
-      assignmentNoticesResult =
-        await volunteerCalls.sendAssignmentNotices(callId);
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to send notices';
-    } finally {
-      sendingNotices = false;
-    }
-  }
-
-  async function handleReopen() {
-    if (!call) return;
-    error = null;
-    try {
-      call = await volunteerCalls.update(callId, { status: 'open' });
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to reopen call';
-    }
-  }
-
-  async function handleDeleteCall() {
-    if (!call) return;
-    const taskCount = call.tasks.length;
-    const ok = window.confirm(
-      `Delete this call? This will remove the call and all info about its ${taskCount} task${taskCount === 1 ? '' : 's'}. This cannot be undone.`,
-    );
-    if (!ok) return;
-    // Second prompt — once invites have been sent (i.e. status is past
-    // Draft), volunteers have already been asked to commit time. Make the
-    // admin confirm twice so a stray click can't blow that away.
-    if (call.status !== 'draft') {
-      const ok2 = window.confirm(
-        'Volunteers have already been notified about this call. Are you sure you want to delete it?',
-      );
-      if (!ok2) return;
-    }
-    error = null;
-    try {
-      await volunteerCalls.delete(callId);
-      await goto('/volunteer-calls');
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to delete call';
     }
   }
 </script>
@@ -220,59 +112,6 @@
       </div>
     {/if}
 
-    <div class="status-actions">
-      {#if call.status === 'draft'}
-        <button
-          class="btn btn-primary"
-          onclick={() => handleSendInvites(true)}
-          disabled={sendingInvites || call.tasks.length === 0}
-          title={call.tasks.length === 0 ? 'Add at least one task before sending invites' : ''}
-        >
-          {sendingInvites ? 'Sending...' : 'Send Volunteer Invites'}
-        </button>
-      {/if}
-      {#if call.status === 'open'}
-        <button class="btn btn-primary" onclick={handleAssignVolunteers}>
-          Assign Volunteers
-        </button>
-        <button class="btn btn-secondary" onclick={() => handleSendInvites(false)} disabled={sendingInvites}>
-          {sendingInvites ? 'Sending...' : 'Re-send Invites'}
-        </button>
-      {/if}
-      {#if call.status === 'closed'}
-        <button class="btn btn-primary" onclick={handleAssignVolunteers}>
-          Assign Volunteers
-        </button>
-        <button
-          class="btn btn-secondary"
-          onclick={handleSendAssignmentNotices}
-          disabled={sendingNotices}
-        >
-          {sendingNotices ? 'Sending...' : 'Send Assignment Notices'}
-        </button>
-        <button class="btn btn-secondary" onclick={handleReopen}>
-          Reopen
-        </button>
-      {/if}
-      <button class="btn btn-danger" onclick={handleDeleteCall}>
-        Delete Call
-      </button>
-    </div>
-
-    {#if sendInvitesResult}
-      <div class="result-banner">
-        {sendInvitesResult.volunteers_notified} volunteer{sendInvitesResult.volunteers_notified === 1 ? '' : 's'} notified{#if sendInvitesResult.volunteers_skipped > 0}, {sendInvitesResult.volunteers_skipped} skipped (unsubscribed/paused){/if}.
-      </div>
-    {/if}
-
-    {#if assignmentNoticesResult}
-      <div class="result-banner">
-        {assignmentNoticesResult.assignment_emails} assignment email{assignmentNoticesResult.assignment_emails === 1 ? '' : 's'} sent
-        &middot;
-        {assignmentNoticesResult.thanks_emails} thank-you email{assignmentNoticesResult.thanks_emails === 1 ? '' : 's'} sent.
-      </div>
-    {/if}
-
     <div class="section">
       <div class="section-header">
         <h2>{isSingleTaskProgram ? `Task (${programLabel(call.program)})` : `Tasks (${call.task_count})`}</h2>
@@ -286,6 +125,7 @@
               expanded={expandedTaskId === task.id}
               ontoggle={() => handleToggleRow(task.id)}
               onchange={handleRowChange}
+              onupdate={handleRowUpdate}
               ondelete={handleDeleteTask}
             />
           {/each}
@@ -293,9 +133,17 @@
       {/if}
 
       {#if call.status !== 'closed' && !isSingleTaskProgram}
-        <div class="card add-form">
-          <TaskEntryForm submitLabel="Add" onsubmit={handleAddTask} />
-        </div>
+        {#if addOpen}
+          <div class="task-row task-row-add expanded">
+            <div class="form-wrapper">
+              <TaskEntryForm submitLabel="Done" onsubmit={handleAddTask} />
+            </div>
+          </div>
+        {:else}
+          <button type="button" class="add-task-label" onclick={() => (addOpen = true)}>
+            - Add task to Project -
+          </button>
+        {/if}
       {:else if call.tasks.length === 0}
         <p class="empty">No tasks yet.</p>
       {/if}
@@ -342,21 +190,6 @@
     color: var(--rt-text-light, #555);
   }
 
-  .status-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--spacing-sm);
-    margin-bottom: var(--spacing-md);
-  }
-
-  .result-banner {
-    padding: var(--spacing-md) var(--spacing-md);
-    background: var(--rt-success-bg);
-    color: var(--rt-success-text);
-    border-radius: var(--card-radius);
-    margin-bottom: var(--spacing-lg);
-  }
-
   .section-header {
     display: flex;
     justify-content: space-between;
@@ -370,13 +203,44 @@
     margin: 0;
   }
 
-  .add-form {
-    margin-top: var(--spacing-md);
-  }
-
   .task-list {
     display: flex;
     flex-direction: column;
+  }
+
+  /* "- Add task to Project -" affordance. Renders as a green italic label
+     that behaves like a button. */
+  .add-task-label {
+    display: block;
+    margin-top: var(--spacing-md);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: none;
+    border: none;
+    color: var(--rt-success-text, #2f7a45);
+    font: inherit;
+    font-style: italic;
+    font-weight: 600;
+    text-decoration: underline;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .add-task-label:hover {
+    color: var(--color-primary, #3a6db5);
+  }
+
+  /* The expanded add card reuses the same green panel styling as TaskRow's
+     expanded state. */
+  .task-row-add {
+    border: 1px solid var(--rt-success-text, #2f7a45);
+    border-radius: var(--card-radius);
+    background: var(--rt-success-bg, #e6f4ea);
+    margin-top: var(--spacing-md);
+    overflow: hidden;
+  }
+
+  .task-row-add .form-wrapper {
+    padding: var(--spacing-md);
   }
 
   .badge-draft {

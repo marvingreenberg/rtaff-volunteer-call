@@ -8,34 +8,48 @@
     expanded: boolean;
     ontoggle: () => void;
     onchange: (taskId: string, value: TaskCreate | null, dirty: boolean) => void;
+    onupdate: (taskId: string, value: TaskCreate) => Promise<void> | void;
     ondelete: (taskId: string) => void;
   };
 
-  let { task, expanded, ontoggle, onchange, ondelete }: Props = $props();
+  let { task, expanded, ontoggle, onchange, onupdate, ondelete }: Props =
+    $props();
 
   function handleDeleteClick(e: MouseEvent) {
     e.stopPropagation();
-    if (confirm(`Delete task "${task.short_description}"?`)) {
+    const dateText = task.date ? `on ${formatDate(task.date)}` : task.short_description;
+    if (window.confirm(`Delete task ${dateText}?`)) {
       ondelete(task.id);
     }
   }
 </script>
 
 <div class="task-row" class:expanded>
-  <button
-    type="button"
-    class="summary"
-    aria-expanded={expanded}
-    onclick={ontoggle}
-  >
-    <span class="caret" aria-hidden="true">{expanded ? "▾" : "▸"}</span>
-    <span class="date">{task.date ? formatDate(task.date) : "—"}</span>
-    <span class="volunteers">
-      {volunteersLabel(task.volunteers_needed, task.skilled_needed)}
-    </span>
-    <span class="city">{task.city ?? ""}</span>
-    <span class="description">{task.short_description}</span>
-  </button>
+  <div class="summary-row">
+    <button
+      type="button"
+      class="summary"
+      aria-expanded={expanded}
+      onclick={ontoggle}
+    >
+      <span class="caret" aria-hidden="true">{expanded ? "▾" : "▸"}</span>
+      <span class="date">{task.date ? formatDate(task.date) : "—"}</span>
+      <span class="volunteers">
+        {volunteersLabel(task.volunteers_needed, task.skilled_needed)}
+      </span>
+      <span class="city">{task.city ?? ""}</span>
+      <span class="description">{task.short_description}</span>
+    </button>
+    <button
+      type="button"
+      class="delete-x"
+      onclick={handleDeleteClick}
+      aria-label="Delete task"
+      title="Delete task"
+    >
+      ×
+    </button>
+  </div>
 
   {#if expanded}
     <div class="form-wrapper">
@@ -43,17 +57,8 @@
         initial={task}
         mode="edit"
         onchange={(value, dirty) => onchange(task.id, value, dirty)}
+        onupdate={(value) => onupdate(task.id, value)}
       />
-      <div class="row-actions">
-        <button
-          type="button"
-          class="delete-btn"
-          onclick={handleDeleteClick}
-          aria-label="Delete task"
-        >
-          Delete task
-        </button>
-      </div>
     </div>
   {/if}
 </div>
@@ -74,11 +79,17 @@
     border-color: var(--rt-success-text, #2f7a45);
   }
 
+  .summary-row {
+    display: flex;
+    align-items: stretch;
+  }
+
   .summary {
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
-    width: 100%;
+    flex: 1;
+    min-width: 0;
     padding: var(--spacing-sm) var(--spacing-md);
     background: none;
     border: none;
@@ -91,6 +102,21 @@
 
   .task-row:not(.expanded) .summary:hover {
     background: var(--rt-gray-100, #f5f3ef);
+  }
+
+  .delete-x {
+    background: none;
+    border: none;
+    padding: 0 var(--spacing-md);
+    color: var(--rt-text-muted, #888);
+    font-size: 1.4em;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .delete-x:hover {
+    color: var(--rt-danger-text, #b00020);
   }
 
   .caret {
@@ -128,26 +154,5 @@
     padding: var(--spacing-md);
     /* No top border or background change — the form sits on the same green
        canvas as the summary. */
-  }
-
-  .row-actions {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: var(--spacing-sm);
-  }
-
-  .delete-btn {
-    background: none;
-    border: 1px solid var(--rt-danger-text, #b00020);
-    color: var(--rt-danger-text, #b00020);
-    border-radius: var(--card-radius);
-    padding: var(--spacing-xs) var(--spacing-sm);
-    font: inherit;
-    font-size: var(--font-size-sm);
-    cursor: pointer;
-  }
-
-  .delete-btn:hover {
-    background: var(--rt-danger-bg, #fdecea);
   }
 </style>

@@ -3,6 +3,7 @@
   import AutocompleteInput from "./AutocompleteInput.svelte";
   import TeamLeadAutocomplete from "./TeamLeadAutocomplete.svelte";
   import { matchCities } from "$lib/constants/cities";
+  import { formatDate } from "$lib/utils/format";
   import type { TaskCreate } from "$lib/api/client";
 
   // Structural shape — accepts both TaskCreate and TaskResponse.
@@ -24,14 +25,16 @@
     mode?: "add" | "edit";
     submitLabel?: string;
     onsubmit?: (value: TaskCreate) => Promise<void> | void;
+    onupdate?: (value: TaskCreate) => Promise<void> | void;
     onchange?: (value: TaskCreate | null, dirty: boolean) => void;
   };
 
   let {
     initial,
     mode = "add",
-    submitLabel = "Add",
+    submitLabel = "Done",
     onsubmit,
+    onupdate,
     onchange,
   }: Props = $props();
 
@@ -230,19 +233,62 @@
 
   async function handleSubmit(e: Event) {
     e.preventDefault();
-    if (!currentPayload || saving || !onsubmit) return;
+    if (saving) return;
+    if (mode === "edit") {
+      if (!currentPayload || !dirty || !onupdate) return;
+      saving = true;
+      try {
+        await onupdate(currentPayload);
+      } finally {
+        saving = false;
+      }
+      return;
+    }
+    if (!currentPayload || !onsubmit) return;
     saving = true;
     try {
       await onsubmit(currentPayload);
       // Add mode clears back to defaults for the next entry.
-      if (mode === "add") resetToDefaults();
+      resetToDefaults();
     } finally {
       saving = false;
     }
   }
+
+  // Auto-insert "/" once the user has typed a third digit into MM/DD with
+  // no separator yet. Only fires on direct keystrokes (insertText) so paste
+  // and deletion leave the buffer alone.
+  function handleDateInput(e: Event) {
+    const evt = e as InputEvent;
+    if (evt.inputType !== "insertText") return;
+    if (!evt.data || !/^\d$/.test(evt.data)) return;
+    const m = dateText.match(/^(\d{2})(\d+)$/);
+    if (m) dateText = `${m[1]}/${m[2]}`;
+  }
+
+  // Label for the edit-mode action button: "Update Tuesday, May 12".
+  let updateLabel = $derived(
+    parsedDate ? `Update ${formatDate(parsedDate)}` : "Update",
+  );
+  let showAddButton = $derived(mode === "add" && !!onsubmit && valid);
+  let showUpdateButton = $derived(
+    mode === "edit" && !!onupdate && dirty && valid,
+  );
 </script>
 
 <form class="task-entry-form" onsubmit={handleSubmit}>
+  {#if showAddButton || showUpdateButton}
+    <div class="form-actions top-actions">
+      <button type="submit" class="btn btn-primary" disabled={saving}>
+        {#if showUpdateButton}
+          {saving ? "Saving..." : updateLabel}
+        {:else}
+          {saving ? "Saving..." : submitLabel}
+        {/if}
+      </button>
+    </div>
+  {/if}
+
   <div class="form-row">
     <div class="field icon-field">
       <span class="leading-icon" aria-hidden="true">
@@ -263,6 +309,7 @@
       <input
         type="text"
         bind:value={dateText}
+        oninput={handleDateInput}
         placeholder="MM/DD"
         title="Task date (year inferred — past dates roll into next year)"
         aria-label="Task date, MM slash DD"
@@ -407,13 +454,6 @@
     ></textarea>
   </div>
 
-  {#if mode === "add" && valid && onsubmit}
-    <div class="form-actions">
-      <button type="submit" class="btn btn-primary" disabled={saving}>
-        {saving ? "Saving..." : submitLabel}
-      </button>
-    </div>
-  {/if}
 </form>
 
 <style>
