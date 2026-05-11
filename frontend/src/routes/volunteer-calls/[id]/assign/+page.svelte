@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { page } from "$app/state";
+  import { goto } from "$app/navigation";
   import {
     volunteerCalls,
     people,
@@ -13,6 +14,16 @@
   import Breadcrumb from "$lib/components/Breadcrumb.svelte";
   import { skillBadgeClass } from "$lib/utils/badges";
   import { formatDate, volunteersLabel } from "$lib/utils/format";
+  import {
+    ASSIGNMENT_POLICY_LABELS,
+    type AssignmentPolicy,
+  } from "$lib/api/types";
+  import {
+    computeCounts,
+    countsMessage as computeCountsMessage,
+    gateMessage as computeGateMessage,
+    canSave as computeCanSave,
+  } from "$lib/utils/assignment-policy";
 
   type TeamLead = { id: string; first_name: string; last_name: string };
 
@@ -22,10 +33,14 @@
   let busyTaskIds = $state<Set<string>>(new Set());
   let teamLeads = $state<TeamLead[]>([]);
 
+  // Policy is in-page state only (per spec). Default: Exact required.
+  let policy = $state<AssignmentPolicy>("exact");
+  let saving = $state(false);
+
   let callId = $derived(page.params.id!);
 
   let totals = $derived.by(() => {
-    if (!overview) return { needed: 0, assigned: 0, full: 0 };
+    if (!overview) return { needed: 0, assigned: 0, full: 0, tasks: 0 };
     let needed = 0;
     let assigned = 0;
     let full = 0;
@@ -34,8 +49,19 @@
       assigned += t.assignments.length;
       if (t.assignments.length >= t.volunteers_needed) full += 1;
     }
-    return { needed, assigned, full };
+    return { needed, assigned, full, tasks: overview.tasks.length };
   });
+
+  // Counts and gate text are derived from the overview + selected policy.
+  // The actual logic lives in $lib/utils/assignment-policy so it can be
+  // unit-tested without the SvelteKit route runtime; this component just
+  // wires the reactive values through.
+  let counts = $derived(overview ? computeCounts(overview.tasks) : { under: 0, over: 0, noLead: 0 });
+  let countsMessage = $derived(computeCountsMessage(counts));
+  let gateMessage = $derived(computeGateMessage(counts, policy));
+  let canSave = $derived(
+    !!overview && computeCanSave(overview.tasks, counts, policy),
+  );
 
   onMount(async () => {
     await load();
@@ -131,6 +157,20 @@
   function isFull(t: TaskOverviewItem): boolean {
     return t.assignments.length >= t.volunteers_needed;
   }
+
+  async function handleSave() {
+    if (!canSave || saving) return;
+    saving = true;
+    error = null;
+    try {
+      await volunteerCalls.update(callId, { status: "closed" });
+      await volunteerCalls.sendAssignmentNotices(callId);
+      await goto("/volunteer-calls");
+    } catch (e) {
+      error = e instanceof Error ? e.message : "Failed to complete assignment";
+      saving = false;
+    }
+  }
 </script>
 
 <svelte:head>
@@ -153,17 +193,46 @@
       ]}
     />
     <h1>Assign — {overview.call_title}</h1>
-    <p class="subtitle">
-      {totals.assigned}/{totals.needed} spots filled
-      &middot;
-      {totals.full}/{overview.tasks.length} task{overview.tasks.length === 1
-        ? ""
-        : "s"} full
-      &middot;
-      {overview.volunteers.length} volunteer{overview.volunteers.length === 1
-        ? ""
-        : "s"} responded
-    </p>
+
+    <div class="top-bar">
+      <div class="counts-col">
+        <div class="counts-line">
+          {totals.assigned}/{totals.needed} spots filled
+        </div>
+        <div class="counts-line">
+          {totals.full}/{totals.tasks} task{totals.tasks === 1 ? "" : "s"} complete
+        </div>
+      </div>
+
+      <div class="messages-col">
+        <div class="message-area" data-area="counts">{countsMessage}</div>
+        <div class="message-area" data-area="gate" class:hidden={!gateMessage}>
+          {gateMessage}
+        </div>
+      </div>
+
+      <div class="actions-col">
+        <label class="policy-label">
+          <span class="policy-prefix">Completion when:</span>
+          <select bind:value={policy} aria-label="Completion policy">
+            <option value="exact">{ASSIGNMENT_POLICY_LABELS.exact}</option>
+            <option value="over">{ASSIGNMENT_POLICY_LABELS.over}</option>
+            <option value="over_under">
+              {ASSIGNMENT_POLICY_LABELS.over_under}
+            </option>
+          </select>
+        </label>
+        <button
+          type="button"
+          class="btn btn-primary save-btn"
+          disabled={!canSave || saving}
+          onclick={handleSave}
+          aria-label="Complete assignment"
+        >
+          {saving ? "Saving..." : "Save"}
+        </button>
+      </div>
+    </div>
 
     {#if overview.tasks.length === 0}
       <p class="empty">This call has no tasks.</p>
@@ -280,9 +349,109 @@
 </div>
 
 <style>
-  .subtitle {
+  /* Sticky two-row top bar that pins to the top of the viewport while the
+     task cards below scroll. Visually a "separate scroll area" without
+     fighting the existing page-md / layout-main flow. */
+  .top-bar {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    display: grid;
+    grid-template-columns: max-content 1fr max-content;
+    grid-template-rows: auto auto;
+    gap: var(--spacing-xs) var(--spacing-lg);
+    align-items: center;
+    padding: var(--spacing-sm) var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+    background: var(--rt-bg-subtle, #f9f7f2);
+    border: 1px solid var(--rt-gray-200, #e4dfda);
+    border-radius: var(--card-radius, 8px);
+  }
+
+  .counts-col {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    font-size: var(--font-size-sm);
     color: var(--rt-text-light, #555);
-    margin-bottom: var(--spacing-lg);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .counts-line {
+    line-height: 1.4;
+  }
+
+  .messages-col {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--spacing-xs);
+    min-width: 0;
+  }
+
+  .message-area {
+    font-size: var(--font-size-sm);
+    color: var(--rt-text-light, #555);
+    line-height: 1.4;
+  }
+
+  .message-area[data-area="gate"] {
+    color: var(--rt-warning-text, #b35900);
+    font-weight: 500;
+  }
+
+  .message-area.hidden {
+    visibility: hidden;
+  }
+
+  .actions-col {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--spacing-xs);
+  }
+
+  .policy-label {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: var(--font-size-sm);
+  }
+
+  .policy-prefix {
+    color: var(--rt-text-muted, #777);
+  }
+
+  .policy-label select {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border: 1px solid var(--rt-gray-200, #e4dfda);
+    border-radius: var(--card-radius, 8px);
+    font: inherit;
+    background: var(--rt-white, #fff);
+  }
+
+  .save-btn {
+    min-width: 6em;
+  }
+
+  @media (max-width: 720px) {
+    .top-bar {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto auto auto;
+    }
+    .counts-col,
+    .messages-col,
+    .actions-col {
+      grid-column: 1;
+      grid-row: auto;
+      align-items: flex-start;
+    }
   }
 
   .task-cards {

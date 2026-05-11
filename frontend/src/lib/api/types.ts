@@ -210,6 +210,19 @@ export interface TaskConflicts {
 export type CallStatus = "draft" | "open" | "closed";
 export type TaskStatus = "open" | "full" | "cancelled";
 
+/**
+ * UI-only setting on the /assign page that decides when the call's
+ * assignment phase can be completed. Not persisted server-side (yet) —
+ * lives in /assign page state until the user picks Save.
+ */
+export type AssignmentPolicy = "exact" | "over" | "over_under";
+
+export const ASSIGNMENT_POLICY_LABELS: Record<AssignmentPolicy, string> = {
+  exact: "Exact required volunteers",
+  over: "Allow over-assignment",
+  over_under: "Allow over/under-assignment",
+};
+
 export interface VolunteerCallCreate {
   title: string;
   program: Program;

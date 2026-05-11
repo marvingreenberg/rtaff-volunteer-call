@@ -43,10 +43,6 @@
 - "Assignment complete" gate: per the team-lead spec, an assignment can't be complete if any
   task has no team lead. Wire this into the Send Assignment Notices guard once the
   under/over-assignment policy is decided.
-- Admin-on-behalf-of-volunteer availability entry was dropped with the `/availability` page;
-  if needed, add a small affordance inside the assign view (per-task "Add availability" combobox).
-- Optimistic UI on the assign page (currently refetches `assignment-overview` after each
-  click — fine at this scale but will feel sluggish at higher task/volunteer counts).
 
 ### Calendar follow-ups
 
@@ -68,11 +64,3 @@ Spec needed: re-notify only volunteers who didn't respond for *this* task (skipp
 already-assigned and already-said-no), or re-blast the whole program? Most likely a
 button on the assign view next to under-staffed tasks.
 
-### Make color of buttons everywhere consistent.
-    Buttns are blue or gray, seemingly unrelated to whetehr thhey are active.  Ideally the buttons should somehow express the workflow.  Maybe the volunteer call button should have create, assign, notify, reopen.  Lets plan and discuss this.
-
-### People
-
-- Import / export for users: bulk and per-user, after the source-of-truth
-  volunteer adapter is decided
-  (SharePoint, external DB, manual). The People editor at `/people/[id]` is the current entry point.
