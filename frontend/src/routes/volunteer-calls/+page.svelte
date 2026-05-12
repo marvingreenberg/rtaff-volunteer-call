@@ -7,6 +7,7 @@
   import TaskEntryForm from '$lib/components/TaskEntryForm.svelte';
   import { callStatusBadgeClass, programLabel } from '$lib/utils/badges';
   import { rowAction, type RowAction } from '$lib/utils/call-row-action';
+  import { rowNotes } from '$lib/utils/call-row-notes';
 
   type TeamLead = { id: string; first_name: string; last_name: string };
 
@@ -160,15 +161,34 @@
           `Called: ${res.volunteers_notified} notification` +
           (res.volunteers_notified === 1 ? '' : 's') +
           ` sent.`;
-      } else if (action === 'assign') {
+      } else if (action === 'assign' || action === 'update_assignments') {
+        // Same destination either way — admin re-uses the existing /assign
+        // page; in ASSIGNED state it'll just have a 'Done' return button.
         await goto(`/volunteer-calls/${call.id}/assign`);
         return; // navigation; nothing else to do.
-      } else if (action === 'send_assignments') {
+      } else if (
+        action === 'send_assignments' ||
+        action === 'send_changed_assignments'
+      ) {
+        // Backend decides what to send based on call.last_sent_roster:
+        // first send → everyone; subsequent → per-task diff.
         const res = await volunteerCalls.sendAssignmentNotices(call.id);
+        const parts: string[] = [];
+        if (res.assignment_emails)
+          parts.push(`${res.assignment_emails} assignment`);
+        if (res.team_lead_emails)
+          parts.push(`${res.team_lead_emails} team-lead`);
+        if (res.thanks_emails) parts.push(`${res.thanks_emails} thank-you`);
+        if (res.removal_emails) parts.push(`${res.removal_emails} removal`);
+        const total =
+          res.assignment_emails +
+          res.team_lead_emails +
+          res.thanks_emails +
+          res.removal_emails;
         rowMessage =
-          `${res.assignment_emails} assignment / ${res.thanks_emails} thank-you email` +
-          (res.assignment_emails + res.thanks_emails === 1 ? '' : 's') +
-          ` sent.`;
+          parts.length === 0
+            ? 'No emails sent (nothing to send).'
+            : `${parts.join(' / ')} email${total === 1 ? '' : 's'} sent.`;
       } else if (action === 'archive') {
         await volunteerCalls.archive(call.id);
         rowMessage = `Call "${call.title}" archived.`;
@@ -312,14 +332,16 @@
           <th>Program</th>
           <th>Tasks</th>
           <th>Status</th>
+          <th>Notes</th>
           <th>Action</th>
           <th aria-label="Delete"></th>
         </tr>
       </thead>
       <tbody>
         {#each calls as call (call.id)}
-          {@const action = rowAction(call)}
+          {@const actions = rowAction(call)}
           {@const busy = busyCallIds.has(call.id)}
+          {@const notes = rowNotes(call)}
           <tr>
             <td>
               <a href="/volunteer-calls/{call.id}" class="row-link">{call.title}</a>
@@ -329,17 +351,18 @@
             <td>
               <span class="badge {callStatusBadgeClass(call.status)}">{call.status}</span>
             </td>
+            <td class="notes-cell">{notes}</td>
             <td class="action-cell">
-              {#if action.action}
+              {#each actions as action (action.action)}
                 <button
                   type="button"
                   class="btn btn-primary action-btn"
                   disabled={busy}
-                  onclick={() => handleRowAction(call, action.action!)}
+                  onclick={() => handleRowAction(call, action.action)}
                 >
                   {busy ? '...' : action.label}
                 </button>
-              {/if}
+              {/each}
             </td>
             <td class="trash-cell">
               <button
@@ -441,12 +464,30 @@
 
   .action-cell {
     white-space: nowrap;
+    /* Two stacked buttons on Update + Send rows; arrange them side-by-side
+       within a single cell. flex-wrap keeps them readable on narrow widths. */
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    align-items: stretch;
   }
 
   .action-btn {
     padding: var(--spacing-xs) var(--spacing-md);
     font-size: var(--font-size-sm);
     min-height: 32px;
+    /* Button labels carry literal newlines ("Send\nCall") so the words
+       stack vertically — narrow columns, taller cells. Centred so the
+       two lines read cleanly. */
+    white-space: pre-line;
+    text-align: center;
+    line-height: 1.15;
+  }
+
+  .notes-cell {
+    color: var(--rt-text-muted, #777);
+    font-size: var(--font-size-sm);
+    white-space: nowrap;
   }
 
   .trash-cell {

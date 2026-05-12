@@ -75,6 +75,14 @@ CREATE TABLE volunteer_calls (
     -- Stamped when an admin clicks Send Assignments on the list page;
     -- absence == "Done Assigning was clicked but notices haven't been sent yet".
     assignments_sent_at TIMESTAMPTZ,
+    -- Bumped on every team_assignment create/update/delete and every
+    -- Task.team_lead_id change. Drives the "Send Changed Assignments"
+    -- button label on the list page by comparing with assignments_sent_at.
+    assignments_changed_at TIMESTAMPTZ,
+    -- {task_id: [person_id, ...]} snapshot captured each time Send
+    -- Assignments fires. Diffed at next Send to decide which tasks need
+    -- re-emails and which volunteers were unassigned since last send.
+    last_sent_roster JSONB,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

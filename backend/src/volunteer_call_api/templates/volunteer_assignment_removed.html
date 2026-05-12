@@ -1,0 +1,27 @@
+{% extends "email_base.html" %}
+{% block body %}
+<p style="margin:0 0 14px 0;">Hi {{ first_name }},</p>
+
+<p style="margin:0 0 14px 0;">
+    <span style="background-color:{{ theme.colors.highlight }}; padding:2px 4px; font-weight:700;">Assignment update.</span>
+    Your previous assignment{{ 's' if removed_tasks|length > 1 else '' }} for {{ call_title }} {{ 'have' if removed_tasks|length > 1 else 'has' }} been changed and you're no longer on the team for the task{{ 's' if removed_tasks|length > 1 else '' }} below.
+</p>
+
+<ul style="margin:0 0 18px 1.25em; padding:0;">
+    {% for task in removed_tasks %}
+    <li style="margin-bottom:4px;">
+        <span style="font-weight:600;">{{ task.date_label }}</span> &mdash; {{ task.short_description }}
+        {% if task.city %} ({{ task.city }}){% endif %}
+    </li>
+    {% endfor %}
+</ul>
+
+<p style="margin:0 0 18px 0;">Thanks for offering your time. If you'd like to take on a different task, your volunteer page still has options:</p>
+
+<p style="text-align:center; margin:24px 0;">
+    <a href="{{ volunteering_url }}"
+       style="background-color:{{ theme.colors.primary }}; color:#ffffff; padding:14px 32px; text-decoration:none; border-radius:6px; font-size:16px; font-weight:700; display:inline-block;">
+        View My Volunteer Page
+    </a>
+</p>
+{% endblock %}

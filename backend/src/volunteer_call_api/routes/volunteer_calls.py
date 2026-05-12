@@ -102,7 +102,9 @@ async def list_volunteer_calls(
     db: AsyncSession = Depends(get_db),
 ) -> list[VolunteerCallListResponse]:
     query = select(VolunteerCall).options(
-        selectinload(VolunteerCall.tasks).selectinload(Task.assignments)
+        selectinload(VolunteerCall.tasks).selectinload(Task.assignments),
+        # Needed for the volunteers_responded aggregate on the list page.
+        selectinload(VolunteerCall.availabilities),
     )
     if status is not None:
         query = query.where(VolunteerCall.status == status)
@@ -305,12 +307,14 @@ async def send_assignment_notices(
             status_code=400,
             detail="Cannot send assignment notices: assignment is not complete",
         )
-    assigned, thanks = await generate_call_notifications(call_id, db)
+    assigned, thanks, lead_emails, removed = await generate_call_notifications(call_id, db)
     call.assignments_sent_at = datetime.datetime.now(datetime.timezone.utc)
     await db.commit()
     return AssignmentNoticesResponse(
         assignment_emails=assigned,
         thanks_emails=thanks,
+        team_lead_emails=lead_emails,
+        removal_emails=removed,
     )
 
 
@@ -471,6 +475,7 @@ async def assignment_overview(
     return AssignmentOverviewResponse(
         call_id=call.id,
         call_title=call.title,
+        call_status=call.status,
         tasks=task_items,
         volunteers=list(vol_map.values()),
     )
@@ -523,8 +528,19 @@ async def update_task(
     # Use exclude_unset so explicit `null` clears nullable fields, while
     # omitted fields are left untouched. (Naively `if value is not None`
     # would conflate "client wants to clear" with "client didn't send".)
-    for field, value in body.model_dump(exclude_unset=True).items():
+    updates = body.model_dump(exclude_unset=True)
+    team_lead_changed = "team_lead_id" in updates and updates["team_lead_id"] != task.team_lead_id
+    for field, value in updates.items():
         setattr(task, field, value)
+
+    # team_lead is part of "who needs to be re-notified", so a change
+    # bumps the parent call's assignments_changed_at — same gate the
+    # list page reads for the Send Changed Assignments button label.
+    if team_lead_changed:
+        call_result = await db.execute(select(VolunteerCall).where(VolunteerCall.id == call_id))
+        call = call_result.scalar_one_or_none()
+        if call is not None:
+            call.assignments_changed_at = datetime.datetime.now(datetime.timezone.utc)
 
     await db.commit()
     result = await db.execute(

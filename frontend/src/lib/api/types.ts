@@ -309,6 +309,17 @@ export interface VolunteerCallListResponse {
   status: CallStatus;
   task_count: number;
   assignments_sent_at: string | null;
+  assignments_changed_at: string | null;
+  /** Distinct people with any availability record on this call. */
+  volunteers_responded: number;
+  /** Sum of len(task.assignments) across non-cancelled tasks. */
+  spots_filled: number;
+  /** Sum of task.volunteers_needed. */
+  spots_needed: number;
+  /** Tasks where assigned >= volunteers_needed. */
+  tasks_fully_assigned: number;
+  /** Max(task.date) across the call's tasks; null when no tasks have dates. */
+  last_task_date: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -448,6 +459,7 @@ export interface VolunteerOverviewItem {
 export interface AssignmentOverviewResponse {
   call_id: string;
   call_title: string;
+  call_status: CallStatus;
   tasks: TaskOverviewItem[];
   volunteers: VolunteerOverviewItem[];
 }
@@ -460,6 +472,8 @@ export interface SendInvitesResponse {
 export interface AssignmentNoticesResponse {
   assignment_emails: number;
   thanks_emails: number;
+  team_lead_emails: number;
+  removal_emails: number;
 }
 
 // --- Volunteering (volunteer-facing) ---

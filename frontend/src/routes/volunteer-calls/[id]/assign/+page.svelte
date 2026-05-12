@@ -158,8 +158,29 @@
     return t.assignments.length >= t.volunteers_needed;
   }
 
+  // Re-entry mode: when admin landed here via "Update Assignments" on
+  // an already-ASSIGNED call, the call's state machine has already moved
+  // past WAITING — done-assigning would error. In that case the button
+  // is a plain "Done" that just returns to the list (per-click assigns
+  // are already persisted live).
+  let isAlreadyAssigned = $derived(overview?.call_status === "assigned");
+  let saveButtonLabel = $derived(
+    saving
+      ? "Saving..."
+      : isAlreadyAssigned
+        ? "Done"
+        : "Done Assigning",
+  );
+
   async function handleSave() {
-    if (!canSave || saving) return;
+    if (saving) return;
+    // Re-entry case: no API call needed; assignments persisted on each
+    // assign/unassign click. The button is just an explicit "back to list".
+    if (isAlreadyAssigned) {
+      await goto("/volunteer-calls");
+      return;
+    }
+    if (!canSave) return;
     saving = true;
     error = null;
     try {
@@ -227,11 +248,11 @@
         <button
           type="button"
           class="btn btn-primary save-btn"
-          disabled={!canSave || saving}
+          disabled={saving || (!isAlreadyAssigned && !canSave)}
           onclick={handleSave}
-          aria-label="Complete assignment"
+          aria-label={isAlreadyAssigned ? "Back to calls" : "Complete assignment"}
         >
-          {saving ? "Saving..." : "Done Assigning"}
+          {saveButtonLabel}
         </button>
       </div>
     </div>

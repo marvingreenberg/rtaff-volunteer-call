@@ -3,8 +3,19 @@
 import datetime
 import enum
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Integer, String, Text, Time
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Date,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    Time,
+)
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from volunteer_call_api.models.base import Base, TimestampMixin, generate_uuid
@@ -57,6 +68,22 @@ class VolunteerCall(Base, TimestampMixin):
     # Assigning (status == ASSIGNED) but not yet sent notification emails.
     assignments_sent_at: Mapped[datetime.datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )
+    # Bumped on every team_assignment create/update/delete and every
+    # Task.team_lead_id change. The list page compares this to
+    # assignments_sent_at to decide whether to render "Send Changed
+    # Assignments" instead of "Send Assignments".
+    assignments_changed_at: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # {task_id: [person_id, ...]} snapshot taken at each Send. Diffed at
+    # next Send to compute which tasks need re-emails and which volunteers
+    # were unassigned since last send (and so need a removal email).
+    last_sent_roster: Mapped[dict[str, list[str]] | None] = mapped_column(
+        # Native JSONB on Postgres, plain JSON text on SQLite (used by the
+        # test suite). Storage shape is identical from the ORM's view.
+        JSON().with_variant(JSONB(), "postgresql"),
+        nullable=True,
     )
 
     tasks: Mapped[list["Task"]] = relationship(

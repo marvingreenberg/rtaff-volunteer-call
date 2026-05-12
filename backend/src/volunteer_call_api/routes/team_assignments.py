@@ -1,5 +1,7 @@
 """Team assignment routes."""
 
+import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,7 +11,7 @@ from volunteer_call_api.database import get_db
 from volunteer_call_api.models.person import Person, RoleType
 from volunteer_call_api.models.team_assignment import TeamAssignment
 from volunteer_call_api.models.volunteer_availability import VolunteerAvailability
-from volunteer_call_api.models.volunteer_call import Task, TaskStatus
+from volunteer_call_api.models.volunteer_call import Task, TaskStatus, VolunteerCall
 from volunteer_call_api.routes.helpers import apply_partial_update, get_one_or_404
 from volunteer_call_api.schemas.team_assignment import (
     AvailableVolunteerResponse,
@@ -57,6 +59,19 @@ async def _update_task_status(task: Task, db: AsyncSession) -> None:
         task.status = TaskStatus.FULL if assigned >= task.volunteers_needed else TaskStatus.OPEN
 
 
+async def _stamp_assignments_changed(call_id: str, db: AsyncSession) -> None:
+    """Bump the parent call's assignments_changed_at timestamp.
+
+    Called on every team_assignment mutation so the list page knows to
+    render 'Send Changed Assignments' (versus 'Send Assignments') by
+    comparing this timestamp with assignments_sent_at.
+    """
+    result = await db.execute(select(VolunteerCall).where(VolunteerCall.id == call_id))
+    call = result.scalar_one_or_none()
+    if call is not None:
+        call.assignments_changed_at = datetime.datetime.now(datetime.timezone.utc)
+
+
 @router.post(
     "/{call_id}/tasks/{task_id}/assignments",
     response_model=TeamAssignmentResponse,
@@ -81,6 +96,7 @@ async def create_assignment(
     db.add(assignment)
     await db.flush()
     await _update_task_status(task, db)
+    await _stamp_assignments_changed(call_id, db)
     await db.commit()
     result = await db.execute(
         select(TeamAssignment)
@@ -128,6 +144,7 @@ async def update_assignment(
     if assignment is None:
         raise HTTPException(status_code=404, detail="Assignment not found")
     apply_partial_update(assignment, body, ["role", "confirmed", "notes"])
+    await _stamp_assignments_changed(call_id, db)
     await db.commit()
     await db.refresh(assignment)
     result = await db.execute(
@@ -158,6 +175,7 @@ async def delete_assignment(
     await db.delete(assignment)
     await db.flush()
     await _update_task_status(task, db)
+    await _stamp_assignments_changed(call_id, db)
     await db.commit()
 
 

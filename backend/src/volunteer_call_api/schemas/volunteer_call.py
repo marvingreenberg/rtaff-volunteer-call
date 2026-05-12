@@ -155,6 +155,7 @@ class VolunteerOverviewItem(BaseModel):
 class AssignmentOverviewResponse(BaseModel):
     call_id: str
     call_title: str
+    call_status: CallStatus
     tasks: list[TaskOverviewItem] = []
     volunteers: list[VolunteerOverviewItem] = []
 
@@ -167,10 +168,12 @@ class SendInvitesResponse(BaseModel):
 
 
 class AssignmentNoticesResponse(BaseModel):
-    """Result of sending assignment / thank-you emails after a call closes."""
+    """Result of sending assignment / thank-you / team-lead / removal emails."""
 
     assignment_emails: int
     thanks_emails: int
+    team_lead_emails: int = 0
+    removal_emails: int = 0
 
 
 class VolunteerCallListResponse(BaseModel):
@@ -180,6 +183,15 @@ class VolunteerCallListResponse(BaseModel):
     status: CallStatus
     task_count: int = 0
     assignments_sent_at: datetime.datetime | None = None
+    assignments_changed_at: datetime.datetime | None = None
+    # List-page aggregates. Computed from the call's tasks + availabilities
+    # in call_list_response so the list page can render Notes column +
+    # Action column buttons without N+1 fetches.
+    volunteers_responded: int = 0
+    spots_filled: int = 0
+    spots_needed: int = 0
+    tasks_fully_assigned: int = 0
+    last_task_date: datetime.date | None = None
     created_at: datetime.datetime
     updated_at: datetime.datetime
 

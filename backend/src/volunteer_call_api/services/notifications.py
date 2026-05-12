@@ -2,7 +2,7 @@
 
 import datetime
 import logging
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,6 +20,7 @@ from volunteer_call_api.models.volunteer_availability import VolunteerAvailabili
 from volunteer_call_api.models.volunteer_call import Task, VolunteerCall
 from volunteer_call_api.services.email import send_email
 from volunteer_call_api.services.email_render import jinja_env as _jinja_env
+from volunteer_call_api.services.roster_diff import Roster, diff_rosters
 from volunteer_call_api.services.sms import send_sms
 
 logger = logging.getLogger(__name__)
@@ -138,15 +139,31 @@ def task_view(task: Task, *, include_full_details: bool) -> dict[str, Any]:
     return view
 
 
-async def generate_call_notifications(call_id: str, db: AsyncSession) -> tuple[int, int]:
-    """Send rich assignment + thank-you emails when a call closes.
+async def generate_call_notifications(call_id: str, db: AsyncSession) -> tuple[int, int, int, int]:
+    """Send assignment / thank-you / removal / team-lead emails.
 
-    Each assigned volunteer gets a templated email with their task list (date,
-    time, full address, team lead, notes) and a link back to their volunteer
-    page. Volunteers who offered availability but went unassigned get a
-    thank-you note.
+    Behavior depends on whether this is the first Send for the call
+    (`call.last_sent_roster` is null) or a subsequent re-send.
 
-    Returns (assignment_emails, thanks_emails).
+    First send:
+      - Every current assignee gets a fresh volunteer_assignment email.
+      - Every task with a team_lead gets a team_lead_roster email.
+      - Every volunteer with availability but no assignment gets a thanks email.
+
+    Re-send (last_sent_roster set):
+      - Per-task diff against the snapshot. For each task whose roster or
+        team_lead differs:
+          - All CURRENT assignees of that task get an "updated" email.
+          - All previously-assigned-but-now-removed volunteers get a
+            removal email.
+          - The current team_lead (if any) gets a fresh roster email.
+      - Thanks emails do NOT re-fire on subsequent sends (we have no
+        per-person "thanked at" tracking).
+
+    Stamps `call.last_sent_roster` and `call.assignments_sent_at` on
+    success.
+
+    Returns (assignment_emails, thanks_emails, team_lead_emails, removal_emails).
     """
     tasks_q = (
         select(Task)
@@ -158,6 +175,7 @@ async def generate_call_notifications(call_id: str, db: AsyncSession) -> tuple[i
     )
     tasks_result = await db.execute(tasks_q)
     tasks = list(tasks_result.scalars().all())
+    tasks_by_id = {t.id: t for t in tasks}
 
     call_result = await db.execute(select(VolunteerCall).where(VolunteerCall.id == call_id))
     call = call_result.scalar_one()
@@ -169,45 +187,99 @@ async def generate_call_notifications(call_id: str, db: AsyncSession) -> tuple[i
     )
     availabilities = list(avail_result.scalars().all())
 
-    volunteer_tasks: dict[str, tuple[Person, list[Task]]] = {}
-    for task in tasks:
-        for assignment in task.assignments:
-            if assignment.person_id not in volunteer_tasks:
-                volunteer_tasks[assignment.person_id] = (assignment.person, [])
-            volunteer_tasks[assignment.person_id][1].append(task)
+    # Build current_roster in the same shape as last_sent_roster so the
+    # diff helper has a like-for-like comparison.
+    current_roster: dict[str, dict[str, object]] = {
+        t.id: {
+            "assigned": sorted(a.person_id for a in t.assignments),
+            "team_lead": t.team_lead_id,
+        }
+        for t in tasks
+    }
 
-    assigned_ids = set(volunteer_tasks.keys())
-    avail_people: dict[str, Person] = {a.person_id: a.person for a in availabilities}
-    available_ids = set(avail_people.keys())
+    # Index every Person we might email by id, including assignees that
+    # have been removed since last send (they aren't in `tasks` anymore;
+    # fetch them by id below).
+    people_by_id: dict[str, Person] = {}
+    for t in tasks:
+        for a in t.assignments:
+            people_by_id[a.person_id] = a.person
+        if t.team_lead is not None:
+            people_by_id[t.team_lead.id] = t.team_lead
+    for av in availabilities:
+        people_by_id[av.person_id] = av.person
+
+    is_first_send = call.last_sent_roster is None
+    last_roster: Roster | None = (
+        cast(Roster, call.last_sent_roster) if call.last_sent_roster is not None else None
+    )
+    tasks_changed, removed_by_task = diff_rosters(last_roster, cast(Roster, current_roster))
+
+    # Hydrate any previously-assigned-but-now-removed Person rows that
+    # aren't already in people_by_id (they were dropped from team_assignments
+    # so the tasks/assignments eager-load won't see them).
+    missing_person_ids: set[str] = set()
+    for removed_set in removed_by_task.values():
+        for pid in removed_set:
+            if pid not in people_by_id:
+                missing_person_ids.add(pid)
+    if missing_person_ids:
+        extra = await db.execute(select(Person).where(Person.id.in_(missing_person_ids)))
+        for p in extra.scalars().all():
+            people_by_id[p.id] = p
 
     assignment_template = _jinja_env.get_template("volunteer_assignment.html")
+    removal_template = _jinja_env.get_template("volunteer_assignment_removed.html")
     thanks_template = _jinja_env.get_template("volunteer_thanks.html")
+    team_lead_template = _jinja_env.get_template("team_lead_roster.html")
 
     assignment_emails = 0
     thanks_emails = 0
+    team_lead_emails = 0
+    removal_emails = 0
 
-    for person_id, (person, person_tasks) in volunteer_tasks.items():
-        if not is_subscribed(person):
-            continue
-        if not person.access_token:
-            # Should already exist from the invite step, but guard anyway.
-            continue
+    def volunteering_url_for(person: Person) -> str:
+        return f"{settings.app_base_url}/volunteering?token={person.access_token}"
 
-        volunteering_url = f"{settings.app_base_url}/volunteering?token={person.access_token}"
-        task_views = [task_view(t, include_full_details=True) for t in person_tasks]
+    # Group changed-task ids by recipient: who needs an assignment/update
+    # email, and what list of tasks goes in that email.
+    person_to_changed_tasks: dict[str, list[Task]] = {}
+    for tid in tasks_changed:
+        changed_task = tasks_by_id.get(tid)
+        if changed_task is None:
+            continue  # task was deleted post-last-send; no current-state email
+        for a in changed_task.assignments:
+            person_to_changed_tasks.setdefault(a.person_id, []).append(changed_task)
+
+    # Group removed assignments by person → list of (now-deleted-or-different) tasks.
+    person_to_removed_tasks: dict[str, list[Task | None]] = {}
+    for tid, removed_set in removed_by_task.items():
+        removed_task = tasks_by_id.get(tid)  # None if the task was deleted entirely
+        for pid in removed_set:
+            person_to_removed_tasks.setdefault(pid, []).append(removed_task)
+
+    # --- Assignment / update emails ---
+    for pid, changed_tasks in person_to_changed_tasks.items():
+        person = people_by_id.get(pid)
+        if person is None or not is_subscribed(person) or not person.access_token:
+            continue
+        task_views = [task_view(t, include_full_details=True) for t in changed_tasks]
         subject = f"Your assignments for {call.title}"
-
         full_body = assignment_template.render(
             subject=subject,
             title=call.title,
-            subtitle=f"You're confirmed for {len(person_tasks)} "
-            f"task{'s' if len(person_tasks) > 1 else ''}",
+            subtitle=(
+                f"You're confirmed for {len(changed_tasks)} "
+                f"task{'s' if len(changed_tasks) > 1 else ''}"
+            ),
             first_name=person.first_name,
             tasks=task_views,
-            volunteering_url=volunteering_url,
+            volunteering_url=volunteering_url_for(person),
+            is_update=not is_first_send,
         )
-        summary_body = f"You're assigned to {len(person_tasks)} task(s) for {call.title}."
-
+        summary_body = (
+            "Updated: " if not is_first_send else ""
+        ) + f"You're assigned to {len(changed_tasks)} task(s) for {call.title}."
         if deliver_notification(
             person=person,
             subject=subject,
@@ -218,26 +290,36 @@ async def generate_call_notifications(call_id: str, db: AsyncSession) -> tuple[i
         ):
             assignment_emails += 1
 
-    for person_id in available_ids - assigned_ids:
-        person = avail_people[person_id]
-        if not is_subscribed(person):
+    # --- Removal emails ---
+    for pid, removed_tasks in person_to_removed_tasks.items():
+        person = people_by_id.get(pid)
+        if person is None or not is_subscribed(person) or not person.access_token:
             continue
-        if not person.access_token:
-            continue
-
-        volunteering_url = f"{settings.app_base_url}/volunteering?token={person.access_token}"
-        subject = f"Thank you for volunteering for {call.title}"
-
-        full_body = thanks_template.render(
+        # For tasks that still exist, include their full label; for
+        # deleted tasks (None) skip and just note the count.
+        removed_task_views = [
+            task_view(t, include_full_details=False) for t in removed_tasks if t is not None
+        ]
+        if not removed_task_views:
+            # Task was deleted entirely and we lack title context; render
+            # a minimal placeholder so the email still reads sensibly.
+            removed_task_views = [
+                {"date_label": "(task removed)", "short_description": "", "city": None}
+            ]
+        subject = f"Assignment update for {call.title}"
+        full_body = removal_template.render(
             subject=subject,
-            title=f"Thanks, {person.first_name}!",
-            subtitle=None,
+            title=call.title,
+            subtitle="Assignment changed",
             first_name=person.first_name,
             call_title=call.title,
-            volunteering_url=volunteering_url,
+            removed_tasks=removed_task_views,
+            volunteering_url=volunteering_url_for(person),
         )
-        summary_body = f"Thanks for volunteering for {call.title} — all teams filled this round."
-
+        summary_body = (
+            f"Assignment changed for {call.title}: you're no longer on the team for "
+            f"{len(removed_task_views)} task(s)."
+        )
         if deliver_notification(
             person=person,
             subject=subject,
@@ -246,6 +328,80 @@ async def generate_call_notifications(call_id: str, db: AsyncSession) -> tuple[i
             link=f"/volunteering?token={person.access_token}",
             inline_images=EMAIL_INLINE_IMAGES,
         ):
-            thanks_emails += 1
+            removal_emails += 1
 
-    return assignment_emails, thanks_emails
+    # --- Team-lead roster emails (one per changed task with a lead set) ---
+    for tid in tasks_changed:
+        lead_task = tasks_by_id.get(tid)
+        if lead_task is None or lead_task.team_lead is None:
+            continue
+        lead = lead_task.team_lead
+        if not is_subscribed(lead) or not lead.access_token:
+            continue
+        roster = [
+            {
+                "name": f"{a.person.first_name} {a.person.last_name}",
+                "phone": a.person.phone,
+                "email": a.person.email,
+                "skills": list(a.person.skills),
+            }
+            for a in lead_task.assignments
+        ]
+        subject = f"Your team for {call.title} — {lead_task.short_description}"
+        full_body = team_lead_template.render(
+            subject=subject,
+            title=call.title,
+            subtitle=lead_task.short_description,
+            first_name=lead.first_name,
+            task=task_view(lead_task, include_full_details=True),
+            roster=roster,
+            volunteering_url=volunteering_url_for(lead),
+        )
+        summary_body = (
+            f"Team for {call.title} — {lead_task.short_description}: "
+            f"{len(roster)} volunteer(s)."
+        )
+        if deliver_notification(
+            person=lead,
+            subject=subject,
+            full_body=full_body,
+            summary_body=summary_body,
+            link=f"/volunteering?token={lead.access_token}",
+            inline_images=EMAIL_INLINE_IMAGES,
+        ):
+            team_lead_emails += 1
+
+    # --- Thanks emails: only on first send ---
+    if is_first_send:
+        assigned_ids = {a.person_id for t in tasks for a in t.assignments}
+        avail_people: dict[str, Person] = {a.person_id: a.person for a in availabilities}
+        for person_id in set(avail_people.keys()) - assigned_ids:
+            person = avail_people[person_id]
+            if not is_subscribed(person) or not person.access_token:
+                continue
+            subject = f"Thank you for volunteering for {call.title}"
+            full_body = thanks_template.render(
+                subject=subject,
+                title=f"Thanks, {person.first_name}!",
+                subtitle=None,
+                first_name=person.first_name,
+                call_title=call.title,
+                volunteering_url=volunteering_url_for(person),
+            )
+            summary_body = (
+                f"Thanks for volunteering for {call.title} — all teams filled this round."
+            )
+            if deliver_notification(
+                person=person,
+                subject=subject,
+                full_body=full_body,
+                summary_body=summary_body,
+                link=f"/volunteering?token={person.access_token}",
+                inline_images=EMAIL_INLINE_IMAGES,
+            ):
+                thanks_emails += 1
+
+    # Snapshot the current roster for next send's diff.
+    call.last_sent_roster = current_roster  # type: ignore[assignment]
+
+    return assignment_emails, thanks_emails, team_lead_emails, removal_emails

@@ -61,6 +61,23 @@ def call_response(call: VolunteerCall) -> VolunteerCallResponse:
 
 
 def call_list_response(call: VolunteerCall) -> VolunteerCallListResponse:
+    # Aggregates used by the list page's Notes column + Action button
+    # decisions. Computed in Python over already-eager-loaded relations
+    # (tasks → assignments + availabilities). Cheap at current scale.
+    spots_filled = 0
+    spots_needed = 0
+    tasks_fully_assigned = 0
+    last_task_date = None
+    for t in call.tasks:
+        assigned = len(t.assignments)
+        spots_filled += assigned
+        spots_needed += t.volunteers_needed
+        if assigned >= t.volunteers_needed:
+            tasks_fully_assigned += 1
+        if t.date is not None and (last_task_date is None or t.date > last_task_date):
+            last_task_date = t.date
+    volunteers_responded = len({a.person_id for a in call.availabilities})
+
     return VolunteerCallListResponse(
         id=call.id,
         title=call.title,
@@ -68,6 +85,12 @@ def call_list_response(call: VolunteerCall) -> VolunteerCallListResponse:
         status=call.status,
         task_count=len(call.tasks),
         assignments_sent_at=call.assignments_sent_at,
+        assignments_changed_at=call.assignments_changed_at,
+        volunteers_responded=volunteers_responded,
+        spots_filled=spots_filled,
+        spots_needed=spots_needed,
+        tasks_fully_assigned=tasks_fully_assigned,
+        last_task_date=last_task_date,
         created_at=call.created_at,
         updated_at=call.updated_at,
     )
