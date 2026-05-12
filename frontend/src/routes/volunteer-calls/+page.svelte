@@ -325,15 +325,14 @@
   {:else if calls.length === 0}
     <p class="empty">No volunteer calls found.</p>
   {:else}
-    <table class="data-table">
+    <table class="data-table calls-table">
       <thead>
         <tr>
-          <th>Title</th>
-          <th>Program</th>
+          <th class="title-col">Title</th>
           <th>Tasks</th>
           <th>Status</th>
-          <th>Notes</th>
           <th>Action</th>
+          <th>Notes</th>
           <th aria-label="Delete"></th>
         </tr>
       </thead>
@@ -343,15 +342,13 @@
           {@const busy = busyCallIds.has(call.id)}
           {@const notes = rowNotes(call)}
           <tr>
-            <td>
+            <td class="title-col">
               <a href="/volunteer-calls/{call.id}" class="row-link">{call.title}</a>
             </td>
-            <td>{programLabel(call.program)}</td>
             <td>{call.task_count}</td>
             <td>
               <span class="badge {callStatusBadgeClass(call.status)}">{call.status}</span>
             </td>
-            <td class="notes-cell">{notes}</td>
             <td class="action-cell">
               {#each actions as action (action.action)}
                 <button
@@ -364,6 +361,7 @@
                 </button>
               {/each}
             </td>
+            <td class="notes-cell">{notes}</td>
             <td class="trash-cell">
               <button
                 type="button"
@@ -487,7 +485,16 @@
   .notes-cell {
     color: var(--rt-text-muted, #777);
     font-size: var(--font-size-sm);
-    white-space: nowrap;
+    /* Wrap when the available width forces it (the "filled · fully
+       assigned" string can be long on narrow viewports). */
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  /* Title gets roughly a third of the available width — call titles
+     are the row's anchor and should have visible room. */
+  .calls-table .title-col {
+    width: 33%;
   }
 
   .trash-cell {
