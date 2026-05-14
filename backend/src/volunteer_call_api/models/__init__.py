@@ -4,6 +4,7 @@ from volunteer_call_api.models.base import Base
 from volunteer_call_api.models.notification import Notification, NotificationType
 from volunteer_call_api.models.person import (
     Person,
+    PersonLoginAlias,
     PersonRole,
     Program,
     RoleType,
@@ -18,6 +19,7 @@ from volunteer_call_api.models.volunteer_call import CallStatus, Task, TaskStatu
 __all__ = [
     "Base",
     "Person",
+    "PersonLoginAlias",
     "PersonRole",
     "Program",
     "RoleType",

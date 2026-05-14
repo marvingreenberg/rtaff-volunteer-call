@@ -105,6 +105,9 @@ class Person(Base, TimestampMixin):
     program_memberships: Mapped[list["VolunteerProgram"]] = relationship(
         back_populates="person", cascade="all, delete-orphan"
     )
+    login_aliases: Mapped[list["PersonLoginAlias"]] = relationship(
+        back_populates="person", cascade="all, delete-orphan"
+    )
 
 
 class VolunteerProgram(Base):
@@ -125,6 +128,27 @@ class VolunteerProgram(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     person: Mapped["Person"] = relationship(back_populates="program_memberships")
+
+
+class PersonLoginAlias(Base):
+    """Alternate email address usable to request a magic-link login.
+
+    The primary `Person.email` remains the channel for all outbound
+    notifications; aliases only widen the set of addresses a user can
+    type into the login form. The magic link itself is sent to whichever
+    address the user typed.
+    """
+
+    __tablename__ = "person_login_aliases"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True, default=generate_uuid)
+    person_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("people.id", ondelete="CASCADE"), nullable=False
+    )
+    # Stored lowercased; uniqueness is enforced case-insensitively at write time.
+    email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+
+    person: Mapped["Person"] = relationship(back_populates="login_aliases")
 
 
 class PersonRole(Base):

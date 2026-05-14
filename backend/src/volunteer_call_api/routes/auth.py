@@ -3,12 +3,12 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from volunteer_call_api.config import settings
 from volunteer_call_api.database import get_db
-from volunteer_call_api.models.person import Person
+from volunteer_call_api.models.person import Person, PersonLoginAlias
 from volunteer_call_api.routes.people import PERSON_LOAD_OPTIONS, _person_response
 from volunteer_call_api.schemas.auth import LoginRequest, LoginResponse, VerifyRequest
 from volunteer_call_api.schemas.person import PersonResponse
@@ -32,8 +32,16 @@ async def request_magic_link(
 ) -> LoginResponse:
     """Request a magic link for login."""
     logger.info("Magic link requested for: %s", req.email)
-    result = await db.execute(select(Person).where(Person.email == req.email))
+    lookup_email = req.email.strip().lower()
+    result = await db.execute(select(Person).where(func.lower(Person.email) == lookup_email))
     person = result.scalar_one_or_none()
+    if person is None:
+        alias_result = await db.execute(
+            select(Person)
+            .join(PersonLoginAlias, PersonLoginAlias.person_id == Person.id)
+            .where(PersonLoginAlias.email == lookup_email)
+        )
+        person = alias_result.scalar_one_or_none()
     throttled = login_throttle.is_throttled
     generic_msg = GENERIC_LOGIN_MSG.format(email=req.email)
 
@@ -75,9 +83,8 @@ async def request_magic_link(
         login_url=login_url,
     )
 
-    assert person.email is not None
     send_email(
-        to=person.email,
+        to=req.email,
         subject=subject,
         html_body=html_body,
         inline_images=EMAIL_INLINE_IMAGES,

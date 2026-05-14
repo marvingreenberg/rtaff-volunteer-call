@@ -46,6 +46,18 @@ CREATE TABLE people (
 
 CREATE INDEX idx_people_access_token ON people(access_token);
 
+-- Alternate login email addresses. Primary email on `people` remains the
+-- channel for all outbound notifications; aliases only widen the set of
+-- addresses a user can type into the login form. Magic link is sent to
+-- whichever address the user typed.
+CREATE TABLE person_login_aliases (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    person_id UUID NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+    email VARCHAR(255) NOT NULL UNIQUE
+);
+
+CREATE INDEX idx_person_login_aliases_email ON person_login_aliases(email);
+
 -- Person roles
 CREATE TABLE person_roles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
