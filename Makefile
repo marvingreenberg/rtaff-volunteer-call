@@ -18,7 +18,7 @@ export DEMO_MODE
         dev dev-db-reset db-snapshot mailpit \
         test test-backend test-frontend types \
         lint lint-be lint-fe format format-be format-fe \
-        build clean
+        demo build clean
 
 help:
 	@echo "Available targets:"
@@ -117,6 +117,13 @@ test-frontend:
 
 types:
 	cd frontend && pnpm run generate-types
+
+# Records a video walkthrough of the full volunteer-call flow following
+# Demo.md. Assumes `make dev` is running in another shell (frontend on
+# 5173, backend on 8001, Mailpit on 8025). Output lands in
+# frontend/test-results/demo/.
+demo:
+	cd frontend && pnpm exec playwright test e2e/demo.spec.ts
 
 clean:
 	make -C backend clean
