@@ -111,7 +111,8 @@ async def list_people(
     if role is not None:
         query = query.join(Person.roles).where(PersonRole.role == role)
 
-    query = query.order_by(Person.last_name, Person.first_name).limit(25)
+    # Admins know volunteers by first name — sort everywhere by first name.
+    query = query.order_by(Person.first_name, Person.last_name).limit(25)
     result = await db.execute(query)
     people = result.scalars().unique().all()
 

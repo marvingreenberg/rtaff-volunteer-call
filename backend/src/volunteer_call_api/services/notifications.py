@@ -174,7 +174,17 @@ async def generate_call_notifications(call_id: str, db: AsyncSession) -> tuple[i
         )
     )
     tasks_result = await db.execute(tasks_q)
-    tasks = list(tasks_result.scalars().all())
+    # Outbound emails list tasks chronologically (matches the in-app views).
+    # Python-side so SQLite tests sort identically to Postgres prod.
+    tasks = sorted(
+        tasks_result.scalars().all(),
+        key=lambda t: (
+            t.date is None,
+            t.date or datetime.date.max,
+            t.time_start or datetime.time.max,
+            t.created_at,
+        ),
+    )
     tasks_by_id = {t.id: t for t in tasks}
 
     call_result = await db.execute(select(VolunteerCall).where(VolunteerCall.id == call_id))

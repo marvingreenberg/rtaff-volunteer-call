@@ -234,7 +234,7 @@
           <span class="avatar" style="background-color: {getInitialColor(person.last_name)}">
             {getInitials(person.first_name, person.last_name)}
           </span>
-          <span class="person-name">{person.last_name}, {person.first_name}</span>
+          <span class="person-name">{person.first_name} {person.last_name}</span>
           <span class="person-skill">{person.skills.length ? person.skills.map(skillLabel).join(', ') : '—'}</span>
           <span class="person-roles">
             {#each person.roles as role (role)}

@@ -1,5 +1,7 @@
 """Helper functions for volunteer call routes."""
 
+import datetime
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -13,10 +15,31 @@ from volunteer_call_api.schemas.volunteer_call import (
 )
 
 
+# Sentinels for the task sort key — None values sort after real ones.
+_DATE_SENTINEL = datetime.date.max
+_TIME_SENTINEL = datetime.time.max
+
+
 def _initials(first_name: str, last_name: str) -> str:
     first = first_name[0].upper() if first_name else ""
     last = last_name[0].upper() if last_name else ""
     return first + last
+
+
+def _sorted_tasks(tasks: list[Task]) -> list[Task]:
+    """Tasks shown chronologically (ASC date, NULLs last) everywhere — task
+    list, emails, call detail, assign view. Stable secondary sort by
+    created_at so two tasks on the same date keep a predictable order.
+    """
+    return sorted(
+        tasks,
+        key=lambda t: (
+            t.date is None,
+            t.date or _DATE_SENTINEL,
+            t.time_start or _TIME_SENTINEL,
+            t.created_at,
+        ),
+    )
 
 
 def task_response(task: Task) -> TaskResponse:
@@ -45,7 +68,7 @@ def task_response(task: Task) -> TaskResponse:
 
 
 def call_response(call: VolunteerCall) -> VolunteerCallResponse:
-    tasks = [task_response(t) for t in call.tasks]
+    tasks = [task_response(t) for t in _sorted_tasks(call.tasks)]
     return VolunteerCallResponse(
         id=call.id,
         title=call.title,
