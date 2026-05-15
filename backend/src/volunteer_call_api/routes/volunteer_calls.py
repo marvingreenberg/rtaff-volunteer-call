@@ -3,7 +3,7 @@
 import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -402,8 +402,9 @@ async def assignment_overview(
     for t in tasks:
         assigned_ids = {a.person_id for a in t.assignments}
         candidates = [p for p in avail_by_task.get(t.id, []) if p.id not in assigned_ids]
-        # Skilled (any tag) volunteers float to the top, then alpha by name.
-        candidates.sort(key=lambda p: (not p.skills, p.first_name, p.last_name))
+        # Default order: alphabetical by first name. Frontend re-sorts by
+        # fairness, but a stable default makes the API output predictable.
+        candidates.sort(key=lambda p: (p.first_name.casefold(), p.last_name.casefold(), p.id))
         task_items.append(
             TaskOverviewItem(
                 task_id=t.id,
@@ -425,6 +426,8 @@ async def assignment_overview(
                         assignment_id=a.id,
                         person_id=a.person_id,
                         person_name=f"{a.person.first_name} {a.person.last_name}",
+                        first_name=a.person.first_name,
+                        last_name=a.person.last_name,
                         initials=_initials(a.person.first_name, a.person.last_name),
                         skills=list(a.person.skills),
                         role=a.role.value,
@@ -435,6 +438,8 @@ async def assignment_overview(
                     AvailableVolunteer(
                         person_id=p.id,
                         person_name=f"{p.first_name} {p.last_name}",
+                        first_name=p.first_name,
+                        last_name=p.last_name,
                         initials=_initials(p.first_name, p.last_name),
                         skills=list(p.skills),
                     )
@@ -457,6 +462,8 @@ async def assignment_overview(
             vol_map[p.id] = VolunteerOverviewItem(
                 person_id=p.id,
                 person_name=f"{p.first_name} {p.last_name}",
+                first_name=p.first_name,
+                last_name=p.last_name,
                 initials=_initials(p.first_name, p.last_name),
                 skills=list(p.skills),
                 phone=p.phone,
@@ -472,12 +479,48 @@ async def assignment_overview(
     for vid, item in vol_map.items():
         item.assignments_this_call = assigned_counts.get(vid, 0)
 
+    # Cross-call fairness signals (history across every call) for the
+    # responding pool. One round-trip: max(task.date) and a count of
+    # assignments in the trailing 90 days per person.
+    person_ids = list(vol_map.keys())
+    if person_ids:
+        cutoff = datetime.date.today() - datetime.timedelta(days=90)
+        stats_q = (
+            select(
+                TeamAssignment.person_id,
+                func.max(Task.date).label("last_date"),
+                func.count()
+                .filter(Task.date >= cutoff)
+                .label("trailing_3mo"),
+            )
+            .join(Task, Task.id == TeamAssignment.task_id)
+            .where(
+                TeamAssignment.person_id.in_(person_ids),
+                Task.date.is_not(None),
+            )
+            .group_by(TeamAssignment.person_id)
+        )
+        stats_result = await db.execute(stats_q)
+        for row in stats_result.all():
+            item = vol_map.get(row.person_id)
+            if item is None:
+                continue
+            item.last_assignment_date = row.last_date
+            item.assignments_trailing_3mo = row.trailing_3mo or 0
+
+    # Volunteers sorted by first_name everywhere — admins usually know first
+    # names. Last name + person_id are stable tiebreakers.
+    volunteers = sorted(
+        vol_map.values(),
+        key=lambda v: (v.first_name.casefold(), v.last_name.casefold(), v.person_id),
+    )
+
     return AssignmentOverviewResponse(
         call_id=call.id,
         call_title=call.title,
         call_status=call.status,
         tasks=task_items,
-        volunteers=list(vol_map.values()),
+        volunteers=volunteers,
     )
 
 

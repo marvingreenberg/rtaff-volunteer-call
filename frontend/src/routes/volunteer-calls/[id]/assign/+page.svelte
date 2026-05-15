@@ -24,6 +24,11 @@
     gateMessage as computeGateMessage,
     canSave as computeCanSave,
   } from "$lib/utils/assignment-policy";
+  import {
+    buildFairnessContext,
+    partitionAvailable,
+    badgesFor,
+  } from "$lib/utils/assignment-fairness";
 
   type TeamLead = { id: string; first_name: string; last_name: string };
 
@@ -62,6 +67,22 @@
   let canSave = $derived(
     !!overview && computeCanSave(overview.tasks, counts, policy),
   );
+  // Per-call fairness context drives the badges + sort. Rebuilds whenever
+  // the overview changes — including after an assign/unassign round-trip,
+  // which is what gives us live re-ranking on other task-cards.
+  let fairness = $derived(
+    overview
+      ? buildFairnessContext(overview.volunteers, overview.tasks)
+      : null,
+  );
+  let expandedConflicts = $state<Set<string>>(new Set());
+
+  function toggleConflicts(taskId: string) {
+    const next = new Set(expandedConflicts);
+    if (next.has(taskId)) next.delete(taskId);
+    else next.add(taskId);
+    expandedConflicts = next;
+  }
 
   onMount(async () => {
     await load();
@@ -95,23 +116,26 @@
     busyTaskIds = next;
   }
 
-  async function refreshTask(taskId: string) {
-    // Refetch the overview and replace the single task slice.
-    const fresh = await volunteerCalls.assignmentOverview(callId);
-    if (!overview) {
-      overview = fresh;
-      return;
-    }
-    const next = fresh.tasks.find((t) => t.task_id === taskId);
-    if (!next) return;
-    overview = {
-      ...overview,
-      tasks: overview.tasks.map((t) => (t.task_id === taskId ? next : t)),
-    };
+  async function refreshTask(_taskId: string) {
+    // Full overview refresh — needed for live re-rank on OTHER task-cards
+    // (assigning Bryan to task 1 bumps Bryan down in task 2's list because
+    // his assignments_this_call goes up). The _taskId arg is unused but
+    // kept for callsite readability.
+    overview = await volunteerCalls.assignmentOverview(callId);
   }
 
-  async function assign(taskId: string, candidate: AvailableVolunteer) {
+  async function assign(
+    taskId: string,
+    candidate: AvailableVolunteer,
+    isConflictOverride = false,
+  ) {
     if (busyTaskIds.has(taskId)) return;
+    if (isConflictOverride) {
+      const ok = confirm(
+        `${candidate.person_name} is already assigned to another task on this date. Assign anyway?`,
+      );
+      if (!ok) return;
+    }
     setBusy(taskId, true);
     error = null;
     try {
@@ -315,6 +339,7 @@
                 {:else}
                   <ul class="people">
                     {#each task.assignments as a (a.assignment_id)}
+                      {@const b = fairness ? badgesFor(a.person_id, task, fairness) : null}
                       <li class="person assigned">
                         <button
                           type="button"
@@ -325,6 +350,11 @@
                         >
                           <span class="check" aria-hidden="true">✓</span>
                           <span class="name">{a.person_name}</span>
+                          {#if b}
+                            {#if b.exhausted}<span class="fairness-badge" title="At weekly cap">🥵</span>{/if}
+                            {#if b.idle}<span class="fairness-badge" title="Hasn't been assigned recently">😴</span>{/if}
+                            {#if b.skilled}<span class="fairness-badge" title="Skilled volunteer">🛠️</span>{/if}
+                          {/if}
                           {#each a.skills as s (s)}
                             <span class="badge {skillBadgeClass(s)}">{s}</span>
                           {/each}
@@ -340,27 +370,73 @@
                 <h3 class="list-heading">Available</h3>
                 {#if task.available_volunteers.length === 0}
                   <p class="list-empty">No more candidates.</p>
-                {:else}
-                  <ul class="people">
-                    {#each task.available_volunteers as v (v.person_id)}
-                      <li class="person available">
-                        <button
-                          type="button"
-                          class="person-row"
-                          aria-label="Assign {v.person_name}"
-                          disabled={busyTaskIds.has(task.task_id)}
-                          onclick={() => assign(task.task_id, v)}
-                        >
-                          <span class="check empty" aria-hidden="true">☐</span>
-                          <span class="name">{v.person_name}</span>
-                          {#each v.skills as s (s)}
-                            <span class="badge {skillBadgeClass(s)}">{s}</span>
-                          {/each}
-                          <span class="action">Assign</span>
-                        </button>
-                      </li>
-                    {/each}
-                  </ul>
+                {:else if fairness}
+                  {@const part = partitionAvailable(task, fairness)}
+                  {#if part.visible.length === 0 && part.hidden.length > 0}
+                    <p class="list-empty">All {part.hidden.length} candidate{part.hidden.length === 1 ? "" : "s"} are already booked this day.</p>
+                  {:else if part.visible.length === 0}
+                    <p class="list-empty">No more candidates.</p>
+                  {:else}
+                    <ul class="people">
+                      {#each part.visible as v (v.person_id)}
+                        {@const b = badgesFor(v.person_id, task, fairness)}
+                        <li class="person available">
+                          <button
+                            type="button"
+                            class="person-row"
+                            aria-label="Assign {v.person_name}"
+                            disabled={busyTaskIds.has(task.task_id)}
+                            onclick={() => assign(task.task_id, v)}
+                          >
+                            <span class="check empty" aria-hidden="true">☐</span>
+                            <span class="name">{v.person_name}</span>
+                            {#if b.exhausted}<span class="fairness-badge" title="At weekly cap">🥵</span>{/if}
+                            {#if b.idle}<span class="fairness-badge" title="Hasn't been assigned recently">😴</span>{/if}
+                            {#if b.skilled}<span class="fairness-badge" title="Skilled volunteer">🛠️</span>{/if}
+                            {#each v.skills as s (s)}
+                              <span class="badge {skillBadgeClass(s)}">{s}</span>
+                            {/each}
+                            <span class="action">Assign</span>
+                          </button>
+                        </li>
+                      {/each}
+                    </ul>
+                  {/if}
+                  {#if part.hidden.length > 0}
+                    <button
+                      type="button"
+                      class="conflicts-toggle"
+                      onclick={() => toggleConflicts(task.task_id)}
+                    >
+                      {expandedConflicts.has(task.task_id) ? "Hide" : "Show"}
+                      {part.hidden.length}
+                      already booked this day
+                    </button>
+                    {#if expandedConflicts.has(task.task_id)}
+                      <ul class="people conflicts">
+                        {#each part.hidden as v (v.person_id)}
+                          {@const b = badgesFor(v.person_id, task, fairness)}
+                          <li class="person available conflict">
+                            <button
+                              type="button"
+                              class="person-row"
+                              aria-label="Assign {v.person_name} (already booked this day)"
+                              disabled={busyTaskIds.has(task.task_id)}
+                              onclick={() => assign(task.task_id, v, true)}
+                              title="Already assigned to another task on this date"
+                            >
+                              <span class="check empty" aria-hidden="true">☐</span>
+                              <span class="name">{v.person_name}</span>
+                              <span class="fairness-badge" title="Same-day conflict">‼️</span>
+                              {#if b.exhausted}<span class="fairness-badge" title="At weekly cap">🥵</span>{/if}
+                              {#if b.skilled}<span class="fairness-badge" title="Skilled volunteer">🛠️</span>{/if}
+                              <span class="action">Override</span>
+                            </button>
+                          </li>
+                        {/each}
+                      </ul>
+                    {/if}
+                  {/if}
                 {/if}
               </div>
             </div>
@@ -690,6 +766,40 @@
     flex-shrink: 0;
     font-size: var(--font-size-xs);
     color: var(--rt-text-muted, #777);
+  }
+
+  .fairness-badge {
+    flex-shrink: 0;
+    font-size: 0.95em;
+    line-height: 1;
+  }
+
+  .conflicts-toggle {
+    margin-top: var(--spacing-xs);
+    padding: 4px 8px;
+    background: transparent;
+    border: 1px dashed var(--rt-gray-200, #e4dfda);
+    border-radius: var(--card-radius);
+    color: var(--rt-text-muted, #777);
+    font-size: var(--font-size-xs);
+    cursor: pointer;
+    width: 100%;
+    text-align: left;
+  }
+
+  .conflicts-toggle:hover {
+    background: var(--rt-gray-50, #fafaf7);
+    color: var(--color-text);
+  }
+
+  ul.people.conflicts {
+    opacity: 0.7;
+    margin-top: 4px;
+  }
+
+  .person.conflict .person-row {
+    border-color: var(--rt-warning-text, #b35900);
+    background: var(--rt-warning-bg, #fff7e6);
   }
 
   .person-row:hover:not(:disabled) .action {

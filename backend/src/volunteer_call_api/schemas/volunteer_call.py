@@ -110,6 +110,8 @@ class TaskAssignment(BaseModel):
     assignment_id: str
     person_id: str
     person_name: str
+    first_name: str
+    last_name: str
     initials: str
     skills: list[Skill] = []
     role: str
@@ -120,6 +122,8 @@ class AvailableVolunteer(BaseModel):
 
     person_id: str
     person_name: str
+    first_name: str
+    last_name: str
     initials: str
     skills: list[Skill] = []
 
@@ -144,12 +148,19 @@ class TaskOverviewItem(BaseModel):
 class VolunteerOverviewItem(BaseModel):
     person_id: str
     person_name: str
+    first_name: str
+    last_name: str
     initials: str
     skills: list[Skill] = []
     phone: str | None = None
     available_task_ids: list[str] = []
     max_tasks_per_week: int = 1
     assignments_this_call: int = 0
+    # Cross-call fairness signals. last_assignment_date is the most recent
+    # Task.date this person was ever assigned to (any call); trailing_3mo
+    # is the count of such assignments in the last 90 days.
+    last_assignment_date: datetime.date | None = None
+    assignments_trailing_3mo: int = 0
 
 
 class AssignmentOverviewResponse(BaseModel):

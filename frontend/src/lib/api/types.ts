@@ -416,6 +416,8 @@ export interface TaskAssignment {
   assignment_id: string;
   person_id: string;
   person_name: string;
+  first_name: string;
+  last_name: string;
   initials: string;
   skills: Skill[];
   role: string;
@@ -424,6 +426,8 @@ export interface TaskAssignment {
 export interface AvailableVolunteer {
   person_id: string;
   person_name: string;
+  first_name: string;
+  last_name: string;
   initials: string;
   skills: Skill[];
 }
@@ -448,12 +452,16 @@ export interface TaskOverviewItem {
 export interface VolunteerOverviewItem {
   person_id: string;
   person_name: string;
+  first_name: string;
+  last_name: string;
   initials: string;
   skills: Skill[];
   phone: string | null;
   available_task_ids: string[];
   max_tasks_per_week: number;
   assignments_this_call: number;
+  last_assignment_date: string | null;
+  assignments_trailing_3mo: number;
 }
 
 export interface AssignmentOverviewResponse {
