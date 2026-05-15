@@ -12,6 +12,7 @@
     type TaskAssignment,
   } from "$lib/api/client";
   import Breadcrumb from "$lib/components/Breadcrumb.svelte";
+  import AssignmentSpreadsheet from "$lib/components/AssignmentSpreadsheet.svelte";
   import { skillBadgeClass } from "$lib/utils/badges";
   import { formatDate, volunteersLabel } from "$lib/utils/format";
   import {
@@ -41,6 +42,40 @@
   // Policy is in-page state only (per spec). Default: Exact required.
   let policy = $state<AssignmentPolicy>("exact");
   let saving = $state(false);
+
+  // View toggle: task-card view (default) or spreadsheet matrix. Persisted
+  // per-browser via localStorage so admins stay in their preferred view.
+  // The matrix needs horizontal real estate — we only allow it at ≥1024px.
+  const VIEW_PREF_KEY = "assign.view";
+  let viewMode = $state<"task" | "spreadsheet">("task");
+  let viewportWide = $state(true);
+
+  function loadViewPref() {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = window.localStorage.getItem(VIEW_PREF_KEY);
+      if (stored === "spreadsheet" || stored === "task") {
+        viewMode = stored;
+      }
+    } catch {
+      /* localStorage blocked — fall through with default */
+    }
+  }
+
+  function setViewMode(next: "task" | "spreadsheet") {
+    viewMode = next;
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(VIEW_PREF_KEY, next);
+    } catch {
+      /* localStorage blocked — preference doesn't persist this session */
+    }
+  }
+
+  function checkViewport() {
+    if (typeof window === "undefined") return;
+    viewportWide = window.innerWidth >= 1024;
+  }
 
   let callId = $derived(page.params.id!);
 
@@ -84,18 +119,28 @@
     expandedConflicts = next;
   }
 
-  onMount(async () => {
-    await load();
-    try {
-      const leads = await people.list({ role: "team_leader", active: true });
-      teamLeads = leads.map((p) => ({
-        id: p.id,
-        first_name: p.first_name,
-        last_name: p.last_name,
-      }));
-    } catch {
-      // Non-fatal — the team-lead select will simply be empty.
-    }
+  onMount(() => {
+    loadViewPref();
+    checkViewport();
+    window.addEventListener("resize", checkViewport);
+
+    // Kick off the load + team-lead fetch but don't return a Promise from
+    // onMount — Svelte 5 expects either void or a cleanup function.
+    (async () => {
+      await load();
+      try {
+        const leads = await people.list({ role: "team_leader", active: true });
+        teamLeads = leads.map((p) => ({
+          id: p.id,
+          first_name: p.first_name,
+          last_name: p.last_name,
+        }));
+      } catch {
+        // Non-fatal — the team-lead select will simply be empty.
+      }
+    })();
+
+    return () => window.removeEventListener("resize", checkViewport);
   });
 
   async function load() {
@@ -281,9 +326,47 @@
       </div>
     </div>
 
+    <div class="view-tabs" role="tablist" aria-label="Assignment view">
+      <button
+        type="button"
+        role="tab"
+        aria-selected={viewMode === "task"}
+        class="view-tab"
+        class:active={viewMode === "task"}
+        onclick={() => setViewMode("task")}
+      >
+        Task View
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={viewMode === "spreadsheet"}
+        class="view-tab"
+        class:active={viewMode === "spreadsheet"}
+        disabled={!viewportWide}
+        title={viewportWide ? "" : "Spreadsheet view requires a wider screen"}
+        onclick={() => setViewMode("spreadsheet")}
+      >
+        Spreadsheet View
+      </button>
+    </div>
+
     {#if overview.tasks.length === 0}
       <p class="empty">This call has no tasks.</p>
+    {:else if viewMode === "spreadsheet" && viewportWide}
+      <AssignmentSpreadsheet
+        {overview}
+        busyTaskIds={busyTaskIds}
+        onAssign={assign}
+        onUnassign={unassign}
+      />
     {:else}
+      {#if viewMode === "spreadsheet" && !viewportWide}
+        <p class="empty">
+          Spreadsheet view needs at least a 1024px-wide screen. Switch to
+          Task View on this device.
+        </p>
+      {/if}
       <div class="task-cards">
         {#each overview.tasks as task (task.task_id)}
           {@const full = isFull(task)}
@@ -551,6 +634,39 @@
       grid-row: auto;
       align-items: flex-start;
     }
+  }
+
+  .view-tabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: var(--spacing-md);
+    border-bottom: 1px solid var(--rt-gray-200, #e4dfda);
+  }
+
+  .view-tab {
+    padding: var(--spacing-xs) var(--spacing-md);
+    background: transparent;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    color: var(--rt-text-muted, #777);
+    cursor: pointer;
+    font: inherit;
+    font-weight: 500;
+    margin-bottom: -1px;
+  }
+
+  .view-tab.active {
+    color: var(--color-primary, #3a6db5);
+    border-bottom-color: var(--color-primary, #3a6db5);
+  }
+
+  .view-tab:hover:not(:disabled):not(.active) {
+    color: var(--color-text);
+  }
+
+  .view-tab:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
   }
 
   .task-cards {

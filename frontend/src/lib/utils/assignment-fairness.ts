@@ -164,6 +164,41 @@ export function sameDateConflicts(
 }
 
 /**
+ * Spreadsheet view: identify (person_id, task_id) cells that are part of a
+ * same-date double-booking. Returns a Set of "personId|taskId" keys. Only
+ * fires when the same person is *assigned* (not just available) to two
+ * tasks on the same date. Both of those assigned cells get flagged so the
+ * admin can see the conflict from either side.
+ */
+export function spreadsheetConflictKeys(
+  tasks: TaskOverviewItem[],
+): Set<string> {
+  const byDate = new Map<string, Map<string, string[]>>();
+  for (const t of tasks) {
+    if (!t.date) continue;
+    let perPerson = byDate.get(t.date);
+    if (!perPerson) {
+      perPerson = new Map();
+      byDate.set(t.date, perPerson);
+    }
+    for (const a of t.assignments) {
+      const arr = perPerson.get(a.person_id) ?? [];
+      arr.push(t.task_id);
+      perPerson.set(a.person_id, arr);
+    }
+  }
+  const out = new Set<string>();
+  for (const perPerson of byDate.values()) {
+    for (const [pid, taskIds] of perPerson) {
+      if (taskIds.length >= 2) {
+        for (const tid of taskIds) out.add(`${pid}|${tid}`);
+      }
+    }
+  }
+  return out;
+}
+
+/**
  * Split `available_volunteers` into (visible, hidden-by-conflict) lists,
  * with the visible list sorted by fairness.
  */

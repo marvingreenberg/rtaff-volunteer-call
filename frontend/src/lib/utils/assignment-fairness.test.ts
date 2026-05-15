@@ -25,6 +25,7 @@ import {
   badgesFor,
   partitionAvailable,
   computeIdleQuartile,
+  spreadsheetConflictKeys,
 } from "./assignment-fairness";
 import type {
   AvailableVolunteer,
@@ -225,6 +226,57 @@ describe("computeIdleQuartile", () => {
     ]);
     expect(idle.has("never")).toBe(true);
     expect(idle.has("new")).toBe(false);
+  });
+});
+
+describe("spreadsheetConflictKeys", () => {
+  it("flags both cells of a double-booking on the same date (spreadsheet_conflict_pairs)", () => {
+    // Vick is assigned to two tasks on the same date — both assignments
+    // are conflicts, so both cells must be flagged. Catches a bug where
+    // only the second-encountered task gets marked.
+    const t1 = task({
+      id: "A",
+      date: "2025-12-01",
+      assignments: [assignmentRow("vick", "Vick")],
+    });
+    const t2 = task({
+      id: "B",
+      date: "2025-12-01",
+      assignments: [assignmentRow("vick", "Vick")],
+    });
+    const keys = spreadsheetConflictKeys([t1, t2]);
+    expect(keys.has("vick|A")).toBe(true);
+    expect(keys.has("vick|B")).toBe(true);
+  });
+
+  it("does not flag a single assignment per date", () => {
+    const t1 = task({
+      id: "A",
+      date: "2025-12-01",
+      assignments: [assignmentRow("vick", "Vick")],
+    });
+    const t2 = task({
+      id: "B",
+      date: "2025-12-02",
+      assignments: [assignmentRow("vick", "Vick")],
+    });
+    expect(spreadsheetConflictKeys([t1, t2]).size).toBe(0);
+  });
+
+  it("does not flag available-but-unassigned same-date cells", () => {
+    // The spreadsheet conflict flag is specifically for double-assignments.
+    // Pure availability overlap on a date is shown but not flagged.
+    const t1 = task({
+      id: "A",
+      date: "2025-12-01",
+      assignments: [assignmentRow("vick", "Vick")],
+    });
+    const t2 = task({
+      id: "B",
+      date: "2025-12-01",
+      available: [avail("vick", "Vick")],
+    });
+    expect(spreadsheetConflictKeys([t1, t2]).size).toBe(0);
   });
 });
 
