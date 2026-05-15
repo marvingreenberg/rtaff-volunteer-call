@@ -155,7 +155,9 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
   await page.waitForSelector(".calls-page");
   await narrate(page, "Don sends the call out to volunteers.", 2000);
 
-  const sendRow = page.locator(`[data-testid="call-row"][data-call-id="${callId}"]`);
+  const sendRow = page.locator(
+    `[data-testid="call-row"][data-call-id="${callId}"]`,
+  );
   await sendRow.locator('[data-testid="row-action-send_invites"]').click();
   await sleep(2000);
 
@@ -246,22 +248,40 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
     2000,
   );
 
-  const assignRow = page.locator(`[data-testid="call-row"][data-call-id="${callId}"]`);
+  const assignRow = page.locator(
+    `[data-testid="call-row"][data-call-id="${callId}"]`,
+  );
   await assignRow.locator('[data-testid="row-action-assign"]').click();
   await page.waitForURL(/\/assign/);
-  await sleep(3500);
+  await sleep(2500);
 
-  // Heuristic auto-assign: click the first Available button for each task
+  // Auto-pick team leads — clears the "9 tasks need a team lead" gate in
+  // one click using the new endpoint.
+  await narrate(
+    page,
+    "Auto-pick assigns the least-recently-used team lead to every unstaffed task.",
+    2400,
+  );
+  await page.click("button.auto-leads-btn").catch(() => {});
+  await sleep(2500);
+
+  // Assign volunteers: click each available row in turn. Use the action
+  // span text since the rows are buttons with mixed content.
+  await narrate(
+    page,
+    "Volunteers get auto-assigned; the fairness sort keeps load even.",
+    2200,
+  );
   const assignButtons = page.locator(
-    ".available-list button:has-text('Assign'), button.assign-btn",
+    ".list-block .person.available button.person-row",
   );
   const btnCount = await assignButtons.count();
-  for (let i = 0; i < Math.min(btnCount, 12); i++) {
+  for (let i = 0; i < Math.min(btnCount, 18); i++) {
     await assignButtons
-      .nth(i)
+      .nth(0) // always the top of the list — re-sorts after each click
       .click()
       .catch(() => {});
-    await sleep(200);
+    await sleep(220);
   }
 
   await page.click("button:has-text('Done Assigning')").catch(() => {});
@@ -276,8 +296,12 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
     "Sending assignments. Volunteers get individual emails; team leads get rosters.",
     2400,
   );
-  const sendAssignRow = page.locator(`[data-testid="call-row"][data-call-id="${callId}"]`);
-  await sendAssignRow.locator('[data-testid="row-action-send_assignments"]').click();
+  const sendAssignRow = page.locator(
+    `[data-testid="call-row"][data-call-id="${callId}"]`,
+  );
+  await sendAssignRow
+    .locator('[data-testid="row-action-send_assignments"]')
+    .click();
   await sleep(2500);
 
   try {

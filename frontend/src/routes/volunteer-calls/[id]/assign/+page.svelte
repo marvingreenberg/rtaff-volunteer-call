@@ -241,6 +241,33 @@
         : "Done Assigning",
   );
 
+  let autoLeadsBusy = $state(false);
+
+  // True when the call has at least one task missing a team lead — drives
+  // the visibility/enabled state of the "Auto-assign Team Leads" button.
+  let needsLeadCount = $derived(
+    overview ? overview.tasks.filter((t) => t.team_lead_id == null).length : 0,
+  );
+
+  async function autoAssignLeads() {
+    if (autoLeadsBusy) return;
+    autoLeadsBusy = true;
+    error = null;
+    try {
+      const result = await volunteerCalls.autoAssignTeamLeads(callId);
+      // Reload the overview so the team-lead selects + counts reflect
+      // the new state — same pattern as assign/unassign.
+      overview = await volunteerCalls.assignmentOverview(callId);
+      if (result.tasks_skipped > 0 && result.tasks_updated === 0) {
+        error = `No eligible team leads found for ${result.tasks_skipped} task(s).`;
+      }
+    } catch (e) {
+      error = e instanceof Error ? e.message : "Failed to auto-assign team leads";
+    } finally {
+      autoLeadsBusy = false;
+    }
+  }
+
   async function handleSave() {
     if (saving) return;
     // Re-entry case: no API call needed; assignments persisted on each
@@ -314,15 +341,30 @@
             </option>
           </select>
         </label>
-        <button
-          type="button"
-          class="btn btn-primary save-btn"
-          disabled={saving || (!isAlreadyAssigned && !canSave)}
-          onclick={handleSave}
-          aria-label={isAlreadyAssigned ? "Back to calls" : "Complete assignment"}
-        >
-          {saveButtonLabel}
-        </button>
+        <div class="action-buttons">
+          {#if needsLeadCount > 0}
+            <button
+              type="button"
+              class="btn btn-secondary auto-leads-btn"
+              disabled={autoLeadsBusy}
+              onclick={autoAssignLeads}
+              title="Pick the least-recently-assigned team lead for each unstaffed task"
+            >
+              {autoLeadsBusy
+                ? "Picking…"
+                : `Auto-pick Team Leads (${needsLeadCount})`}
+            </button>
+          {/if}
+          <button
+            type="button"
+            class="btn btn-primary save-btn"
+            disabled={saving || (!isAlreadyAssigned && !canSave)}
+            onclick={handleSave}
+            aria-label={isAlreadyAssigned ? "Back to calls" : "Complete assignment"}
+          >
+            {saveButtonLabel}
+          </button>
+        </div>
       </div>
     </div>
 
@@ -620,6 +662,16 @@
 
   .save-btn {
     min-width: 6em;
+  }
+
+  .action-buttons {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+
+  .auto-leads-btn {
+    white-space: nowrap;
   }
 
   @media (max-width: 720px) {

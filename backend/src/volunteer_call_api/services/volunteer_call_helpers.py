@@ -14,7 +14,6 @@ from volunteer_call_api.schemas.volunteer_call import (
     VolunteerCallResponse,
 )
 
-
 # Sentinels for the task sort key — None values sort after real ones.
 _DATE_SENTINEL = datetime.date.max
 _TIME_SENTINEL = datetime.time.max

@@ -22,6 +22,7 @@ from volunteer_call_api.models.volunteer_call import CallStatus, Task, TaskStatu
 from volunteer_call_api.schemas.volunteer_call import (
     AssignmentNoticesResponse,
     AssignmentOverviewResponse,
+    AutoAssignTeamLeadsResponse,
     AvailableVolunteer,
     JobListItem,
     SendInvitesResponse,
@@ -353,6 +354,147 @@ async def archive_call(call_id: str, db: AsyncSession = Depends(get_db)) -> Volu
     return call_response(call)
 
 
+# --- Auto-assign Team Leads ---
+
+
+@router.post(
+    "/{call_id}/auto-assign-team-leads",
+    response_model=AutoAssignTeamLeadsResponse,
+)
+async def auto_assign_team_leads(
+    call_id: str, db: AsyncSession = Depends(get_db)
+) -> AutoAssignTeamLeadsResponse:
+    """Fill in a team lead for every task that doesn't have one.
+
+    Heuristic: for each unstaffed task, pick the team-leader from the
+    call's program who's been assigned the least recently (NULL = never =
+    most-eligible). Ties broken by total trailing-3mo assignments, then
+    first name. Avoids re-picking the same lead for two same-date tasks
+    within this call.
+
+    The state machine is unaffected — this just mutates Task.team_lead_id
+    and bumps assignments_changed_at. The admin still has to click
+    Done Assigning afterwards.
+    """
+    call = await get_call_or_404(call_id, db)
+
+    # Tasks needing a lead, sorted by date so we hand out the most-eligible
+    # leads to the earliest tasks first (a tiny visible-ordering nicety).
+    needy_tasks = sorted(
+        (t for t in call.tasks if t.team_lead_id is None),
+        key=lambda t: (t.date is None, t.date or datetime.date.max),
+    )
+    if not needy_tasks:
+        return AutoAssignTeamLeadsResponse(tasks_updated=0, tasks_skipped=0)
+
+    # Eligible leads: people with TEAM_LEADER role who are members of the
+    # call's program (matches existing /people?role=team_leader semantics
+    # plus a program filter — admins don't want an ACR lead on an RTX task).
+    leads_q = (
+        select(Person)
+        .options(selectinload(Person.roles))
+        .join(PersonRole, PersonRole.person_id == Person.id)
+        .join(VolunteerProgram, VolunteerProgram.person_id == Person.id)
+        .where(
+            Person.active.is_(True),
+            PersonRole.role == RoleType.TEAM_LEADER,
+            VolunteerProgram.program == call.program,
+            VolunteerProgram.active.is_(True),
+        )
+        .order_by(Person.first_name, Person.last_name)
+    )
+    leads_result = await db.execute(leads_q)
+    leads = list({p.id: p for p in leads_result.scalars().all()}.values())
+    if not leads:
+        # Nothing to do — no qualifying leads exist for this program.
+        return AutoAssignTeamLeadsResponse(
+            tasks_updated=0,
+            tasks_skipped=len(needy_tasks),
+        )
+
+    # Pull last_assignment_date + trailing_3mo per candidate so the
+    # heuristic doesn't keep handing the same lead every task.
+    cutoff = datetime.date.today() - datetime.timedelta(days=90)
+    stats_q = (
+        select(
+            TeamAssignment.person_id,
+            func.max(Task.date).label("last_date"),
+            func.count().filter(Task.date >= cutoff).label("trailing_3mo"),
+        )
+        .join(Task, Task.id == TeamAssignment.task_id)
+        .where(
+            TeamAssignment.person_id.in_([p.id for p in leads]),
+            Task.date.is_not(None),
+        )
+        .group_by(TeamAssignment.person_id)
+    )
+    stats: dict[str, tuple[datetime.date | None, int]] = {}
+    for row in (await db.execute(stats_q)).all():
+        stats[row.person_id] = (row.last_date, row.trailing_3mo or 0)
+
+    # The pick state changes as we assign — track which dates each lead is
+    # already booked for within THIS call so we don't double-book by date.
+    booked_by_lead: dict[str, set[datetime.date]] = {}
+    for t in call.tasks:
+        if t.team_lead_id and t.date is not None:
+            booked_by_lead.setdefault(t.team_lead_id, set()).add(t.date)
+    # Track how many tasks we've assigned each lead during this run so the
+    # sort key naturally pushes them down on subsequent picks.
+    picks_this_run: dict[str, int] = {}
+
+    def lead_sort_key(
+        p: Person, task_date: datetime.date | None
+    ) -> tuple[bool, int, bool, datetime.date, int, str, str]:
+        last, t3m = stats.get(p.id, (None, 0))
+        already = picks_this_run.get(p.id, 0)
+        conflict = task_date is not None and task_date in booked_by_lead.get(p.id, set())
+        # Tuple shape: avoid date-conflicts first, then this-run-picks,
+        # then global last_date (NULL first), then trailing_3mo, then name.
+        return (
+            conflict,
+            already,
+            last is not None,
+            last or datetime.date.min,
+            t3m,
+            p.first_name.casefold(),
+            p.last_name.casefold(),
+        )
+
+    assigned_ids: list[str] = []
+    skipped = 0
+    for task in needy_tasks:
+        candidates = sorted(leads, key=lambda p: lead_sort_key(p, task.date))
+        # If the top candidate has a conflict on this exact date, prefer
+        # any non-conflicting candidate even if they've been picked more.
+        winner = candidates[0]
+        if task.date is not None and task.date in booked_by_lead.get(winner.id, set()):
+            non_conflict = [
+                p for p in candidates if task.date not in booked_by_lead.get(p.id, set())
+            ]
+            if non_conflict:
+                winner = non_conflict[0]
+            else:
+                # Every lead is already booked that day in this call —
+                # skip rather than double-book.
+                skipped += 1
+                continue
+        task.team_lead_id = winner.id
+        picks_this_run[winner.id] = picks_this_run.get(winner.id, 0) + 1
+        if task.date is not None:
+            booked_by_lead.setdefault(winner.id, set()).add(task.date)
+        assigned_ids.append(winner.id)
+
+    if assigned_ids:
+        call.assignments_changed_at = datetime.datetime.now(datetime.timezone.utc)
+
+    await db.commit()
+    return AutoAssignTeamLeadsResponse(
+        tasks_updated=len(assigned_ids),
+        tasks_skipped=skipped,
+        assigned_lead_ids=assigned_ids,
+    )
+
+
 # --- Assignment Overview ---
 
 
@@ -489,9 +631,7 @@ async def assignment_overview(
             select(
                 TeamAssignment.person_id,
                 func.max(Task.date).label("last_date"),
-                func.count()
-                .filter(Task.date >= cutoff)
-                .label("trailing_3mo"),
+                func.count().filter(Task.date >= cutoff).label("trailing_3mo"),
             )
             .join(Task, Task.id == TeamAssignment.task_id)
             .where(
@@ -502,9 +642,10 @@ async def assignment_overview(
         )
         stats_result = await db.execute(stats_q)
         for row in stats_result.all():
-            item = vol_map.get(row.person_id)
-            if item is None:
+            existing = vol_map.get(row.person_id)
+            if existing is None:
                 continue
+            item = existing
             item.last_assignment_date = row.last_date
             item.assignments_trailing_3mo = row.trailing_3mo or 0
 

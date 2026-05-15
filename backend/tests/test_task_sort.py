@@ -67,16 +67,22 @@ async def client(engine) -> AsyncClient:
 
 
 @pytest.mark.asyncio
-async def test_tasks_sorted_by_date_in_call_response(
-    db: AsyncSession, client: AsyncClient
-) -> None:
+async def test_tasks_sorted_by_date_in_call_response(db: AsyncSession, client: AsyncClient) -> None:
     call = VolunteerCall(title="Spring", program=Program.RTX, status=CallStatus.OPEN)
     db.add(call)
     await db.flush()
     # Insert in reverse-chronological order; expect chronological out.
-    db.add(Task(volunteer_call_id=call.id, short_description="Third", date=datetime.date(2025, 12, 12)))
-    db.add(Task(volunteer_call_id=call.id, short_description="First", date=datetime.date(2025, 11, 1)))
-    db.add(Task(volunteer_call_id=call.id, short_description="Second", date=datetime.date(2025, 11, 15)))
+    db.add(
+        Task(volunteer_call_id=call.id, short_description="Third", date=datetime.date(2025, 12, 12))
+    )
+    db.add(
+        Task(volunteer_call_id=call.id, short_description="First", date=datetime.date(2025, 11, 1))
+    )
+    db.add(
+        Task(
+            volunteer_call_id=call.id, short_description="Second", date=datetime.date(2025, 11, 15)
+        )
+    )
     await db.commit()
 
     resp = await client.get(f"/api/volunteer-calls/{call.id}")
@@ -86,15 +92,17 @@ async def test_tasks_sorted_by_date_in_call_response(
 
 
 @pytest.mark.asyncio
-async def test_undated_tasks_sink_to_bottom(
-    db: AsyncSession, client: AsyncClient
-) -> None:
+async def test_undated_tasks_sink_to_bottom(db: AsyncSession, client: AsyncClient) -> None:
     call = VolunteerCall(title="Mixed", program=Program.RTX, status=CallStatus.OPEN)
     db.add(call)
     await db.flush()
     db.add(Task(volunteer_call_id=call.id, short_description="No date", date=None))
-    db.add(Task(volunteer_call_id=call.id, short_description="Dec", date=datetime.date(2025, 12, 1)))
-    db.add(Task(volunteer_call_id=call.id, short_description="Nov", date=datetime.date(2025, 11, 1)))
+    db.add(
+        Task(volunteer_call_id=call.id, short_description="Dec", date=datetime.date(2025, 12, 1))
+    )
+    db.add(
+        Task(volunteer_call_id=call.id, short_description="Nov", date=datetime.date(2025, 11, 1))
+    )
     await db.commit()
 
     resp = await client.get(f"/api/volunteer-calls/{call.id}")
@@ -104,9 +112,7 @@ async def test_undated_tasks_sink_to_bottom(
 
 
 @pytest.mark.asyncio
-async def test_first_name_sort_in_people_endpoint(
-    db: AsyncSession, client: AsyncClient
-) -> None:
+async def test_first_name_sort_in_people_endpoint(db: AsyncSession, client: AsyncClient) -> None:
     # Three volunteers with deliberately misleading last-name order:
     # last-name sort would give Aronson, Davies, Williams; first-name
     # sort gives Bryan, Vick, Zara — distinct enough to detect the bug.

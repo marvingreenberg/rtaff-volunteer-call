@@ -34,10 +34,12 @@ import type {
   VolunteerOverviewItem,
 } from "$lib/api/types";
 
-function vol(partial: Partial<VolunteerOverviewItem> & {
-  id: string;
-  first?: string;
-}): VolunteerOverviewItem {
+function vol(
+  partial: Partial<VolunteerOverviewItem> & {
+    id: string;
+    first?: string;
+  },
+): VolunteerOverviewItem {
   return {
     person_id: partial.id,
     person_name: `${partial.first ?? partial.id} Last`,
@@ -196,8 +198,12 @@ describe("badgesFor", () => {
       [vol({ id: "handy", skills: ["plumbing"] as never })],
       [],
     );
-    expect(badgesFor("handy", task({ id: "t1", skilled_needed: 1 }), ctx).skilled).toBe(true);
-    expect(badgesFor("handy", task({ id: "t1", skilled_needed: 0 }), ctx).skilled).toBe(false);
+    expect(
+      badgesFor("handy", task({ id: "t1", skilled_needed: 1 }), ctx).skilled,
+    ).toBe(true);
+    expect(
+      badgesFor("handy", task({ id: "t1", skilled_needed: 0 }), ctx).skilled,
+    ).toBe(false);
   });
 });
 

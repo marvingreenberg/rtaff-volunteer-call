@@ -24,6 +24,7 @@ import type {
   AvailableVolunteerResponse,
   SendInvitesResponse,
   AssignmentNoticesResponse,
+  AutoAssignTeamLeadsResponse,
   AssignmentOverviewResponse,
   CalendarConnect,
   CalendarStatus,
@@ -225,6 +226,12 @@ export const volunteerCalls = {
   assignmentOverview: (callId: string) =>
     request<AssignmentOverviewResponse>(
       `/volunteer-calls/${callId}/assignment-overview`,
+    ),
+
+  autoAssignTeamLeads: (callId: string) =>
+    request<AutoAssignTeamLeadsResponse>(
+      `/volunteer-calls/${callId}/auto-assign-team-leads`,
+      { method: "POST" },
     ),
 
   /** Conflict info per task using the calling user's connected calendar.

@@ -171,6 +171,15 @@ class AssignmentOverviewResponse(BaseModel):
     volunteers: list[VolunteerOverviewItem] = []
 
 
+class AutoAssignTeamLeadsResponse(BaseModel):
+    """Outcome of POST /{call_id}/auto-assign-team-leads."""
+
+    tasks_updated: int
+    tasks_skipped: int
+    # Person ids picked, in pick order. Useful for the UI to toast/log.
+    assigned_lead_ids: list[str] = []
+
+
 class SendInvitesResponse(BaseModel):
     """Result of sending volunteer invitations."""
 

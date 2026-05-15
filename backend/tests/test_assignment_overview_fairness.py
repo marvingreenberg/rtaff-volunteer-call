@@ -186,9 +186,7 @@ async def test_trailing_3mo_excludes_older_assignments(
 
 
 @pytest.mark.asyncio
-async def test_volunteers_sorted_by_first_name(
-    db: AsyncSession, client: AsyncClient
-) -> None:
+async def test_volunteers_sorted_by_first_name(db: AsyncSession, client: AsyncClient) -> None:
     # Seed in non-alphabetical order; expect first-name alphabetical out.
     zara = await _seed_volunteer(db, "Zara", "Adams", "z@example.com")
     alex = await _seed_volunteer(db, "alex", "Zimmerman", "a@example.com")  # lowercase

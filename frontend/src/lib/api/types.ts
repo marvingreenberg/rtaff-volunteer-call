@@ -477,6 +477,12 @@ export interface SendInvitesResponse {
   volunteers_skipped: number;
 }
 
+export interface AutoAssignTeamLeadsResponse {
+  tasks_updated: number;
+  tasks_skipped: number;
+  assigned_lead_ids: string[];
+}
+
 export interface AssignmentNoticesResponse {
   assignment_emails: number;
   thanks_emails: number;
