@@ -591,8 +591,15 @@
   .lists {
     display: grid;
     grid-template-columns: 1fr 1fr;
+    /* Don't stretch the shorter column to match the taller one — keeps
+       both lists visually anchored at the top once one column scrolls. */
+    align-items: start;
     gap: var(--spacing-md);
     padding: var(--spacing-md);
+  }
+
+  .list-block {
+    min-width: 0;
   }
 
   .list-heading {
@@ -617,6 +624,11 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
+    /* When many volunteers respond, the Available column can dwarf the
+       Assigned column — bound both at the same height and let the longer
+       one scroll. Roughly six rows tall. */
+    max-height: 16em;
+    overflow-y: auto;
   }
 
   .person-row {

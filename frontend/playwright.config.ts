@@ -15,9 +15,15 @@ export default defineConfig({
   use: {
     baseURL: process.env.BASE_URL || "http://localhost:5173",
     headless: false,
-    viewport: { width: 1920, height: 1080 },
+    // Sized to fit comfortably on a 1440-wide laptop screen with room for
+    // the macOS menu bar and Chrome chrome. The recorded video uses the
+    // viewport size, not the window size, so video stays 1280x800.
+    viewport: { width: 1280, height: 800 },
     video: "on",
     screenshot: "only-on-failure",
-    launchOptions: { slowMo: 180 },
+    launchOptions: {
+      slowMo: 180,
+      args: ["--window-size=1280,860", "--window-position=40,40"],
+    },
   },
 });

@@ -18,11 +18,15 @@ import { request, test } from "@playwright/test";
 import {
   BASE_URL,
   clearNarration,
-  injectNarrationOverlay,
+  extractAppLink,
+  fetchMessageHtml,
+  hideMailpitPanel,
+  installNarrator,
   loginViaMagicLink,
   logout,
   narrate,
   runBulk,
+  showMailpitInbox,
   showMailpitPanel,
   sleep,
   waitForMessage,
@@ -36,12 +40,15 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
   test.setTimeout(300_000);
   const api = await request.newContext();
 
+  // Register the narration overlay BEFORE any navigation so it re-attaches
+  // automatically on every page load.
+  await installNarrator(page);
+
   // ===========================================================================
   // STEP 1: Admin Don Ryan logs in — entering his *gmail alias*. The magic
   // link arrives at the gmail address; Mailpit panel proves it.
   // ===========================================================================
   await page.goto(`${BASE_URL}/login`);
-  await injectNarrationOverlay(page);
   await narrate(
     page,
     "Don Ryan is an admin. He logs in with his personal gmail — an email alias on his RT-AFF account.",
@@ -87,27 +94,36 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
   for (const t of [
     {
       desc: "Roof patch at 102 Maple Ave",
-      date: dateOffsetIso(5), // Saturday-ish
+      date: dateOffsetMMDD(5),
       address: "102 Maple Ave",
       city: "Arlington",
     },
     {
       desc: "Bathroom grab-bar install",
-      date: dateOffsetIso(6),
+      date: dateOffsetMMDD(6),
       address: "44 Oak St",
       city: "Falls Church",
     },
   ]) {
-    await page.click(".task-link");
+    await page.click('[data-testid="task-add-open"]');
+    await page.waitForSelector('[data-testid="task-description"]');
     await sleep(400);
-    await page.fill('input[placeholder*="Roof repair"]', t.desc);
-    await page.fill('input[type="date"]', t.date);
-    await page.fill('input[placeholder*="123 Main St"]', t.address);
-    await page.fill('input[placeholder="City"]', t.city);
-    await sleep(400);
-    await page.click(
-      'button:has-text("Add Task"), button.action-btn:has-text("Add")',
+    await page.fill('[data-testid="task-date"]', t.date);
+    await page.fill('[data-testid="task-address"]', t.address);
+    await page.selectOption('[data-testid="task-city"]', t.city);
+    await page.fill('[data-testid="task-description"]', t.desc);
+    // Button is disabled until TaskEntryForm reports a valid payload.
+    const submit = page.locator('[data-testid="task-add-submit"]');
+    await submit.waitFor({ state: "visible" });
+    await page.waitForFunction(
+      () =>
+        !(
+          document.querySelector(
+            '[data-testid="task-add-submit"]',
+          ) as HTMLButtonElement | null
+        )?.disabled,
     );
+    await submit.click();
     await sleep(800);
   }
 
@@ -137,36 +153,49 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
   // ===========================================================================
   await page.goto(`${BASE_URL}/volunteer-calls`);
   await page.waitForSelector(".calls-page");
-  await narrate(
-    page,
-    "Sending the call out to volunteers. Mailpit will show the first invite.",
-    2200,
-  );
+  await narrate(page, "Don sends the call out to volunteers.", 2000);
 
-  const sendRow = page.locator(`tr:has-text("${callTitle}")`);
-  await sendRow.locator("button:has-text('Send')").first().click();
+  const sendRow = page.locator(`[data-testid="call-row"][data-call-id="${callId}"]`);
+  await sendRow.locator('[data-testid="row-action-send_invites"]').click();
   await sleep(2000);
 
-  // Show one invite in Mailpit (any volunteer recipient will do).
-  try {
-    const inviteMsg = await waitForMessage(api, VICK, /invite|call/i, 12_000);
-    await showMailpitPanel(page, inviteMsg.ID);
-    await sleep(3500);
-  } catch {
-    await narrate(
-      page,
-      "(Invite emails dispatching — check Mailpit at :8025)",
-      1500,
-    );
-  }
+  // Don's role in this scene is done — log him out, then narrate over the
+  // logged-out app while showing what every volunteer just received.
   await clearNarration(page);
   await logout(page);
 
+  await narrate(
+    page,
+    "Every active volunteer just received an invite — here's the outbox.",
+    2400,
+  );
+  await showMailpitInbox(page);
+  await sleep(4000);
+
+  // Zoom in on one volunteer's invite specifically.
+  const inviteMsg = await waitForMessage(api, VICK, /invite|call/i, 12_000);
+  await narrate(
+    page,
+    "Here's Vick Fisher's invite. The button below logs Vick in directly — no password.",
+    2800,
+  );
+  await showMailpitPanel(api, page, inviteMsg.ID);
+  await sleep(3500);
+
   // ===========================================================================
-  // STEP 6: Volunteer Vick Fisher logs in, submits full availability
+  // STEP 6: Vick clicks the invite link — auto-authenticates, lands on
+  // the availability page. No login form.
   // ===========================================================================
-  await narrate(page, "Vick Fisher (volunteer) logs in.", 1600).catch(() => {});
-  await loginViaMagicLink(page, api, VICK, { showInMailpit: false });
+  const inviteHtml = await fetchMessageHtml(api, inviteMsg.ID);
+  const inviteLink = extractAppLink(inviteHtml, /\/volunteering\?token=/);
+  await hideMailpitPanel(page);
+  await clearNarration(page);
+  await narrate(
+    page,
+    "Vick clicks the link and lands straight on the availability page.",
+    2000,
+  );
+  await page.goto(inviteLink);
   await page.waitForSelector("text=/Volunteer|Open Volunteer Calls/i");
   await sleep(800);
 
@@ -203,7 +232,6 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
   // availability seeds in parallel
   // ===========================================================================
   await page.goto(`${BASE_URL}/login`);
-  await injectNarrationOverlay(page);
   await narrate(page, "Overnight, 24 more volunteers responded…", 2000);
   await runBulk(["respond-availability", "--call-id", callId, "--count", "24"]);
 
@@ -218,8 +246,8 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
     2000,
   );
 
-  const assignRow = page.locator(`tr:has-text("${callTitle}")`);
-  await assignRow.locator("button:has-text('Assign')").first().click();
+  const assignRow = page.locator(`[data-testid="call-row"][data-call-id="${callId}"]`);
+  await assignRow.locator('[data-testid="row-action-assign"]').click();
   await page.waitForURL(/\/assign/);
   await sleep(3500);
 
@@ -248,8 +276,8 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
     "Sending assignments. Volunteers get individual emails; team leads get rosters.",
     2400,
   );
-  const sendAssignRow = page.locator(`tr:has-text("${callTitle}")`);
-  await sendAssignRow.locator("button:has-text('Send')").first().click();
+  const sendAssignRow = page.locator(`[data-testid="call-row"][data-call-id="${callId}"]`);
+  await sendAssignRow.locator('[data-testid="row-action-send_assignments"]').click();
   await sleep(2500);
 
   try {
@@ -259,7 +287,7 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
       /assign|task/i,
       12_000,
     );
-    await showMailpitPanel(page, assignmentMsg.ID);
+    await showMailpitPanel(api, page, assignmentMsg.ID);
     await sleep(4000);
   } catch {
     /* swallow — recording still useful */
@@ -278,8 +306,8 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
 // helpers local to this spec
 // ---------------------------------------------------------------------------
 
-function dateOffsetIso(days: number): string {
+function dateOffsetMMDD(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
 }

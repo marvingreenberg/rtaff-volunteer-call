@@ -220,6 +220,7 @@
       </span>
       <input
         type="text"
+        data-testid="task-date"
         bind:value={dateText}
         oninput={handleDateInput}
         placeholder="MM/DD"
@@ -277,6 +278,7 @@
       </span>
       <input
         type="text"
+        data-testid="task-address"
         bind:value={address}
         placeholder="Address"
         title="Street address"
@@ -302,6 +304,7 @@
         </svg>
       </span>
       <select
+        data-testid="task-city"
         bind:value={city}
         aria-label="City"
         class:invalid={cityMissing}
@@ -340,6 +343,7 @@
   <div class="form-row">
     <textarea
       class="description"
+      data-testid="task-description"
       bind:value={shortDescription}
       placeholder="e.g., Install two lights, repair drywall, grab bars in upstairs bathroom"
       title="What needs to be done"

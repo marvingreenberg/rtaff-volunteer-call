@@ -175,6 +175,7 @@
               <button
                 type="button"
                 class="action-btn"
+                data-testid="task-add-submit"
                 disabled={!addPayload || addSaving}
                 onclick={handleAddSubmit}
               >
@@ -197,7 +198,7 @@
         {/if}
 
         <div class="task-links">
-          <button type="button" class="task-link" onclick={() => (addOpen = true)} disabled={addOpen}>
+          <button type="button" class="task-link" data-testid="task-add-open" onclick={() => (addOpen = true)} disabled={addOpen}>
             - Add new task -
           </button>
           {#if call.tasks.length > 0}

@@ -341,7 +341,7 @@
           {@const actions = rowAction(call)}
           {@const busy = busyCallIds.has(call.id)}
           {@const notes = rowNotes(call)}
-          <tr>
+          <tr data-testid="call-row" data-call-id={call.id}>
             <td class="title-col">
               <a href="/volunteer-calls/{call.id}" class="row-link">{call.title}</a>
             </td>
@@ -354,6 +354,7 @@
                 <button
                   type="button"
                   class="btn btn-primary action-btn"
+                  data-testid="row-action-{action.action}"
                   disabled={busy}
                   onclick={() => handleRowAction(call, action.action)}
                 >
