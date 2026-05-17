@@ -183,8 +183,7 @@
 
 <style>
   .spreadsheet {
-    overflow: auto;
-    max-height: 70vh;
+    overflow-x: auto;
     border: 1px solid var(--rt-gray-200, #e4dfda);
     border-radius: var(--card-radius);
     background: var(--rt-white, #fff);
@@ -194,6 +193,7 @@
     border-collapse: separate;
     border-spacing: 0;
     font-size: var(--font-size-sm);
+    width: 100%;
   }
 
   thead th {

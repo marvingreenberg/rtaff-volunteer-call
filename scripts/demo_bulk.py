@@ -61,16 +61,39 @@ def cli() -> None:
     """Bulk demo seeding helpers."""
 
 
-async def _add_tasks(call_id: str, count: int, thursday: int) -> int:
+def _first_monday_after(today: date) -> date:
+    """First Monday *strictly* after `today` (never today itself)."""
+    days_ahead = (0 - today.weekday()) % 7 or 7
+    return today + timedelta(days=days_ahead)
+
+
+def _schedule_slots(today: date) -> list[date]:
+    """Two-week task schedule with variation, starting on the first Monday
+    after `today`:
+
+        Week 1: Mon, [skip Tue], Wed, Thu, Thu, Fri          (5 slots)
+        Week 2: Mon, Tue, Wed, Thu, Fri, Sat                 (6 slots)
+
+    Two Thursday slots on the first week and a Saturday on the second
+    weekend are the deliberate variations. Total: 11 slots.
+    """
+    d0 = _first_monday_after(today)
+    week1_offsets = [0, 2, 3, 3, 4]
+    week2_offsets = [7, 8, 9, 10, 11, 12]
+    return [d0 + timedelta(days=o) for o in week1_offsets + week2_offsets]
+
+
+async def _add_tasks(call_id: str, count: int, offset: int) -> int:
     async with async_session_factory() as session:
         call = await session.get(VolunteerCall, call_id)
         if call is None:
             raise click.ClickException(f"No volunteer_call with id {call_id}")
 
-        today = date.today()
-        days_to_thursday = (3 - today.weekday()) % 7 or 7
-        thursday_date = today + timedelta(days=days_to_thursday)
-        weekend_dates = [thursday_date + timedelta(days=i) for i in (1, 2, 3)]
+        slots = _schedule_slots(date.today())
+        if offset < 0 or offset + count > len(slots):
+            raise click.ClickException(
+                f"offset+count must be ≤ {len(slots)} (offset={offset}, count={count})"
+            )
 
         rng = random.Random(call_id)
         pool = list(TASK_DESCRIPTIONS)
@@ -78,7 +101,7 @@ async def _add_tasks(call_id: str, count: int, thursday: int) -> int:
         descriptions = (pool * ((count // len(pool)) + 1))[:count]
 
         for i in range(count):
-            d = thursday_date if i < thursday else rng.choice(weekend_dates)
+            d = slots[offset + i]
             address, city = rng.choice(ADDRESS_POOL)
             session.add(
                 Task(
@@ -152,17 +175,22 @@ async def _respond_availability(call_id: str, count: int) -> int:
 
 @cli.command("add-tasks")
 @click.option("--call-id", required=True, help="VolunteerCall.id to add tasks under")
-@click.option("--count", type=int, default=7, show_default=True)
+@click.option("--count", type=int, default=9, show_default=True)
 @click.option(
-    "--thursday",
+    "--offset",
     type=int,
     default=0,
     show_default=True,
-    help="How many of the tasks should land on the next Thursday (rest go weekend).",
+    help=(
+        "Start index in the 11-slot two-week schedule "
+        "(Mon, Wed, Thu×2, Fri, Mon, Tue, Wed, Thu, Fri, Sat). "
+        "Use a non-zero offset when tasks at slots 0..offset-1 are added by hand."
+    ),
 )
-def add_tasks_cmd(call_id: str, count: int, thursday: int) -> None:
-    """Add COUNT synthetic tasks to an existing call."""
-    inserted = asyncio.run(_add_tasks(call_id, count, thursday))
+def add_tasks_cmd(call_id: str, count: int, offset: int) -> None:
+    """Add COUNT synthetic tasks to an existing call, filling consecutive
+    slots of the two-week schedule starting from --offset."""
+    inserted = asyncio.run(_add_tasks(call_id, count, offset))
     click.echo(f"Inserted {inserted} task(s) into call {call_id}.")
 
 

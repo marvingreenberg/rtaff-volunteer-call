@@ -91,16 +91,18 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
 
   await narrate(page, "Adding two tasks by hand…", 1600);
 
+  // Slots 0 and 1 of the two-week schedule (first Monday and Wednesday
+  // after today). The bulk step below fills slots 2..10.
   for (const t of [
     {
       desc: "Roof patch at 102 Maple Ave",
-      date: dateOffsetMMDD(5),
+      date: scheduleSlotMMDD(0),
       address: "102 Maple Ave",
       city: "Arlington",
     },
     {
       desc: "Bathroom grab-bar install",
-      date: dateOffsetMMDD(6),
+      date: scheduleSlotMMDD(1),
       address: "44 Oak St",
       city: "Falls Church",
     },
@@ -128,20 +130,20 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
   }
 
   // ===========================================================================
-  // STEP 3a: Bulk add 7 more tasks (2 on the upcoming Thursday)
+  // STEP 3a: Bulk add the remaining 9 tasks (slots 2..10 of the schedule)
   // ===========================================================================
   await narrate(
     page,
-    "…and the rest of the schedule lands in bulk (seven more, two on Thursday).",
-    2200,
+    "…and the rest of the two-week schedule lands in bulk (nine more, including a second Thursday and a Saturday).",
+    2400,
   );
   await runBulk([
     "add-tasks",
     "--call-id",
     callId,
     "--count",
-    "7",
-    "--thursday",
+    "9",
+    "--offset",
     "2",
   ]);
   await page.reload();
@@ -330,8 +332,20 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
 // helpers local to this spec
 // ---------------------------------------------------------------------------
 
-function dateOffsetMMDD(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
+/**
+ * MM/DD for slot `idx` (0..10) of the two-week task schedule used by the
+ * demo: Mon, Wed, Thu, Thu, Fri, Mon, Tue, Wed, Thu, Fri, Sat — anchored
+ * on the first Monday strictly after today. Mirrors `_schedule_slots` in
+ * scripts/demo_bulk.py.
+ */
+function scheduleSlotMMDD(idx: number): string {
+  const offsets = [0, 2, 3, 3, 4, 7, 8, 9, 10, 11, 12];
+  if (idx < 0 || idx >= offsets.length) {
+    throw new Error(`scheduleSlotMMDD: idx ${idx} out of range`);
+  }
+  const today = new Date();
+  const daysAhead = (1 - today.getDay() + 7) % 7 || 7; // first Monday after today
+  const d = new Date(today);
+  d.setDate(today.getDate() + daysAhead + offsets[idx]);
   return `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
 }

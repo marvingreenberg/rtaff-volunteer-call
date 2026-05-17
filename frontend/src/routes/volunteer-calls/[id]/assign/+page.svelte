@@ -227,6 +227,12 @@
     return t.assignments.length >= t.volunteers_needed;
   }
 
+  function fillState(t: TaskOverviewItem): "under" | "full" | "over" {
+    if (t.assignments.length > t.volunteers_needed) return "over";
+    if (t.assignments.length === t.volunteers_needed) return "full";
+    return "under";
+  }
+
   // Re-entry mode: when admin landed here via "Update Assignments" on
   // an already-ASSIGNED call, the call's state machine has already moved
   // past WAITING — done-assigning would error. In that case the button
@@ -296,7 +302,7 @@
   <title>{overview ? `Assign — ${overview.call_title}` : "Assign"} - RT-AFF</title>
 </svelte:head>
 
-<div class="assign-page page-md">
+<div class="assign-page" class:page-md={viewMode === "task"} class:page-lg={viewMode === "spreadsheet"}>
   {#if error}
     <div class="error-banner">{error}</div>
   {/if}
@@ -412,6 +418,7 @@
       <div class="task-cards">
         {#each overview.tasks as task (task.task_id)}
           {@const full = isFull(task)}
+          {@const state = fillState(task)}
           <section class="task-card" class:full>
             <header class="card-header">
               <span class="date">{task.date ? formatDate(task.date) : "—"}</span>
@@ -420,9 +427,10 @@
               </span>
               <span class="city">{task.city ?? ""}</span>
               <span class="description">{task.short_description}</span>
-              <span class="progress" class:full>
+              <span class="progress" class:full={state !== "under"}>
                 {task.assignments.length}/{task.volunteers_needed}
-                {#if full}<span class="full-tag">Full</span>{/if}
+                {#if state === "full"}<span class="full-tag">Full</span>{/if}
+                {#if state === "over"}<span class="extra-tag">Extra!</span>{/if}
               </span>
             </header>
 
@@ -457,7 +465,7 @@
             </div>
 
             <div class="lists">
-              <div class="list-block">
+              <div class="list-block assigned-block">
                 <h3 class="list-heading">Assigned</h3>
                 {#if task.assignments.length === 0}
                   <p class="list-empty">No one assigned yet.</p>
@@ -491,7 +499,8 @@
                 {/if}
               </div>
 
-              <div class="list-block">
+              <div class="separator" aria-hidden="true"></div>
+              <div class="list-block available-block">
                 <h3 class="list-heading">Available</h3>
                 {#if task.available_volunteers.length === 0}
                   <p class="list-empty">No more candidates.</p>
@@ -821,20 +830,29 @@
 
   .progress.full {
     color: var(--rt-success-text, #2f7a45);
+    font-weight: 800;
   }
 
-  .full-tag {
+  .full-tag,
+  .extra-tag {
     font-size: var(--font-size-xs);
-    background: var(--rt-success-text, #2f7a45);
     color: var(--rt-white, #fff);
     padding: 1px 6px;
     border-radius: 10px;
     font-weight: 500;
   }
 
+  .full-tag {
+    background: var(--rt-success-text, #2f7a45);
+  }
+
+  .extra-tag {
+    background: var(--rt-warning-text, #b35900);
+  }
+
   .lists {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
     /* Don't stretch the shorter column to match the taller one — keeps
        both lists visually anchored at the top once one column scrolls. */
     align-items: start;
@@ -844,6 +862,12 @@
 
   .list-block {
     min-width: 0;
+  }
+
+  .lists .separator {
+    align-self: stretch;
+    width: 1px;
+    background: var(--rt-gray-200, #e4dfda);
   }
 
   .list-heading {
@@ -865,9 +889,12 @@
     list-style: none;
     padding: 0;
     margin: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+    /* Grid (not flex) so stray whitespace text nodes inside {#each} don't
+       become flex items that consume vertical leading. Single column by
+       default; two columns when the card has room (see media query). */
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2px 12px;
     /* When many volunteers respond, the Available column can dwarf the
        Assigned column — bound both at the same height and let the longer
        one scroll. Roughly six rows tall. */
@@ -875,12 +902,20 @@
     overflow-y: auto;
   }
 
+  @media (min-width: 900px) {
+    ul.people {
+      grid-template-columns: 1fr 1fr;
+      grid-auto-flow: row;
+    }
+  }
+
   .person-row {
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
     width: 100%;
-    padding: var(--spacing-xs) var(--spacing-sm);
+    padding: 2px var(--spacing-sm);
+    line-height: 1.5;
     background: none;
     border: 1px solid transparent;
     border-radius: var(--card-radius);
@@ -976,6 +1011,12 @@
 
   @media (max-width: 768px) {
     .lists {
+      grid-template-columns: 1fr;
+    }
+    .lists .separator {
+      display: none;
+    }
+    ul.people {
       grid-template-columns: 1fr;
     }
   }
