@@ -7,9 +7,12 @@
  * - sort_last_date_nulls_first: regression where null last_assignment_date
  *   is treated as "today" (or sorted last), pushing brand-new volunteers
  *   to the bottom instead of the top.
- * - badges_exhausted_off_by_one: regression where 🥵 only fires when the
- *   count strictly exceeds the cap, missing the exact-equality case
- *   (which is the entire intent: "you said max 2 and you have 2").
+ * - badges_fully_booked_at_cap: regression where 💯 fails to fire at exact
+ *   per-week cap equality — the entire intent of the badge ("you said max 2
+ *   and you have 2 in week 1").
+ * - badges_exhausted_only_when_over: regression where 🥵 fires at exact cap
+ *   equality, conflating "fully booked" with "oversubscribed". 🥵 must
+ *   require count > cap; the equality case belongs to 💯.
  * - quartile_includes_ties_at_cutoff: regression where the cutoff index
  *   alone bounds the 😴 set, so ties at the boundary get split arbitrarily
  *   — two volunteers with the same idle date land on opposite sides.
@@ -50,6 +53,7 @@ function vol(
     phone: null,
     available_task_ids: partial.available_task_ids ?? [],
     max_tasks_per_week: partial.max_tasks_per_week ?? 2,
+    max_tasks_per_week_2: partial.max_tasks_per_week_2 ?? 2,
     assignments_this_call: partial.assignments_this_call ?? 0,
     last_assignment_date: partial.last_assignment_date ?? null,
     assignments_trailing_3mo: partial.assignments_trailing_3mo ?? 0,
@@ -164,33 +168,86 @@ describe("fairnessCompare", () => {
 });
 
 describe("badgesFor", () => {
-  it("fires exhausted at exact equality, not strictly over (badges_exhausted_off_by_one)", () => {
-    const ctx = buildFairnessContext(
-      [
-        vol({
-          id: "tired",
-          max_tasks_per_week: 2,
-          assignments_this_call: 2,
-        }),
-      ],
-      [],
+  // Build a per-week assignment scenario: two week-1 tasks with `personId`
+  // assigned to both. Used by the per-week badge tests.
+  const week1Tasks = (personId: string, dates: string[]): TaskOverviewItem[] =>
+    dates.map((d, i) =>
+      task({
+        id: `t${i}`,
+        date: d,
+        assignments: [assignmentRow(personId, personId)],
+      }),
     );
-    const t = task({ id: "t1" });
-    expect(badgesFor("tired", t, ctx).exhausted).toBe(true);
+
+  it("fires fullyBooked (💯) at exact per-week cap equality (badges_fully_booked_at_cap)", () => {
+    // 2 assignments in week 1, cap 2 → fullyBooked for week 1, not exhausted.
+    const tasks = week1Tasks("tina", ["2025-12-01", "2025-12-03"]);
+    const ctx = buildFairnessContext(
+      [vol({ id: "tina", max_tasks_per_week: 2 })],
+      tasks,
+    );
+    const b = badgesFor("tina", tasks[0], ctx);
+    expect(b.fullyBookedWeeks).toEqual([1]);
+    expect(b.fullyBookedReason).toBe("2/2 for week 1");
+    expect(b.exhausted).toBe(false);
   });
 
-  it("does not fire exhausted under cap", () => {
+  it("only fires exhausted (🥵) when over cap, not at equality (badges_exhausted_only_when_over)", () => {
+    // 3 assignments in week 1, cap 2 → exhausted (over), NOT fullyBooked.
+    const tasks = week1Tasks("over", [
+      "2025-12-01",
+      "2025-12-02",
+      "2025-12-03",
+    ]);
     const ctx = buildFairnessContext(
-      [
-        vol({
-          id: "fine",
-          max_tasks_per_week: 2,
-          assignments_this_call: 1,
-        }),
-      ],
-      [],
+      [vol({ id: "over", max_tasks_per_week: 2 })],
+      tasks,
     );
-    expect(badgesFor("fine", task({ id: "t1" }), ctx).exhausted).toBe(false);
+    const b = badgesFor("over", tasks[0], ctx);
+    expect(b.exhausted).toBe(true);
+    expect(b.exhaustedReason).toContain("3 of max 2 for week 1");
+    expect(b.fullyBookedWeeks).toEqual([]);
+  });
+
+  it("does not fire either badge under cap", () => {
+    const tasks = week1Tasks("light", ["2025-12-01"]);
+    const ctx = buildFairnessContext(
+      [vol({ id: "light", max_tasks_per_week: 2 })],
+      tasks,
+    );
+    const b = badgesFor("light", tasks[0], ctx);
+    expect(b.exhausted).toBe(false);
+    expect(b.fullyBookedWeeks).toEqual([]);
+  });
+
+  it("tracks week 1 and week 2 independently with separate caps", () => {
+    // Week 1 cap = 1 (full), week 2 cap = 4 (half). Tasks: 1 in week 1
+    // (2025-12-01 Mon), 2 in week 2 (2025-12-08, 2025-12-10).
+    const tasks: TaskOverviewItem[] = [
+      task({
+        id: "w1a",
+        date: "2025-12-01",
+        assignments: [assignmentRow("mix", "Mix")],
+      }),
+      task({
+        id: "w2a",
+        date: "2025-12-08",
+        assignments: [assignmentRow("mix", "Mix")],
+      }),
+      task({
+        id: "w2b",
+        date: "2025-12-10",
+        assignments: [assignmentRow("mix", "Mix")],
+      }),
+    ];
+    const ctx = buildFairnessContext(
+      [vol({ id: "mix", max_tasks_per_week: 1, max_tasks_per_week_2: 4 })],
+      tasks,
+    );
+    const b = badgesFor("mix", tasks[0], ctx);
+    expect(b.fullyBookedWeeks).toEqual([1]);
+    expect(b.fullyBookedReason).toBe("1/1 for week 1");
+    expect(b.exhausted).toBe(false);
   });
 
   it("skilled badge fires when task needs skilled volunteers AND volunteer has any skill", () => {

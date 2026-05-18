@@ -16,7 +16,8 @@
   let error: string | null = $state(null);
   let showAddForm = $state(false);
   let saving = $state(false);
-  let statusFilter = $state('');
+  // 'active' = open ∪ waiting ∪ assigned; 'archived' = archived only.
+  let statusFilter = $state<'active' | 'archived'>('active');
 
   let newCall: VolunteerCallCreate = $state({ title: '', program: 'RTX' });
   let newCallTask: TaskCreate | null = $state(null);
@@ -86,9 +87,11 @@
     loading = true;
     error = null;
     try {
-      const params: Record<string, string> = {};
-      if (statusFilter) params.status = statusFilter;
-      calls = await volunteerCalls.list(params);
+      const status =
+        statusFilter === 'archived'
+          ? ['archived']
+          : ['open', 'waiting', 'assigned'];
+      calls = await volunteerCalls.list({ status });
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load volunteer calls';
     } finally {
@@ -308,10 +311,7 @@
 
   <div class="filters">
     <select bind:value={statusFilter} onchange={handleFilterChange}>
-      <option value="">All Statuses</option>
-      <option value="open">Open</option>
-      <option value="waiting">Waiting</option>
-      <option value="assigned">Assigned</option>
+      <option value="active">Active (open · waiting · assigned)</option>
       <option value="archived">Archived</option>
     </select>
   </div>

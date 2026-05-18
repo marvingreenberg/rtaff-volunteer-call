@@ -52,6 +52,17 @@
   --font-heading: "DM Serif Display", Georgia, serif;
   --font-body: "DM Sans", "Segoe UI", Helvetica, sans-serif;
 
+  /* Volunteer-name display budget. Names longer than
+     --volunteer-name-truncate-at are clipped to that length + an ellipsis
+     glyph (so total displayed characters never exceed
+     --volunteer-name-display-max). Used both for CSS width caps and the
+     truncateVolunteerName() helper in $lib/utils/volunteer-name.ts —
+     keep the values in lockstep. Width caps use `ch` units so they scale
+     automatically with the current density's font size. */
+  --volunteer-name-display-max: 22;
+  --volunteer-name-truncate-at: 21;
+  --volunteer-name-max-width: calc(var(--volunteer-name-display-max) * 1ch);
+
   /* Density — sizing & spacing */
   --font-size-body: 16px;
   --font-size-sm: 0.85rem;
@@ -265,6 +276,13 @@ main {
   width: 100%;
 }
 
+/* Let a page opt out of the 1200px main cap when it wants the full
+   viewport (e.g. the assignment spreadsheet). */
+main:has(.page-full) {
+  max-width: none;
+  padding-inline: var(--spacing-md);
+}
+
 /* ──────────────────────────────
    Page containers — width tiers
    ────────────────────────────── */
@@ -276,6 +294,10 @@ main {
 }
 .page-lg {
   max-width: 1100px;
+}
+.page-full {
+  max-width: none;
+  width: 100%;
 }
 
 /* ──────────────────────────────

@@ -30,6 +30,7 @@
     partitionAvailable,
     badgesFor,
   } from "$lib/utils/assignment-fairness";
+  import { truncateVolunteerName } from "$lib/utils/volunteer-name";
 
   type TeamLead = { id: string; first_name: string; last_name: string };
 
@@ -278,11 +279,11 @@
     if (saving) return;
     // Re-entry case: no API call needed; assignments persisted on each
     // assign/unassign click. The button is just an explicit "back to list".
+    if (!canSave) return;
     if (isAlreadyAssigned) {
       await goto("/volunteer-calls");
       return;
     }
-    if (!canSave) return;
     saving = true;
     error = null;
     try {
@@ -302,7 +303,7 @@
   <title>{overview ? `Assign — ${overview.call_title}` : "Assign"} - RT-AFF</title>
 </svelte:head>
 
-<div class="assign-page" class:page-md={viewMode === "task"} class:page-lg={viewMode === "spreadsheet"}>
+<div class="assign-page page-full">
   {#if error}
     <div class="error-banner">{error}</div>
   {/if}
@@ -332,14 +333,15 @@
       <div class="messages-col">
         <div class="message-area" data-area="counts">{countsMessage}</div>
         <div class="message-area" data-area="gate" class:hidden={!gateMessage}>
+          {#if gateMessage}<span class="gate-icon" aria-hidden="true">⚠️</span>{/if}
           {gateMessage}
         </div>
       </div>
 
       <div class="actions-col">
         <label class="policy-label">
-          <span class="policy-prefix">Completion when:</span>
-          <select bind:value={policy} aria-label="Completion policy">
+          <span class="policy-prefix">Desired</span>
+          <select bind:value={policy} aria-label="Desired">
             <option value="exact">{ASSIGNMENT_POLICY_LABELS.exact}</option>
             <option value="over">{ASSIGNMENT_POLICY_LABELS.over}</option>
             <option value="over_under">
@@ -364,7 +366,7 @@
           <button
             type="button"
             class="btn btn-primary save-btn"
-            disabled={saving || (!isAlreadyAssigned && !canSave)}
+            disabled={saving || !canSave}
             onclick={handleSave}
             aria-label={isAlreadyAssigned ? "Back to calls" : "Complete assignment"}
           >
@@ -481,10 +483,11 @@
                           disabled={busyTaskIds.has(task.task_id)}
                           onclick={() => unassign(task.task_id, a)}
                         >
-                          <span class="check" aria-hidden="true">✓</span>
-                          <span class="name">{a.person_name}</span>
+                          <span class="check checked" aria-hidden="true"></span>
+                          <span class="name">{truncateVolunteerName(a.person_name)}</span>
                           {#if b}
-                            {#if b.exhausted}<span class="fairness-badge" title="At weekly cap">🥵</span>{/if}
+                            {#if b.fullyBookedWeeks.length}<span class="fairness-badge" title={b.fullyBookedReason}>💯</span>{/if}
+                            {#if b.exhausted}<span class="fairness-badge" title={b.exhaustedReason}>🥵</span>{/if}
                             {#if b.idle}<span class="fairness-badge" title="Hasn't been assigned recently">😴</span>{/if}
                             {#if b.skilled}<span class="fairness-badge" title="Skilled volunteer">🛠️</span>{/if}
                           {/if}
@@ -522,9 +525,10 @@
                             disabled={busyTaskIds.has(task.task_id)}
                             onclick={() => assign(task.task_id, v)}
                           >
-                            <span class="check empty" aria-hidden="true">☐</span>
-                            <span class="name">{v.person_name}</span>
-                            {#if b.exhausted}<span class="fairness-badge" title="At weekly cap">🥵</span>{/if}
+                            <span class="check" aria-hidden="true"></span>
+                            <span class="name">{truncateVolunteerName(v.person_name)}</span>
+                            {#if b.fullyBookedWeeks.length}<span class="fairness-badge" title={b.fullyBookedReason}>💯</span>{/if}
+                            {#if b.exhausted}<span class="fairness-badge" title={b.exhaustedReason}>🥵</span>{/if}
                             {#if b.idle}<span class="fairness-badge" title="Hasn't been assigned recently">😴</span>{/if}
                             {#if b.skilled}<span class="fairness-badge" title="Skilled volunteer">🛠️</span>{/if}
                             {#each v.skills as s (s)}
@@ -559,10 +563,11 @@
                               onclick={() => assign(task.task_id, v, true)}
                               title="Already assigned to another task on this date"
                             >
-                              <span class="check empty" aria-hidden="true">☐</span>
-                              <span class="name">{v.person_name}</span>
+                              <span class="check" aria-hidden="true"></span>
+                              <span class="name">{truncateVolunteerName(v.person_name)}</span>
                               <span class="fairness-badge" title="Same-day conflict">‼️</span>
-                              {#if b.exhausted}<span class="fairness-badge" title="At weekly cap">🥵</span>{/if}
+                              {#if b.fullyBookedWeeks.length}<span class="fairness-badge" title={b.fullyBookedReason}>💯</span>{/if}
+                              {#if b.exhausted}<span class="fairness-badge" title={b.exhaustedReason}>🥵</span>{/if}
                               {#if b.skilled}<span class="fairness-badge" title="Skilled volunteer">🛠️</span>{/if}
                               <span class="action">Override</span>
                             </button>
@@ -582,6 +587,20 @@
 </div>
 
 <style>
+  /* The page itself is full-viewport so the spreadsheet view can use all
+     horizontal real estate, but the page header (title, top-bar, view
+     tabs) and the task-card stack don't benefit from being wider than the
+     cards themselves — keep them aligned to the same left-aligned 1400px
+     frame so the chrome doesn't sprawl on ultrawide monitors. */
+  .assign-page > h1,
+  .assign-page > :global(.breadcrumb),
+  .top-bar,
+  .view-tabs,
+  .task-cards {
+    max-width: 1400px;
+    width: 100%;
+  }
+
   /* Sticky two-row top bar that pins to the top of the viewport while the
      task cards below scroll. Visually a "separate scroll area" without
      fighting the existing page-md / layout-main flow. */
@@ -607,7 +626,8 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
-    font-size: var(--font-size-sm);
+    font-size: calc(var(--font-size-sm) * 1.5);
+    font-weight: 700;
     color: var(--rt-text-light, #555);
     font-variant-numeric: tabular-nums;
   }
@@ -627,14 +647,23 @@
   }
 
   .message-area {
-    font-size: var(--font-size-sm);
-    color: var(--rt-text-light, #555);
-    line-height: 1.4;
+    font-size: calc(var(--font-size-sm) * 1.6);
+    color: var(--rt-text-light, #d81010);
+    line-height: 1.3;
   }
 
   .message-area[data-area="gate"] {
-    color: var(--rt-warning-text, #b35900);
-    font-weight: 500;
+    color: var(--rt-warning-text, #e1b402);
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+
+  .gate-icon {
+    font-size: 1em;
+    line-height: 1;
+    flex-shrink: 0;
   }
 
   .message-area.hidden {
@@ -654,11 +683,12 @@
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
-    font-size: var(--font-size-sm);
+    font-size: calc(var(--font-size-sm) * 1.5);
+    font-weight: 700;
   }
 
   .policy-prefix {
-    color: var(--rt-text-muted, #777);
+    color: var(--color-text);
   }
 
   .policy-label select {
@@ -734,6 +764,13 @@
     display: flex;
     flex-direction: column;
     gap: var(--spacing-md);
+    /* The page itself is full-viewport (so the spreadsheet view can use
+       all the horizontal real estate), but the task cards don't benefit
+       from being arbitrarily wide — cap so each card has comfortable
+       room for two volunteer columns at any density without growing to
+       fill an ultrawide monitor. */
+    max-width: 1400px;
+    width: 100%;
   }
 
   .task-meta {
@@ -894,12 +931,30 @@
        default; two columns when the card has room (see media query). */
     display: grid;
     grid-template-columns: 1fr;
+    grid-auto-rows: max-content;
+    /* `align-content: start` keeps the rows from being spread when the ul
+       has extra vertical space (e.g. when its sibling list-block is taller
+       and grid `align-items` stretches the list-block). `align-items:
+       start` keeps each <li> hugging the top of its row instead of
+       stretching to fill it. */
+    align-content: start;
+    align-items: start;
     gap: 2px 12px;
     /* When many volunteers respond, the Available column can dwarf the
        Assigned column — bound both at the same height and let the longer
        one scroll. Roughly six rows tall. */
     max-height: 16em;
     overflow-y: auto;
+  }
+
+  /* Reset default <li>/button box model so the row's height is exactly
+     the button's content + padding. Without these, browser/UA quirks
+     (margin on <li>, min-height inherited via flow root, etc.) leave a
+     tall blank slot below each name in the Available column. */
+  ul.people > li.person {
+    margin: 0;
+    padding: 0;
+    min-height: 0;
   }
 
   @media (min-width: 900px) {
@@ -914,6 +969,12 @@
     align-items: center;
     gap: var(--spacing-sm);
     width: 100%;
+    margin: 0;
+    /* Explicit min-height: 0 overrides anything inherited (the global
+       .btn rule sets min-height: 44px and some browsers' UA button
+       stylesheet adds its own) so the button's height is just padding +
+       content. */
+    min-height: 0;
     padding: 2px var(--spacing-sm);
     line-height: 1.5;
     background: none;
@@ -935,24 +996,43 @@
     cursor: progress;
   }
 
-  .person.assigned .check {
-    color: var(--rt-success-text, #2f7a45);
-    font-weight: 700;
-  }
-
-  .person.available .check.empty {
-    color: var(--rt-text-muted, #777);
-  }
-
   .check {
     flex-shrink: 0;
-    width: 1.2em;
-    text-align: center;
+    box-sizing: border-box;
+    display: inline-block;
+    position: relative;
+    width: 14px;
+    height: 14px;
+    border: 1.5px solid var(--rt-gray-400, #b3aea7);
+    border-radius: 3px;
+    background: #fff;
+  }
+
+  .check.checked {
+    background: var(--rt-success-text, #2f7a45);
+    border-color: var(--rt-success-text, #2f7a45);
+  }
+
+  .check.checked::after {
+    content: "";
+    position: absolute;
+    left: 3px;
+    top: 0;
+    width: 4px;
+    height: 8px;
+    border: solid #fff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
   }
 
   .name {
     flex: 1;
     min-width: 0;
+    /* Width budget is computed from --volunteer-name-display-max so the
+       two-column Available/Assigned grid lines up at every density. The
+       truncateVolunteerName() helper trims the text first, so the
+       text-overflow ellipsis is a defensive secondary clip only. */
+    max-width: var(--volunteer-name-max-width);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

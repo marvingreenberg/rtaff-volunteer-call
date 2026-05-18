@@ -155,6 +155,7 @@ class VolunteerOverviewItem(BaseModel):
     phone: str | None = None
     available_task_ids: list[str] = []
     max_tasks_per_week: int = 1
+    max_tasks_per_week_2: int = 1
     assignments_this_call: int = 0
     # Cross-call fairness signals. last_assignment_date is the most recent
     # Task.date this person was ever assigned to (any call); trailing_3mo

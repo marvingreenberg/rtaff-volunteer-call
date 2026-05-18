@@ -34,15 +34,27 @@ container_exists() {
 }
 
 wait_healthy() {
+    # On a fresh container Postgres starts twice: a temporary init server
+    # runs the docker-entrypoint initdb scripts, shuts down, then restarts
+    # for real. pg_isready against the temp server can succeed and then
+    # the socket disappears mid-seed. Require N consecutive successful
+    # round-trips (not just pg_isready) so we wait past the restart.
     echo "Waiting for PostgreSQL to be ready..."
-    for _i in $(seq 1 30); do
-        if docker exec "$CONTAINER" pg_isready -U "$DB_USER" &>/dev/null; then
-            echo "PostgreSQL is ready."
-            return 0
+    local consecutive=0 required=3
+    for _i in $(seq 1 60); do
+        if docker exec "$CONTAINER" psql -U "$DB_USER" -d postgres \
+                -tAc 'SELECT 1' &>/dev/null; then
+            consecutive=$((consecutive + 1))
+            if [ "$consecutive" -ge "$required" ]; then
+                echo "PostgreSQL is ready."
+                return 0
+            fi
+        else
+            consecutive=0
         fi
         sleep 1
     done
-    echo "ERROR: PostgreSQL did not become ready in 30s"
+    echo "ERROR: PostgreSQL did not become ready in 60s"
     exit 1
 }
 

@@ -64,3 +64,7 @@ Spec needed: re-notify only volunteers who didn't respond for *this* task (skipp
 already-assigned and already-said-no), or re-blast the whole program? Most likely a
 button on the assign view next to under-staffed tasks.
 
+### Gamification
+
+Badges and other things.  10 weeks "calls in a row" 20 weeks, 52 weeks....  Kahuna, every task in a week?
+Put badges on the login for the volunteer, add in the email somewhere.

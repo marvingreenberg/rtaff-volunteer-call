@@ -54,8 +54,8 @@ info "Sarah Admin authenticated (token: ${ADMIN_TOKEN:0:12}...)"
 step "2. Admin creates a volunteer call"
 CALL=$(curl -sf "$API/volunteer-calls" -H 'Content-Type: application/json' \
     -d '{
-        "title": "June 2026 Weekend Build",
-        "notes": "Two-day build event in Arlington and Falls Church"
+        "title": "Call for Volunteers",
+        "notes": "Two week RTX volunteer call for May"
     }')
 CALL_ID=$(echo "$CALL" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
 info "Created call: $CALL_ID"

@@ -2,7 +2,7 @@
 
 import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -98,7 +98,7 @@ async def create_volunteer_call(
 
 @router.get("", response_model=list[VolunteerCallListResponse])
 async def list_volunteer_calls(
-    status: CallStatus | None = None,
+    status: list[CallStatus] | None = Query(default=None),
     program: Program | None = None,
     db: AsyncSession = Depends(get_db),
 ) -> list[VolunteerCallListResponse]:
@@ -107,8 +107,8 @@ async def list_volunteer_calls(
         # Needed for the volunteers_responded aggregate on the list page.
         selectinload(VolunteerCall.availabilities),
     )
-    if status is not None:
-        query = query.where(VolunteerCall.status == status)
+    if status:
+        query = query.where(VolunteerCall.status.in_(status))
     if program is not None:
         query = query.where(VolunteerCall.program == program)
     query = query.order_by(VolunteerCall.created_at.desc())
@@ -610,6 +610,7 @@ async def assignment_overview(
                 skills=list(p.skills),
                 phone=p.phone,
                 max_tasks_per_week=av.max_tasks_per_week or 2,
+                max_tasks_per_week_2=av.max_tasks_per_week_2 or 2,
             )
         if av.task_id and av.available:
             vol_map[p.id].available_task_ids.append(av.task_id)

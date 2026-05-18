@@ -155,9 +155,14 @@ export const people = {
 
 // Volunteer call endpoints
 export const volunteerCalls = {
-  list: (params?: { status?: string; program?: Program }) => {
+  list: (params?: { status?: string | string[]; program?: Program }) => {
     const query = new URLSearchParams();
-    if (params?.status) query.set("status", params.status);
+    if (params?.status) {
+      const statuses = Array.isArray(params.status)
+        ? params.status
+        : [params.status];
+      for (const s of statuses) query.append("status", s);
+    }
     if (params?.program) query.set("program", params.program);
     const qs = query.toString();
     return request<VolunteerCallListResponse[]>(

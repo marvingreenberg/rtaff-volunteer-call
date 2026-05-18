@@ -86,7 +86,7 @@ export function gateMessage(
     return `Cannot close assignment: ${phrase} a team lead`;
   }
   if (countsViolatePolicy(counts, policy)) {
-    return `Cannot close assignment with current policy "${ASSIGNMENT_POLICY_LABELS[policy]}"`;
+    return `Tasks don't have desired volunteers`;
   }
   return "";
 }

@@ -219,8 +219,8 @@ export type AssignmentPolicy = "exact" | "over" | "over_under";
 
 export const ASSIGNMENT_POLICY_LABELS: Record<AssignmentPolicy, string> = {
   exact: "Exact required volunteers",
-  over: "Allow over-assignment",
-  over_under: "Allow over/under-assignment",
+  over: "Allow extra",
+  over_under: "Allow extra or insufficient",
 };
 
 export interface VolunteerCallCreate {
@@ -459,6 +459,7 @@ export interface VolunteerOverviewItem {
   phone: string | null;
   available_task_ids: string[];
   max_tasks_per_week: number;
+  max_tasks_per_week_2: number;
   assignments_this_call: number;
   last_assignment_date: string | null;
   assignments_trailing_3mo: number;

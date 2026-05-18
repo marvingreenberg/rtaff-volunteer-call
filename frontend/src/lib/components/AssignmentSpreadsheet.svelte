@@ -18,6 +18,7 @@
   import {
     buildFairnessContext,
     badgesFor,
+    personBadges,
     spreadsheetConflictKeys,
   } from "$lib/utils/assignment-fairness";
   import type {
@@ -134,13 +135,13 @@
     </thead>
     <tbody>
       {#each overview.volunteers as person (person.person_id)}
-        {@const rowExhausted = person.assignments_this_call >= person.max_tasks_per_week}
-        {@const rowIdle = fairness.idleQuartile.has(person.person_id)}
+        {@const rb = personBadges(person.person_id, fairness)}
         <tr>
           <th class="row-header" scope="row" title={person.person_name}>
             <span class="row-name">{person.first_name} {person.last_name[0] ?? ""}.</span>
-            {#if rowExhausted}<span class="fairness-badge" title="At weekly cap">🥵</span>{/if}
-            {#if rowIdle}<span class="fairness-badge" title="Idle">😴</span>{/if}
+            {#if rb.fullyBookedWeeks.length}<span class="fairness-badge" title={rb.fullyBookedReason}>💯</span>{/if}
+            {#if rb.exhausted}<span class="fairness-badge" title={rb.exhaustedReason}>🥵</span>{/if}
+            {#if rb.idle}<span class="fairness-badge" title="Idle">😴</span>{/if}
           </th>
           {#each overview.tasks as task (task.task_id)}
             {@const cell = cellState(person, task)}

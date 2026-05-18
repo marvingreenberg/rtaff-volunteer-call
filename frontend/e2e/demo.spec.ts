@@ -14,35 +14,69 @@
  * emails actually arrive in Mailpit and the demo can showcase them.
  */
 
-import { request, test } from "@playwright/test";
+import { suggestCallTitle } from "../src/lib/api/types";
+import { request, test, type Page } from "@playwright/test";
 import {
   BASE_URL,
+  addTaskByForm,
+  bulkAddTasks,
+  bulkRespondAvailability,
   clearNarration,
+  clickCallAction,
+  clickWithCursor,
   extractAppLink,
   fetchMessageHtml,
+  fillTaskCards,
   hideMailpitPanel,
+  installClickVisualizer,
   installNarrator,
   loginViaMagicLink,
   logout,
   narrate,
-  runBulk,
+  pickTasks,
+  scrollMailpitToHref,
+  setMaxPerWeek,
+  showEmailFor,
+  showEmailMatching,
   showMailpitInbox,
-  showMailpitPanel,
   sleep,
-  waitForMessage,
 } from "./demo-helpers";
 
 const DON_GMAIL_ALIAS = "donryanemail@gmail.com";
 const VICK = "vgfisher@gmail.com";
 const BRYAN = "bcobb2014@gmail.com";
 
+// Per-row pick cadence (ms) for the live volunteer ticks.
+const LIVE_PICK_DELAY_MS = 500;
+// Bryan picks a couple of tasks from each ISO week. The demo schedule
+// (scheduleSlotMMDD) places offsets 0..4 in week 1 and 5..10 in week 2,
+// so these indices visibly hit both weeks.
+const BRYAN_PICK_INDICES = [0, 2, 6, 8];
+
+// All viewing pauses — narrations, mailpit panels, post-action "look at
+// the resulting screen" sleeps — are scaled in one place. Login flow
+// timings are left at their unscaled values so the magic-link
+// interactions stay snappy.
+const DISPLAY_HOLD_MULTIPLIER = 2.5;
+const display = (ms: number): number =>
+  Math.round(ms * DISPLAY_HOLD_MULTIPLIER);
+
 test("RT-AFF volunteer-call demo", async ({ page }) => {
-  test.setTimeout(300_000);
+  test.setTimeout(900_000);
   const api = await request.newContext();
 
+  // `say` and `pause` bake the display-hold multiplier into the two call
+  // shapes that dominate this file. Local closures so they pick up `page`
+  // without threading it through.
+  const say = (text: string, ms: number) => narrate(page, text, display(ms));
+  const pause = (ms: number) => sleep(display(ms));
+
   // Register the narration overlay BEFORE any navigation so it re-attaches
-  // automatically on every page load.
+  // automatically on every page load. Same for the click-ripple visualizer
+  // — registered up front so every synthesized Playwright click leaves a
+  // visible mark.
   await installNarrator(page);
+  await installClickVisualizer(page);
 
   // ===========================================================================
   // STEP 1: Admin Don Ryan logs in — entering his *gmail alias*. The magic
@@ -51,14 +85,14 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
   await page.goto(`${BASE_URL}/login`);
   await narrate(
     page,
-    "Don Ryan is an admin. He logs in with his personal gmail — an email alias on his RT-AFF account.",
-    2400,
+    "Don Ryan is an admin. He logs in to the RT-AFF volunteer call site.",
+    2000,
   );
   await loginViaMagicLink(page, api, DON_GMAIL_ALIAS);
   await narrate(
     page,
     "Logged in. Notification emails still go to his @rebuildingtogether-aff.org address.",
-    2200,
+    900,
   );
 
   // ===========================================================================
@@ -66,125 +100,79 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
   // ===========================================================================
   await page.goto(`${BASE_URL}/volunteer-calls`);
   await page.waitForSelector(".calls-page");
-  await narrate(page, "Don creates a new volunteer call.", 1500);
-  await page.click("text=New Call");
-  await sleep(600);
+  await say("Don creates a new volunteer call.", 1500);
+  await clickWithCursor(page.locator("text=New Call"), { postMs: 600 });
 
-  const callTitle = `Weekend Build — Demo ${new Date().toISOString().slice(0, 10)}`;
+  const callTitle = `Call for Volunteers ${suggestCallTitle("RTX")}`;
   await page.fill('input[placeholder*="Spring NRD"]', callTitle);
-  await page.fill(
-    "textarea",
-    "Two-day weekend build across Arlington and Falls Church",
-  );
+  await page.fill("textarea", "Call for Volunteers");
   await sleep(500);
-  await page.click('button[type="submit"]:has-text("Create")');
+  await clickWithCursor(
+    page.locator('button[type="submit"]:has-text("Create")'),
+  );
   await page.waitForSelector(`text=${callTitle}`);
   await sleep(500);
 
   // ===========================================================================
   // STEP 3: Drill into the call and add two tasks manually
   // ===========================================================================
-  await page.click(`text=${callTitle}`);
+  await clickWithCursor(page.locator(`text=${callTitle}`));
   await page.waitForURL(/\/volunteer-calls\/[0-9a-f-]+/);
-  const callUrl = page.url();
-  const callId = callUrl.split("/").pop()!;
+  const callId = page.url().split("/").pop()!;
 
-  await narrate(page, "Adding two tasks by hand…", 1600);
-
-  // Slots 0 and 1 of the two-week schedule (first Monday and Wednesday
-  // after today). The bulk step below fills slots 2..10.
-  for (const t of [
-    {
-      desc: "Roof patch at 102 Maple Ave",
-      date: scheduleSlotMMDD(0),
-      address: "102 Maple Ave",
-      city: "Arlington",
-    },
-    {
-      desc: "Bathroom grab-bar install",
-      date: scheduleSlotMMDD(1),
-      address: "44 Oak St",
-      city: "Falls Church",
-    },
-  ]) {
-    await page.click('[data-testid="task-add-open"]');
-    await page.waitForSelector('[data-testid="task-description"]');
-    await sleep(400);
-    await page.fill('[data-testid="task-date"]', t.date);
-    await page.fill('[data-testid="task-address"]', t.address);
-    await page.selectOption('[data-testid="task-city"]', t.city);
-    await page.fill('[data-testid="task-description"]', t.desc);
-    // Button is disabled until TaskEntryForm reports a valid payload.
-    const submit = page.locator('[data-testid="task-add-submit"]');
-    await submit.waitFor({ state: "visible" });
-    await page.waitForFunction(
-      () =>
-        !(
-          document.querySelector(
-            '[data-testid="task-add-submit"]',
-          ) as HTMLButtonElement | null
-        )?.disabled,
-    );
-    await submit.click();
-    await sleep(800);
-  }
+  await say("Adding two tasks by hand", 1200);
+  await addTaskByForm(page, {
+    desc: "Roof patch at 102 Maple Ave",
+    date: scheduleSlotMMDD(0),
+    address: "102 Maple Ave",
+    city: "Arlington",
+  });
+  await addTaskByForm(page, {
+    desc: "Bathroom grab-bar install",
+    date: scheduleSlotMMDD(1),
+    address: "44 Oak St",
+    city: "Falls Church",
+  });
 
   // ===========================================================================
   // STEP 3a: Bulk add the remaining 9 tasks (slots 2..10 of the schedule)
   // ===========================================================================
-  await narrate(
-    page,
-    "…and the rest of the two-week schedule lands in bulk (nine more, including a second Thursday and a Saturday).",
+  await say(
+    "The rest of the two-week schedule is added... (nine more total).",
     2400,
   );
-  await runBulk([
-    "add-tasks",
-    "--call-id",
-    callId,
-    "--count",
-    "9",
-    "--offset",
-    "2",
-  ]);
+  await bulkAddTasks(callId, 9, 2);
   await page.reload();
   await page.waitForSelector(".call-detail, .task-row, table");
-  await sleep(1500);
+  await pause(1500);
 
   // ===========================================================================
   // STEP 4 + 5: Send the call (transitions open → waiting; invites go out)
   // ===========================================================================
   await page.goto(`${BASE_URL}/volunteer-calls`);
   await page.waitForSelector(".calls-page");
-  await narrate(page, "Don sends the call out to volunteers.", 2000);
-
-  const sendRow = page.locator(
-    `[data-testid="call-row"][data-call-id="${callId}"]`,
-  );
-  await sendRow.locator('[data-testid="row-action-send_invites"]').click();
-  await sleep(2000);
+  await say("Don sends the call out to volunteers.", 2000);
+  await clickCallAction(page, callId, "send_invites");
+  await pause(2000);
 
   // Don's role in this scene is done — log him out, then narrate over the
   // logged-out app while showing what every volunteer just received.
+  await say("Don logs out, waits for the responses to roll in.", 1000);
   await clearNarration(page);
   await logout(page);
 
-  await narrate(
-    page,
-    "Every active volunteer just received an invite — here's the outbox.",
-    2400,
-  );
   await showMailpitInbox(page);
-  await sleep(4000);
+  await say("Every active volunteer gets an email — here's the outbox.", 2400);
+  await pause(4000);
 
-  // Zoom in on one volunteer's invite specifically.
-  const inviteMsg = await waitForMessage(api, VICK, /invite|call/i, 12_000);
-  await narrate(
-    page,
-    "Here's Vick Fisher's invite. The button below logs Vick in directly — no password.",
+  // Zoom in on Vick's invite specifically, then scroll the panel to the
+  // verify button before navigating away.
+  await say(
+    "Here's Vick Fisher's invite. The link brings up the Volunteer page for Vick — no log in.",
     2800,
   );
-  await showMailpitPanel(api, page, inviteMsg.ID);
-  await sleep(3500);
+  const inviteMsg = await showEmailFor(api, page, VICK, /invite|call/i);
+  await pause(3500);
 
   // ===========================================================================
   // STEP 6: Vick clicks the invite link — auto-authenticates, lands on
@@ -192,10 +180,11 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
   // ===========================================================================
   const inviteHtml = await fetchMessageHtml(api, inviteMsg.ID);
   const inviteLink = extractAppLink(inviteHtml, /\/volunteering\?token=/);
+  await scrollMailpitToHref(page, /\/volunteering\?token=/);
+  await pause(1500);
   await hideMailpitPanel(page);
   await clearNarration(page);
-  await narrate(
-    page,
+  await say(
     "Vick clicks the link and lands straight on the availability page.",
     2000,
   );
@@ -203,134 +192,177 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
   await page.waitForSelector("text=/Volunteer|Open Volunteer Calls/i");
   await sleep(800);
 
-  const vickChecks = page.locator('input[type="checkbox"]');
-  const vickCount = await vickChecks.count();
-  for (let i = 0; i < vickCount; i++) {
-    await vickChecks.nth(i).check();
-    await sleep(160);
-  }
-  await page.click("text=/Submit Availability/i");
-  await page
-    .waitForSelector("text=/saved/i", { timeout: 5000 })
-    .catch(() => {});
-  await sleep(1200);
+  await say("Vick signs up for every project — clicking down the list.", 1600);
+  await pickTasks(page, "all", LIVE_PICK_DELAY_MS);
+  await say(
+    "Then he scrolls back up and caps himself: 2 tasks in week 1, 4 in week 2.",
+    1800,
+  );
+  await setMaxPerWeek(page, 2, 4);
+  await pause(800);
+  await submitAvailability(page);
+  await pause(1200);
   await logout(page);
 
   // ===========================================================================
-  // STEP 7: Bryan Cobb logs in with partial availability
+  // STEP 7: Bryan responds live — leaves the per-week cap alone but picks
+  // a couple tasks in each of the two ISO weeks to show week-aware
+  // selection.
   // ===========================================================================
   await loginViaMagicLink(page, api, BRYAN, { showInMailpit: false });
   await page.waitForSelector("text=/Volunteer|Open Volunteer Calls/i");
-  const bryanChecks = page.locator('input[type="checkbox"]');
-  const bryanTotal = await bryanChecks.count();
-  for (let i = 0; i < Math.min(2, bryanTotal); i++) {
-    await bryanChecks.nth(i).check();
-    await sleep(160);
-  }
-  await page.click("text=/Submit Availability/i");
-  await sleep(1200);
+  await say(
+    "Bryan picks a couple of projects in week 1, then a couple more in week 2.",
+    1800,
+  );
+  await pickTasks(page, BRYAN_PICK_INDICES, LIVE_PICK_DELAY_MS);
+  await submitAvailability(page);
+  await pause(1000);
   await logout(page);
 
   // ===========================================================================
-  // STEP 8: Narration overlay — "24 more responded overnight" while bulk
-  // availability seeds in parallel
+  // STEP 8: Bulk-fill availability for the rest of the schedule.
   // ===========================================================================
   await page.goto(`${BASE_URL}/login`);
-  await narrate(page, "Overnight, 24 more volunteers responded…", 2000);
-  await runBulk(["respond-availability", "--call-id", callId, "--count", "24"]);
+  await say(
+    "Selection continues for the remaining tasks (24 more volunteers respond).",
+    2200,
+  );
+  await bulkRespondAvailability(callId, 24);
 
   // ===========================================================================
   // STEP 9: Admin logs back in, opens Assignment Dashboard
   // ===========================================================================
   await loginViaMagicLink(page, api, DON_GMAIL_ALIAS, { showInMailpit: false });
   await page.goto(`${BASE_URL}/volunteer-calls`);
-  await narrate(
-    page,
-    "Don opens the Assignment Dashboard, now full of responses.",
-    2000,
-  );
-
-  const assignRow = page.locator(
-    `[data-testid="call-row"][data-call-id="${callId}"]`,
-  );
-  await assignRow.locator('[data-testid="row-action-assign"]').click();
+  await say("Don opens the Assignment Dashboard, now full of responses.", 2000);
+  await clickCallAction(page, callId, "assign");
   await page.waitForURL(/\/assign/);
-  await sleep(2500);
+  await pause(2500);
 
   // Auto-pick team leads — clears the "9 tasks need a team lead" gate in
   // one click using the new endpoint.
-  await narrate(
-    page,
-    "Auto-pick assigns the least-recently-used team lead to every unstaffed task.",
+  await say("Auto-assign all the team leads (for the demo).", 2400);
+  await clickWithCursor(page.locator("button.auto-leads-btn"), {
+    postMs: display(2500),
+  });
+
+  // Assign volunteers task-by-task. Two cards get a deliberate over-fill
+  // to surface the "Extra!" / 🥵 state.
+  await say(
+    "Volunteers are assigned task by task — prioritize idle (😴) and skilled (🛠️) where available.",
+    1600,
+  );
+  await fillTaskCards(page, {
+    maxCards: 11,
+    overFill: new Set([4, 5]),
+    narrateOver: () =>
+      say("Adding one extra here — admin can deliberately over-fill.", 900),
+  });
+
+  // Take a beat on the alternate spreadsheet view before closing out the
+  // assignment phase — same data, all-tasks-at-once matrix.
+  await say(
+    "There's also an alternate spreadsheet view showing every volunteer × task at once.",
     2400,
   );
-  await page.click("button.auto-leads-btn").catch(() => {});
-  await sleep(2500);
+  await clickViewTab(page, "spreadsheet");
+  await pause(3500);
+  await clickViewTab(page, "task");
+  await pause(800);
 
-  // Assign volunteers: click each available row in turn. Use the action
-  // span text since the rows are buttons with mixed content.
-  await narrate(
-    page,
-    "Volunteers get auto-assigned; the fairness sort keeps load even.",
-    2200,
+  // Walk through the completion-policy gate. Every task is at or above
+  // its volunteers_needed, but two were deliberately over-filled — so the
+  // default "exact" policy still blocks closing and the Done button is
+  // disabled. The demo narrates the gate, then the admin relaxes the
+  // policy to "Allow extra" and clicks Done.
+  await say(
+    "By default, can't close the assignment unless every task has exactly its requested volunteers.",
+    2600,
   );
-  const assignButtons = page.locator(
-    ".list-block .person.available button.person-row",
+  await pause(800);
+  await say(
+    "But the admin can override — for example, allow extras if more volunteers would help.",
+    2400,
   );
-  const btnCount = await assignButtons.count();
-  for (let i = 0; i < Math.min(btnCount, 18); i++) {
-    await assignButtons
-      .nth(0) // always the top of the list — re-sorts after each click
-      .click()
-      .catch(() => {});
-    await sleep(220);
-  }
-
-  await page.click("button:has-text('Done Assigning')").catch(() => {});
-  await sleep(1500);
+  await page
+    .selectOption('select[aria-label="Desired"]', "over")
+    .catch(() => {});
+  await pause(1000);
+  await say("Now Done Assigning is enabled — close the call.", 1600);
+  await clickWithCursor(page.locator("button:has-text('Done Assigning')"), {
+    postMs: display(1500),
+  });
 
   // ===========================================================================
   // STEP 10: Send Assignments — show one assignment + one team-lead roster
   // ===========================================================================
   await page.goto(`${BASE_URL}/volunteer-calls`);
-  await narrate(
-    page,
+  await say(
     "Sending assignments. Volunteers get individual emails; team leads get rosters.",
     2400,
   );
-  const sendAssignRow = page.locator(
-    `[data-testid="call-row"][data-call-id="${callId}"]`,
-  );
-  await sendAssignRow
-    .locator('[data-testid="row-action-send_assignments"]')
-    .click();
-  await sleep(2500);
+  await clickCallAction(page, callId, "send_assignments");
+  await pause(2500);
 
-  try {
-    const assignmentMsg = await waitForMessage(
-      api,
-      VICK,
-      /assign|task/i,
-      12_000,
-    );
-    await showMailpitPanel(api, page, assignmentMsg.ID);
-    await sleep(4000);
-  } catch {
-    /* swallow — recording still useful */
-  }
+  // Best-effort peek at Vick's assignment email + a team-lead roster
+  // email. Both swallow errors so a Mailpit hiccup doesn't tank the
+  // recording.
+  await peekEmail(
+    say,
+    pause,
+    "Here's Vick's individual assignment email.",
+    () => showEmailFor(api, page, VICK, /assign|task/i),
+    4000,
+  );
+  await peekEmail(
+    say,
+    pause,
+    "And here's what a team lead gets — the full roster for their task.",
+    () => showEmailMatching(api, page, /^Your team for /i),
+    4500,
+  );
 
   // ===========================================================================
   // STEP 11: Vick logs in and sees the final assignment
   // ===========================================================================
   await logout(page);
   await loginViaMagicLink(page, api, VICK, { showInMailpit: false });
-  await narrate(page, "Vick logs in and sees the final assignment.", 2500);
-  await sleep(3000);
+  await say("Vick logs in and sees his assignment(s).", 2500);
+  await pause(3000);
 });
 
 // ---------------------------------------------------------------------------
 // helpers local to this spec
 // ---------------------------------------------------------------------------
+
+async function peekEmail(
+  say: (text: string, ms: number) => Promise<void>,
+  pause: (ms: number) => Promise<void>,
+  narration: string,
+  show: () => Promise<unknown>,
+  holdMs: number,
+): Promise<void> {
+  await say(narration, 1600);
+  await show()
+    .then(() => pause(holdMs))
+    .catch(() => {});
+}
+
+async function submitAvailability(page: Page): Promise<void> {
+  await clickWithCursor(page.locator("text=/Submit Availability/i"));
+  await page
+    .waitForSelector("text=/saved/i", { timeout: 5000 })
+    .catch(() => {});
+}
+
+async function clickViewTab(
+  page: Page,
+  view: "task" | "spreadsheet",
+): Promise<void> {
+  const text = view === "task" ? /task view/i : /spreadsheet/i;
+  await clickWithCursor(page.locator(".view-tab", { hasText: text }));
+}
 
 /**
  * MM/DD for slot `idx` (0..10) of the two-week task schedule used by the

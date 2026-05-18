@@ -8,7 +8,8 @@
  *   4. first_name, last_name  ASC (case-insensitive, stable final tier)
  *
  * Badges:
- *   🥵  hit self-declared cap for this call (assignments_this_call >= max)
+ *   💯  assignments in some week == that week's self-declared cap (exact fit)
+ *   🥵  assignments in some week >  that week's cap (oversubscribed; rare)
  *   😴  bottom quartile of last_assignment_date within the responding pool
  *       (volunteers with null last_assignment_date are oldest of all)
  *   🛠️  task has skilled_needed > 0 and volunteer has any skill
@@ -22,6 +23,7 @@ import type {
   TaskOverviewItem,
   VolunteerOverviewItem,
 } from "$lib/api/types";
+import { taskWeekIndex } from "$lib/utils/task-weeks";
 
 export interface FairnessContext {
   /** All responding volunteers for the call, keyed by person_id. */
@@ -30,6 +32,8 @@ export interface FairnessContext {
   idleQuartile: Set<string>;
   /** All tasks in the call, for same-date conflict detection. */
   tasks: TaskOverviewItem[];
+  /** person_id → weekIndex (1|2) → count of assignments in that week. */
+  assignmentsByPersonWeek: Map<string, Map<1 | 2, number>>;
 }
 
 export function buildFairnessContext(
@@ -37,11 +41,40 @@ export function buildFairnessContext(
   tasks: TaskOverviewItem[],
 ): FairnessContext {
   const volunteerById = new Map(volunteers.map((v) => [v.person_id, v]));
+  const assignmentsByPersonWeek = computeAssignmentsByPersonWeek(tasks);
   return {
     volunteerById,
     idleQuartile: computeIdleQuartile(volunteers),
     tasks,
+    assignmentsByPersonWeek,
   };
+}
+
+/**
+ * Tally each volunteer's assignments per ISO-week bucket (1 or 2) using the
+ * shared `taskWeekIndex` helper. Tasks without a date contribute nothing.
+ */
+export function computeAssignmentsByPersonWeek(
+  tasks: TaskOverviewItem[],
+): Map<string, Map<1 | 2, number>> {
+  const out = new Map<string, Map<1 | 2, number>>();
+  for (const t of tasks) {
+    const wk = taskWeekIndex(t, tasks);
+    if (wk == null) continue;
+    for (const a of t.assignments) {
+      let perWeek = out.get(a.person_id);
+      if (!perWeek) {
+        perWeek = new Map();
+        out.set(a.person_id, perWeek);
+      }
+      perWeek.set(wk, (perWeek.get(wk) ?? 0) + 1);
+    }
+  }
+  return out;
+}
+
+function capForWeek(v: VolunteerOverviewItem, week: 1 | 2): number {
+  return week === 1 ? v.max_tasks_per_week : v.max_tasks_per_week_2;
 }
 
 /**
@@ -120,10 +153,67 @@ export function fairnessCompare(
   return 0;
 }
 
-export interface VolunteerBadges {
-  exhausted: boolean; // 🥵
+/** Person-level badges that don't depend on the task being assigned. */
+export interface PersonBadges {
+  exhausted: boolean; // 🥵 — over cap in at least one week
+  /** Human-readable trigger for 🥵, e.g. "Oversubscribed: 3 of max 2 for
+   *  week 1". null when not exhausted. */
+  exhaustedReason: string | null;
+  /** Week indices (1 and/or 2) where assignments exactly equal the cap. */
+  fullyBookedWeeks: (1 | 2)[];
+  /** Human-readable trigger for 💯, e.g. "2/2 for week 1". null when none. */
+  fullyBookedReason: string | null;
   idle: boolean; // 😴
+}
+
+export interface VolunteerBadges extends PersonBadges {
   skilled: boolean; // 🛠️ (per task)
+}
+
+/** Task-independent badge computation. Used by row-level views (spreadsheet). */
+export function personBadges(
+  personId: string,
+  ctx: FairnessContext,
+): PersonBadges {
+  const v = ctx.volunteerById.get(personId);
+  if (!v) {
+    return {
+      exhausted: false,
+      exhaustedReason: null,
+      fullyBookedWeeks: [],
+      fullyBookedReason: null,
+      idle: false,
+    };
+  }
+
+  const perWeek = ctx.assignmentsByPersonWeek.get(personId) ?? new Map();
+  const fullyBookedWeeks: (1 | 2)[] = [];
+  const fullyBookedParts: string[] = [];
+  const overParts: string[] = [];
+  for (const week of [1, 2] as const) {
+    const count = perWeek.get(week) ?? 0;
+    const cap = capForWeek(v, week);
+    if (count === 0) continue;
+    if (count > cap) {
+      overParts.push(`${count} of max ${cap} for week ${week}`);
+    } else if (count === cap) {
+      fullyBookedWeeks.push(week);
+      fullyBookedParts.push(`${count}/${cap} for week ${week}`);
+    }
+  }
+
+  const exhausted = overParts.length > 0;
+  return {
+    exhausted,
+    exhaustedReason: exhausted
+      ? `Oversubscribed: ${overParts.join("; ")}`
+      : null,
+    fullyBookedWeeks,
+    fullyBookedReason: fullyBookedParts.length
+      ? fullyBookedParts.join("; ")
+      : null,
+    idle: ctx.idleQuartile.has(personId),
+  };
 }
 
 export function badgesFor(
@@ -132,11 +222,9 @@ export function badgesFor(
   ctx: FairnessContext,
 ): VolunteerBadges {
   const v = ctx.volunteerById.get(personId);
-  if (!v) return { exhausted: false, idle: false, skilled: false };
   return {
-    exhausted: v.assignments_this_call >= v.max_tasks_per_week,
-    idle: ctx.idleQuartile.has(personId),
-    skilled: task.skilled_needed > 0 && v.skills.length > 0,
+    ...personBadges(personId, ctx),
+    skilled: !!v && task.skilled_needed > 0 && v.skills.length > 0,
   };
 }
 

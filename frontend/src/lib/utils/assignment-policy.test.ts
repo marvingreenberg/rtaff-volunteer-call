@@ -79,7 +79,6 @@ describe("countsViolatePolicy", () => {
     );
   });
   it("over: only under violates", () => {
-    // Catches a regression that conflates 'allow over' with 'allow any'.
     expect(countsViolatePolicy({ under: 1, over: 0, noLead: 0 }, "over")).toBe(
       true,
     );
@@ -138,10 +137,10 @@ describe("gateMessage", () => {
   });
   it("falls back to the policy message when only counts violate", () => {
     expect(gateMessage({ under: 1, over: 0, noLead: 0 }, "exact")).toBe(
-      'Cannot close assignment with current policy "Exact required volunteers"',
+      `Tasks don't have desired volunteers`,
     );
     expect(gateMessage({ under: 1, over: 0, noLead: 0 }, "over")).toBe(
-      'Cannot close assignment with current policy "Allow over-assignment"',
+      `Tasks don't have desired volunteers`,
     );
   });
   it("returns an empty string when both gates pass (Message area 2 hides)", () => {
