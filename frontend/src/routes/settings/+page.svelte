@@ -7,6 +7,22 @@
     type SubscriptionStatus,
   } from "$lib/api/client";
   import CalendarConnectPanel from "$lib/components/CalendarConnectPanel.svelte";
+  import {
+    settingsState,
+    applySettings,
+    type Density,
+  } from "$lib/stores/settings.svelte";
+
+  function setDensity(d: Density) {
+    settingsState.density = d;
+    applySettings();
+  }
+
+  const densityOptions: { value: Density; label: string }[] = [
+    { value: "large", label: "Large" },
+    { value: "standard", label: "Standard" },
+    { value: "compact", label: "Compact" },
+  ];
 
   // Lives at /settings — the Avatar menu links here. Houses the
   // per-volunteer self-service knobs that previously only the staff
@@ -145,6 +161,31 @@
       />
     </section>
 
+    <section class="card">
+      <h2>Display</h2>
+      <p class="hint">
+        Density controls overall padding and row heights in lists. Saved on
+        this device.
+      </p>
+      <div class="density-options" role="radiogroup" aria-label="Display density">
+        {#each densityOptions as opt (opt.value)}
+          <label
+            class="density-option"
+            class:selected={settingsState.density === opt.value}
+          >
+            <input
+              type="radio"
+              name="density"
+              value={opt.value}
+              checked={settingsState.density === opt.value}
+              onchange={() => setDensity(opt.value)}
+            />
+            {opt.label}
+          </label>
+        {/each}
+      </div>
+    </section>
+
     <div class="actions">
       <button class="btn btn-primary" onclick={save} disabled={saving}>
         {saving ? "Saving…" : "Save changes"}
@@ -206,5 +247,48 @@
   .empty-text {
     color: var(--rt-text-muted, #777);
     font-style: italic;
+  }
+
+  .density-options {
+    display: inline-flex;
+    border: 1px solid var(--rt-gray-200, #e4dfda);
+    border-radius: var(--card-radius, 8px);
+    overflow: hidden;
+  }
+
+  .density-option {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    cursor: pointer;
+    border-right: 1px solid var(--rt-gray-200, #e4dfda);
+    background: transparent;
+    color: var(--rt-text, #222);
+    min-height: var(--btn-min-height, 36px);
+    user-select: none;
+  }
+
+  .density-option:last-child {
+    border-right: none;
+  }
+
+  .density-option.selected {
+    background: var(--color-primary, #3a6db5);
+    color: #fff;
+  }
+
+  .density-option input {
+    /* Visually hidden — the label is the affordance. */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
   }
 </style>
