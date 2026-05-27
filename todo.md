@@ -138,6 +138,28 @@ verification), `deploy.yml` (Docker build to GHCR + GCP Artifact
 Registry, Cloud Run deploy on `v*` tags), Dependabot config for npm
 + uv lockfiles.
 
+### [ ] feat/15-multiple-calendars
+
+**Decision recorded**: store a list of `(provider, url, label)` per
+person in a child table; conflict detection merges events from every
+connected calendar (so personal + work meetings both block a task).
+
+- New `person_calendars` child table: `id`, `person_id` FK,
+  `calendar_url` (bearer-secret), `calendar_provider`, `label`
+  (free-form, e.g. "Work"), `added_at`. Existing
+  `person.calendar_url` / `calendar_provider` columns retire — there's
+  no production data yet, so connected users will need to re-add.
+- Backend: `GET/POST/DELETE /api/people/{id}/calendars` for list /
+  add / remove. `connect_calendar` becomes append-only; the
+  conflicts route iterates over all of the user's calendars and
+  unions the events.
+- Frontend: Settings page swaps the single `CalendarConnectPanel` for
+  a list with an Add row. Each row shows label + provider + an
+  "X" to remove.
+- Conflict cache: keyed by `(person_id, list of urls, window)` so
+  adding/removing a calendar invalidates correctly. Continue to use
+  the existing per-URL fetcher under the hood.
+
 ## Deferred — questions for the user
 
 These need a decision before they can be executed unattended.
@@ -158,8 +180,5 @@ These need a decision before they can be executed unattended.
   `America/New_York`? Make it a settings value or hardcoded?
 - **Multi-instance cache** for calendar conflicts. Deferred per
   current note; revisit when traffic warrants.
-- **Multiple calendar connections per person.** UX: pick one as
-  primary or merge events from all? Data model: array of
-  `(provider, url)` tuples on `Person` or a child table?
 - **Resend for a particular task.** (Already deferred — spec needed.)
 - **Gamification.** (Already deferred — design discussion.)
