@@ -273,6 +273,14 @@ export interface TaskUpdate {
   notes?: string | null;
 }
 
+export interface TaskAssigneeSummary {
+  person_id: string;
+  first_name: string;
+  last_name: string;
+  initials: string;
+  is_team_lead: boolean;
+}
+
 export interface TaskResponse {
   id: string;
   volunteer_call_id: string;
@@ -289,6 +297,7 @@ export interface TaskResponse {
   status: TaskStatus;
   notes: string | null;
   assigned_count: number;
+  assignees: TaskAssigneeSummary[];
   created_at: string;
   updated_at: string;
 }

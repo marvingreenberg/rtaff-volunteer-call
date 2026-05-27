@@ -38,7 +38,7 @@ Reuses the pause check already in `services/notifications.is_subscribed`.
 no-referrer-when-downgrade` on every response. Keeps URL tokens from
 leaking via Referer while the session-cookie migration is finishing.
 
-### [ ] feat/04-task-assignees-display
+### [/] feat/04-task-assignees-display
 
 Show assigned volunteers on each task row in the call detail page.
 Task rows already have an `assignments` selectinload via

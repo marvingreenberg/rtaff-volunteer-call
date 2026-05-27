@@ -35,6 +35,16 @@ class TaskUpdate(BaseModel):
     notes: str | None = None
 
 
+class TaskAssigneeSummary(BaseModel):
+    """Slim view of an assignee — name + initials for chip display."""
+
+    person_id: str
+    first_name: str
+    last_name: str
+    initials: str
+    is_team_lead: bool
+
+
 class TaskResponse(BaseModel):
     id: str
     volunteer_call_id: str
@@ -51,6 +61,7 @@ class TaskResponse(BaseModel):
     status: TaskStatus
     notes: str | None
     assigned_count: int = 0
+    assignees: list[TaskAssigneeSummary] = []
     created_at: datetime.datetime
     updated_at: datetime.datetime
 
