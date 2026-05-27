@@ -67,9 +67,10 @@ Follow-ups on the same branch:
 - `feat/06b` — `calendar_kind` setting + provider-aware Add to Calendar.
 - `feat/06c` — AvatarMenu redesign per the user's reference screenshot:
   email header line, icon+label rows with outline SVG icons,
-  horizontal dividers grouping (Settings · Inbox) | (staff: People ·
-  Inventory) | Logout. Display density relocates to `/settings`
-  since the new menu shape doesn't have a home for the radio group.
+  horizontal dividers grouping (Settings · Inbox) | (staff: People) |
+  Logout. Display density relocates to `/settings` since the new menu
+  shape doesn't have a home for the radio group. Inventory item
+  removed — there's no `/inventory` route in this project.
 
 ### [ ] feat/07-recurring-events
 
@@ -146,7 +147,7 @@ verification), `deploy.yml` (Docker build to GHCR + GCP Artifact
 Registry, Cloud Run deploy on `v*` tags), Dependabot config for npm
 + uv lockfiles.
 
-### [ ] feat/15-multiple-calendars
+### [/] feat/15-multiple-calendars
 
 **Decision recorded**: store a list of `(provider, url, label)` per
 person in a child table; conflict detection merges events from every
