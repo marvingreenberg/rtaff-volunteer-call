@@ -45,7 +45,7 @@ Task rows already have an `assignments` selectinload via
 `/jobs`/`/assignment-overview`; reuse those payloads. Display as
 initials chips, with team-lead distinguished.
 
-### [ ] feat/05-add-to-calendar-deeplinks
+### [/] feat/05-add-to-calendar-deeplinks
 
 Replace the `.ics` download path on `/volunteering`'s My Assignments
 with a deeplink to **Google Calendar's "render event" URL** (the

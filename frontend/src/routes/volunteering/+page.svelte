@@ -15,6 +15,11 @@
     type CallStatus,
   } from '$lib/api/client';
   import { formatDate } from '$lib/utils/format';
+  import {
+    googleCalendarUrl,
+    downloadIcs,
+    type CalendarEvent,
+  } from '$lib/utils/add-to-calendar';
   import { tasksSpanMultipleWeeks } from '$lib/utils/task-weeks';
   import ItemCard from '$lib/components/ItemCard.svelte';
   import ListViewToggle from '$lib/components/ListViewToggle.svelte';
@@ -370,36 +375,26 @@
     jobSortDir = dir;
   }
 
-  function generateIcs(a: MyAssignment): void {
-    if (!a.date) return;
-    const d = a.date.replace(/-/g, '');
-    const startTime = a.time_start ? a.time_start.replace(/:/g, '') : '090000';
-    const endTime = a.time_end ? a.time_end.replace(/:/g, '') : '123000';
-    // Pad to 6 digits for HHMMSS format
-    const startPadded = startTime.length === 4 ? startTime + '00' : startTime;
-    const endPadded = endTime.length === 4 ? endTime + '00' : endTime;
-    const ics = [
-      'BEGIN:VCALENDAR',
-      'VERSION:2.0',
-      'PRODID:-//RT-AFF//Volunteer//EN',
-      'BEGIN:VEVENT',
-      `DTSTART:${d}T${startPadded}`,
-      `DTEND:${d}T${endPadded}`,
-      `SUMMARY:RT-AFF Volunteer - ${a.task_description}`,
-      a.address ? `LOCATION:${a.address}` : '',
-      `DESCRIPTION:Volunteer call: ${a.call_title}`,
-      'END:VEVENT',
-      'END:VCALENDAR',
-    ]
-      .filter(Boolean)
-      .join('\r\n');
-    const blob = new Blob([ics], { type: 'text/calendar' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `rt-aff-${a.date}.ics`;
-    link.click();
-    URL.revokeObjectURL(url);
+  function calendarEventFor(a: MyAssignment): CalendarEvent | null {
+    if (!a.date) return null;
+    return {
+      date: a.date,
+      time_start: a.time_start,
+      time_end: a.time_end,
+      title: `RT-AFF Volunteer - ${a.task_description}`,
+      location: a.address ?? null,
+      description: `Volunteer call: ${a.call_title}`,
+    };
+  }
+
+  function googleUrlFor(a: MyAssignment): string | null {
+    const e = calendarEventFor(a);
+    return e ? googleCalendarUrl(e) : null;
+  }
+
+  function downloadIcsFor(a: MyAssignment): void {
+    const e = calendarEventFor(a);
+    if (e) downloadIcs(e);
   }
 
   function hasExistingAvailability(callId: string): boolean {
@@ -666,8 +661,14 @@
                   {a.confirmed ? 'Confirmed' : 'Pending'}
                 </span>
                 {#if a.date}
-                  <button class="btn btn-sm btn-outline" title="Add to calendar" onclick={() => generateIcs(a)}>
-                    Add to Calendar
+                  {@const gUrl = googleUrlFor(a)}
+                  {#if gUrl}
+                    <a class="btn btn-sm btn-outline" href={gUrl} target="_blank" rel="noopener noreferrer" title="Open in Google Calendar">
+                      Add to Google Calendar
+                    </a>
+                  {/if}
+                  <button class="btn btn-sm btn-link" title="Download .ics for Apple/Outlook" onclick={() => downloadIcsFor(a)}>
+                    .ics
                   </button>
                 {/if}
               </div>
