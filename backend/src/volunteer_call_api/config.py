@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     # directly in the /login response. For local demos only.
     demo_mode: bool = False
 
+    # Toggle for the double-submit-cookie CSRF middleware. On in prod and
+    # dev; the test suite turns it off via conftest so existing
+    # state-change tests don't have to thread a CSRF header through every
+    # POST. The middleware logic itself is exercised by tests/test_csrf.py.
+    csrf_enabled: bool = True
+
     model_config = {"env_file": ".env"}
 
 

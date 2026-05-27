@@ -42,6 +42,19 @@ import type {
 
 const API_BASE = "/api";
 
+/**
+ * Read the double-submit CSRF cookie set by the backend. Returns null
+ * when we haven't talked to the API yet — the first GET response sets
+ * the cookie so subsequent writes can echo it back in the header.
+ */
+function readCsrfCookie(): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(/(?:^|;\s*)csrf=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -54,6 +67,13 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const method = (options.method ?? "GET").toUpperCase();
+  const extraHeaders: Record<string, string> = {};
+  if (UNSAFE_METHODS.has(method)) {
+    const csrf = readCsrfCookie();
+    if (csrf) extraHeaders["X-CSRF-Token"] = csrf;
+  }
+
   const response = await fetch(`${API_BASE}${path}`, {
     // The session cookie is HttpOnly; the fetch needs `credentials: 'include'`
     // so the browser actually sends it cross-origin (dev) and same-origin
@@ -61,6 +81,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
+      ...extraHeaders,
       ...options.headers,
     },
     ...options,

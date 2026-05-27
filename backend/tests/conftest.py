@@ -30,6 +30,10 @@ def _pinned_settings() -> Iterator[None]:
     """
     snapshot = settings.model_dump()
     settings.demo_mode = False
+    # Existing route-level tests don't thread an X-CSRF-Token header
+    # through every POST; tests/test_csrf.py exercises the middleware
+    # directly with csrf_enabled=True.
+    settings.csrf_enabled = False
     try:
         yield
     finally:
