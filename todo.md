@@ -26,7 +26,7 @@ role). Staff still see every program.
 - `routes/volunteering.py::my_assignments` already scoped by person,
   no change.
 
-### [ ] feat/02-pause-date-enforce
+### [/] feat/02-pause-date-enforce
 
 `routes/volunteer_availability.py::submit_availability` rejects the
 POST when `today ∈ [pause_start, pause_end]` for the calling person.
