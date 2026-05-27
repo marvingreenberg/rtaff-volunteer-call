@@ -43,6 +43,9 @@ function compactDate(isoDate: string): string {
   return isoDate.replace(/-/g, "");
 }
 
+/** Mirrors backend CalendarKind. Drives the deeplink/download choice. */
+export type CalendarKind = "google" | "apple" | "outlook" | "other";
+
 /** Google Calendar's TEMPLATE URL for a single event. */
 export function googleCalendarUrl(event: CalendarEvent): string {
   const d = compactDate(event.date);
@@ -56,6 +59,93 @@ export function googleCalendarUrl(event: CalendarEvent): string {
   if (event.location) params.set("location", event.location);
   if (event.description) params.set("details", event.description);
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+/**
+ * Outlook (Live + 365) deeplink for a single event.
+ *
+ * Uses the office.com host because it works for both consumer and
+ * commercial accounts in modern browsers — the user gets routed to
+ * outlook.live.com automatically if they're signed into a personal
+ * account. `path=/calendar/action/compose&rru=addevent` opens the
+ * event-compose pane with the fields pre-filled.
+ *
+ * Timestamps are ISO-8601 *without* a Z, so Outlook interprets them in
+ * the viewer's local timezone — same convention as the Google deeplink.
+ */
+export function outlookCalendarUrl(event: CalendarEvent): string {
+  const startTime = (event.time_start || DEFAULT_START).replace(
+    /:(\d\d)$/,
+    ":$1",
+  );
+  const endTime = (event.time_end || DEFAULT_END).replace(/:(\d\d)$/, ":$1");
+  const startdt = `${event.date}T${pad8601(startTime)}`;
+  const enddt = `${event.date}T${pad8601(endTime)}`;
+  const params = new URLSearchParams({
+    path: "/calendar/action/compose",
+    rru: "addevent",
+    subject: event.title,
+    startdt,
+    enddt,
+  });
+  if (event.location) params.set("location", event.location);
+  if (event.description) params.set("body", event.description);
+  return `https://outlook.office.com/calendar/0/deeplink/compose?${params.toString()}`;
+}
+
+function pad8601(t: string): string {
+  // Accept HH:MM and HH:MM:SS; emit HH:MM:SS for Outlook's ISO-8601 parser.
+  const parts = t.split(":");
+  if (parts.length === 2) return `${t}:00`;
+  return t;
+}
+
+/**
+ * Action shape returned by ``chooseCalendarAction`` — either a URL to
+ * open in a new tab (google, outlook) or a sentinel telling the caller
+ * to trigger the .ics download path (apple, other). For Apple, ``hint``
+ * carries a short string the UI surfaces so the user knows what to do
+ * with the downloaded file.
+ */
+export type CalendarAction =
+  | { kind: "link"; href: string; label: string }
+  | { kind: "download"; label: string; hint: string | null };
+
+/**
+ * Pick the right "Add to calendar" action for the user's preferred app.
+ * Apple has no useful deeplink — the caller should call ``downloadIcs``
+ * and surface ``hint`` so the user knows to double-click the file.
+ */
+export function chooseCalendarAction(
+  _event: CalendarEvent,
+  kind: CalendarKind,
+): CalendarAction {
+  if (kind === "google") {
+    return {
+      kind: "link",
+      href: googleCalendarUrl(_event),
+      label: "Add to Google Calendar",
+    };
+  }
+  if (kind === "outlook") {
+    return {
+      kind: "link",
+      href: outlookCalendarUrl(_event),
+      label: "Add to Outlook",
+    };
+  }
+  if (kind === "apple") {
+    return {
+      kind: "download",
+      label: "Download for Apple Calendar",
+      hint: "Open the downloaded file to add the event to Apple Calendar.",
+    };
+  }
+  return {
+    kind: "download",
+    label: "Download .ics",
+    hint: null,
+  };
 }
 
 /** RFC 5545 .ics body for the same event. */

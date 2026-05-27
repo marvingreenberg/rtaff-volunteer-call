@@ -3,6 +3,7 @@
 import datetime as dt
 
 from volunteer_call_api.models.person import (
+    CalendarKind,
     NotificationDetailLevel,
     NotificationPreference,
     Skill,
@@ -33,6 +34,7 @@ class _StubPerson:
         self.calendar_url: str | None = None
         self.calendar_provider: str | None = None
         self.calendar_url_added_at: dt.datetime | None = None
+        self.calendar_kind: CalendarKind = CalendarKind.GOOGLE
         self.created_at = dt.datetime(2026, 1, 1, tzinfo=dt.timezone.utc)
         self.updated_at = dt.datetime(2026, 1, 1, tzinfo=dt.timezone.utc)
         self.roles: list[object] = []

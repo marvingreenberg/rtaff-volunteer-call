@@ -49,6 +49,22 @@ class SubscriptionStatus(enum.Enum):
     UNSUBSCRIBED = "unsubscribed"
 
 
+class CalendarKind(enum.Enum):
+    """Which calendar app the user prefers for `Add to calendar`.
+
+    Drives the deeplink choice on the volunteering page:
+    - GOOGLE  → render?action=TEMPLATE URL (most common)
+    - OUTLOOK → outlook.office.com deeplink (works for Live + 365)
+    - APPLE   → no deeplink — fall back to .ics download
+    - OTHER   → same .ics fallback as APPLE
+    """
+
+    GOOGLE = "google"
+    APPLE = "apple"
+    OUTLOOK = "outlook"
+    OTHER = "other"
+
+
 class Person(Base, TimestampMixin):
     """A person in the volunteer call system (staff, team leader, volunteer)."""
 
@@ -79,6 +95,16 @@ class Person(Base, TimestampMixin):
     calendar_url: Mapped[str | None] = mapped_column(String(2048))
     calendar_provider: Mapped[str | None] = mapped_column(String(20))
     calendar_url_added_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # User's preferred calendar app for "Add to calendar" deeplinks.
+    # Independent of calendar_url — a user without a connected URL can
+    # still pick Google so their "Add to calendar" button opens in
+    # Google. Defaults to GOOGLE because that's the most common case.
+    calendar_kind: Mapped[CalendarKind] = mapped_column(
+        Enum(CalendarKind, values_callable=lambda e: [x.value for x in e]),
+        nullable=False,
+        default=CalendarKind.GOOGLE,
+        server_default=CalendarKind.GOOGLE.value,
+    )
 
     notification_preference: Mapped[NotificationPreference] = mapped_column(
         Enum(NotificationPreference, values_callable=lambda e: [x.value for x in e]),

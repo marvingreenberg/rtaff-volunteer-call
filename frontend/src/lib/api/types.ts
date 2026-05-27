@@ -149,7 +149,10 @@ export interface PersonUpdate {
   notes?: string;
   roles?: RoleType[];
   programs?: Program[];
+  calendar_kind?: CalendarKind;
 }
+
+export type CalendarKind = "google" | "apple" | "outlook" | "other";
 
 export interface PersonResponse {
   id: string;
@@ -171,6 +174,8 @@ export interface PersonResponse {
   /** True iff calendar_url is set on the server. The URL itself never crosses the wire. */
   calendar_connected: boolean;
   calendar_provider: string | null;
+  /** Preferred calendar app for "Add to calendar" deeplinks. */
+  calendar_kind: CalendarKind;
   created_at: string;
   updated_at: string;
 }

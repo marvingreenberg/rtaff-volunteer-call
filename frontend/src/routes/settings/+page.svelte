@@ -1,7 +1,11 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { authState, initFromToken } from "$lib/stores/auth.svelte";
-  import { people, type SubscriptionStatus } from "$lib/api/client";
+  import {
+    people,
+    type CalendarKind,
+    type SubscriptionStatus,
+  } from "$lib/api/client";
   import CalendarConnectPanel from "$lib/components/CalendarConnectPanel.svelte";
 
   // Lives at /settings — the Avatar menu links here. Houses the
@@ -19,6 +23,7 @@
   let notificationDetailLevel = $state<"summary" | "full">("full");
   let subscriptionStatus = $state<SubscriptionStatus>("active");
   let pauseEnd = $state("");
+  let calendarKind = $state<CalendarKind>("google");
 
   onMount(async () => {
     await initFromToken(null);
@@ -27,6 +32,7 @@
     notificationDetailLevel = authState.user.notification_detail_level;
     subscriptionStatus = authState.user.subscription_status;
     pauseEnd = authState.user.pause_end ?? "";
+    calendarKind = authState.user.calendar_kind;
     loading = false;
   });
 
@@ -46,6 +52,7 @@
         subscription_status: subscriptionStatus,
         pause_end:
           subscriptionStatus === "paused" ? pauseEnd || null : null,
+        calendar_kind: calendarKind,
       });
       await refreshUser();
       saved = true;
@@ -115,6 +122,21 @@
 
     <section class="card">
       <h2>Calendar</h2>
+      <div class="row">
+        <span class="lbl">Calendar sync</span>
+        <select bind:value={calendarKind}>
+          <option value="google">Google Calendar</option>
+          <option value="apple">Apple Calendar</option>
+          <option value="outlook">Outlook</option>
+          <option value="other">Other / .ics download</option>
+        </select>
+      </div>
+      <p class="hint">
+        Chooses which app opens when you click <em>Add to Calendar</em> on
+        an assignment. Apple Calendar has no one-click web action — the
+        button downloads an .ics file you double-click to add.
+      </p>
+
       <CalendarConnectPanel
         personId={authState.user.id}
         calendarConnected={authState.user.calendar_connected}

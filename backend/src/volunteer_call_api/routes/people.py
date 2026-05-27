@@ -57,6 +57,7 @@ def _person_response(person: Person) -> PersonResponse:
         programs=_person_programs(person),
         calendar_connected=person.calendar_url is not None,
         calendar_provider=person.calendar_provider,
+        calendar_kind=person.calendar_kind,
         created_at=person.created_at,
         updated_at=person.updated_at,
     )
@@ -203,6 +204,7 @@ async def update_person(
             "pause_start",
             "pause_end",
             "notes",
+            "calendar_kind",
         ],
     )
 

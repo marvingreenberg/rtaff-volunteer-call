@@ -16,8 +16,9 @@
   } from '$lib/api/client';
   import { formatDate } from '$lib/utils/format';
   import {
-    googleCalendarUrl,
+    chooseCalendarAction,
     downloadIcs,
+    type CalendarAction,
     type CalendarEvent,
   } from '$lib/utils/add-to-calendar';
   import { tasksSpanMultipleWeeks } from '$lib/utils/task-weeks';
@@ -386,14 +387,19 @@
     };
   }
 
-  function googleUrlFor(a: MyAssignment): string | null {
+  function calendarActionFor(a: MyAssignment): CalendarAction | null {
     const e = calendarEventFor(a);
-    return e ? googleCalendarUrl(e) : null;
+    if (!e || !authState.user) return null;
+    return chooseCalendarAction(e, authState.user.calendar_kind);
   }
 
-  function downloadIcsFor(a: MyAssignment): void {
+  let icsHint = $state<string | null>(null);
+
+  function downloadIcsFor(a: MyAssignment, hint: string | null): void {
     const e = calendarEventFor(a);
-    if (e) downloadIcs(e);
+    if (!e) return;
+    downloadIcs(e);
+    icsHint = hint;
   }
 
   function hasExistingAvailability(callId: string): boolean {
@@ -623,6 +629,9 @@
 
     <section class="section">
       <h2>My Assignments</h2>
+      {#if icsHint}
+        <div class="ics-hint" role="status">{icsHint}</div>
+      {/if}
       {#if assignments.length === 0}
         <p class="empty-text">No assignments yet. Sign up for a volunteer call above!</p>
       {:else}
@@ -649,15 +658,16 @@
                   {a.confirmed ? 'Confirmed' : 'Pending'}
                 </span>
                 {#if a.date}
-                  {@const gUrl = googleUrlFor(a)}
-                  {#if gUrl}
-                    <a class="btn btn-sm btn-outline" href={gUrl} target="_blank" rel="noopener noreferrer" title="Open in Google Calendar">
-                      Add to Google Calendar
+                  {@const action = calendarActionFor(a)}
+                  {#if action?.kind === 'link'}
+                    <a class="btn btn-sm btn-outline" href={action.href} target="_blank" rel="noopener noreferrer">
+                      {action.label}
                     </a>
+                  {:else if action?.kind === 'download'}
+                    <button class="btn btn-sm btn-outline" onclick={() => downloadIcsFor(a, action.hint)}>
+                      {action.label}
+                    </button>
                   {/if}
-                  <button class="btn btn-sm btn-link" title="Download .ics for Apple/Outlook" onclick={() => downloadIcsFor(a)}>
-                    .ics
-                  </button>
                 {/if}
               </div>
             </ItemCard>

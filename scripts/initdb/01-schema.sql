@@ -17,6 +17,8 @@ CREATE TYPE taskstatus AS ENUM ('open', 'full', 'cancelled');
 CREATE TYPE assignmentrole AS ENUM ('team_leader', 'volunteer');
 CREATE TYPE notificationtype AS ENUM ('call_invite', 'assignment', 'call_thanks', 'assignment_update');
 CREATE TYPE sloteventtype AS ENUM ('postponed', 'cancelled', 'rescheduled');
+-- Calendar app the user prefers for "Add to calendar" deeplinks.
+CREATE TYPE calendarkind AS ENUM ('google', 'apple', 'outlook', 'other');
 
 -- People
 CREATE TABLE people (
@@ -39,6 +41,10 @@ CREATE TABLE people (
     calendar_url VARCHAR(2048),
     calendar_provider VARCHAR(20),
     calendar_url_added_at TIMESTAMPTZ,
+    -- Preferred calendar app for "Add to calendar" deeplinks. Independent
+    -- of calendar_url — a user without a URL still has a "kind" that
+    -- decides which deeplink the volunteering page opens.
+    calendar_kind calendarkind NOT NULL DEFAULT 'google',
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

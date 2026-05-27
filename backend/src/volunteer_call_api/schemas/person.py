@@ -5,6 +5,7 @@ from datetime import date, datetime
 from pydantic import BaseModel
 
 from volunteer_call_api.models.person import (
+    CalendarKind,
     NotificationDetailLevel,
     NotificationPreference,
     Program,
@@ -52,6 +53,7 @@ class PersonUpdate(BaseModel):
     notes: str | None = None
     roles: list[RoleType] | None = None
     programs: list[Program] | None = None
+    calendar_kind: CalendarKind | None = None
 
 
 class PersonResponse(BaseModel):
@@ -75,6 +77,7 @@ class PersonResponse(BaseModel):
     programs: list[ProgramMembership]
     calendar_connected: bool
     calendar_provider: str | None
+    calendar_kind: CalendarKind
     created_at: datetime
     updated_at: datetime
 
