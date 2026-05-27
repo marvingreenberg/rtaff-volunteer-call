@@ -24,7 +24,6 @@
   import ItemCard from '$lib/components/ItemCard.svelte';
   import ListViewToggle from '$lib/components/ListViewToggle.svelte';
   import DataTable from '$lib/components/DataTable.svelte';
-  import CalendarConnectPanel from '$lib/components/CalendarConnectPanel.svelte';
   import { settingsState, setListView } from '$lib/stores/settings.svelte';
   import { truncateText } from '$lib/components/data-table';
   import type { Column, SortDir } from '$lib/components/data-table';
@@ -403,14 +402,6 @@
     return callLevelAvail[callId] !== null && callLevelAvail[callId] !== undefined;
   }
 
-  async function refreshUserAndConflicts() {
-    const token = page.url.searchParams.get('token');
-    await initFromToken(token);
-    // Connecting/disconnecting the calendar changes which tasks should be
-    // flagged. Reload conflicts for every open call so the warnings update
-    // without making the user reload the page.
-    await Promise.all(openCalls.map((call) => loadCallData(call.id)));
-  }
 </script>
 
 <svelte:head>
@@ -427,13 +418,10 @@
   {:else}
     <section class="section">
       <h2>Volunteer Calls <em class="section-sub">waiting for volunteers</em></h2>
-      {#if authState.user}
-        <CalendarConnectPanel
-          personId={authState.user.id}
-          calendarConnected={authState.user.calendar_connected}
-          calendarProvider={authState.user.calendar_provider}
-          onChanged={refreshUserAndConflicts}
-        />
+      {#if authState.user && !authState.user.calendar_connected}
+        <p class="settings-hint">
+          See <a href="/settings">Settings</a> to connect your calendar and detect conflicts.
+        </p>
       {/if}
       {#if openCalls.length === 0}
         <p class="empty-text">No volunteer calls are looking for volunteers right now.</p>

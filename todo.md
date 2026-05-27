@@ -56,7 +56,7 @@ users who prefer it.
 Calendar requires the `.ics` route (no equivalent deeplink). Outlook
 has its own URL builder; do not add yet — wait for a user to ask.
 
-### [ ] feat/06-avatar-settings-move
+### [/] feat/06-avatar-settings-move
 
 Move notification preference (channel + detail), **pause** (instead
 of full subscription_status), and calendar connection into the

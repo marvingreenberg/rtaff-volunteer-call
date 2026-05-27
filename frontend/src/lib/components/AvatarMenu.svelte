@@ -98,6 +98,7 @@
         <a href="/inbox" class="drawer-link" onclick={navigate}>
           Inbox{unreadCount > 0 ? ` (${unreadCount})` : ''}
         </a>
+        <a href="/settings" class="drawer-link" onclick={navigate}>Settings</a>
       </nav>
 
       <div class="drawer-divider"></div>
