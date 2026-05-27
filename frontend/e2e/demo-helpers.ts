@@ -509,6 +509,101 @@ export async function hideMailpitPanel(page: Page): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Manual pause/continue gate (AUTODEMO=0)
+// ---------------------------------------------------------------------------
+
+/**
+ * When ``AUTODEMO=0`` is set, halt the demo at this point and render a
+ * Continue/Cancel overlay in the top-left of the page until the user
+ * clicks one. Useful for stepping through the demo for screenshots or
+ * narration timing. When the env var is unset (the default — full
+ * auto-replay), this is a no-op.
+ *
+ * Cancel throws, which fails the test cleanly so the run terminates
+ * instead of barrelling on.
+ */
+export async function pauseForUser(page: Page, label: string): Promise<void> {
+  if (process.env.AUTODEMO !== "0") return;
+
+  await page.evaluate((labelText) => {
+    const existing = document.getElementById("__demo_pause__");
+    if (existing) existing.remove();
+    const panel = document.createElement("div");
+    panel.id = "__demo_pause__";
+    panel.style.cssText = [
+      "position:fixed",
+      "top:16px",
+      "left:16px",
+      "min-width:240px",
+      "background:#fff",
+      "border:2px solid #003a5d",
+      "border-radius:10px",
+      "box-shadow:0 18px 48px rgba(0,0,0,.28)",
+      "padding:12px 14px",
+      "font:14px/1.35 system-ui,-apple-system,sans-serif",
+      "color:#222",
+      "z-index:2147483647",
+    ].join(";");
+    const header = document.createElement("div");
+    header.style.cssText =
+      "font-weight:600;color:#003a5d;margin-bottom:8px;font-size:13px;";
+    header.textContent = `⏸  ${labelText}`;
+    panel.appendChild(header);
+    const buttons = document.createElement("div");
+    buttons.style.cssText = "display:flex;gap:8px;";
+    const cont = document.createElement("button");
+    cont.id = "__demo_pause_continue__";
+    cont.textContent = "Continue";
+    cont.style.cssText =
+      "padding:6px 14px;background:#003a5d;color:#fff;border:0;" +
+      "border-radius:6px;cursor:pointer;font:600 13px system-ui;";
+    const cancel = document.createElement("button");
+    cancel.id = "__demo_pause_cancel__";
+    cancel.textContent = "Cancel";
+    cancel.style.cssText =
+      "padding:6px 14px;background:#fff;color:#003a5d;border:1px solid #003a5d;" +
+      "border-radius:6px;cursor:pointer;font:600 13px system-ui;";
+    buttons.appendChild(cont);
+    buttons.appendChild(cancel);
+    panel.appendChild(buttons);
+    document.body.appendChild(panel);
+    // Browser-side state read by Playwright's waitForFunction below.
+    (window as unknown as { __demoPauseAction?: string }).__demoPauseAction =
+      undefined;
+    cont.addEventListener("click", () => {
+      (window as unknown as { __demoPauseAction?: string }).__demoPauseAction =
+        "continue";
+    });
+    cancel.addEventListener("click", () => {
+      (window as unknown as { __demoPauseAction?: string }).__demoPauseAction =
+        "cancel";
+    });
+  }, label);
+
+  // Wait indefinitely (timeout:0) for either button. The test-level
+  // timeout is bumped by the spec when AUTODEMO=0 so manual stepping
+  // isn't artificially capped.
+  await page.waitForFunction(
+    () =>
+      (window as unknown as { __demoPauseAction?: string })
+        .__demoPauseAction !== undefined,
+    null,
+    { timeout: 0 },
+  );
+  const action = await page.evaluate(
+    () =>
+      (window as unknown as { __demoPauseAction?: string }).__demoPauseAction,
+  );
+  await page.evaluate(() => {
+    const el = document.getElementById("__demo_pause__");
+    if (el) el.remove();
+  });
+  if (action === "cancel") {
+    throw new Error(`Demo cancelled by user at: ${label}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Bulk demo script subprocess
 // ---------------------------------------------------------------------------
 

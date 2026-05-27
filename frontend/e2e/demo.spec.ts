@@ -12,6 +12,13 @@
  *
  * The spec uses the real magic-link flow (not DEMO_MODE) so the login
  * emails actually arrive in Mailpit and the demo can showcase them.
+ *
+ * Set AUTODEMO=0 to step through manually — a Continue/Cancel overlay
+ * appears in the top-left at the major beats (login, call created, tasks
+ * added, invites sent, Vick's invite shown, responses in, assignment pane,
+ * assignments done, notifications sent, assignment emails reviewed). The
+ * spec timeout is removed in this mode so you can sit on a pause as long
+ * as you need.
  */
 
 import { suggestCallTitle } from "../src/lib/api/types";
@@ -33,6 +40,7 @@ import {
   loginViaMagicLink,
   logout,
   narrate,
+  pauseForUser,
   pickTasks,
   scrollMailpitToHref,
   setMaxPerWeek,
@@ -62,7 +70,11 @@ const display = (ms: number): number =>
   Math.round(ms * DISPLAY_HOLD_MULTIPLIER);
 
 test("RT-AFF volunteer-call demo", async ({ page }) => {
-  test.setTimeout(900_000);
+  // 20 minutes — long enough that manual-stepping pauses for discussion
+  // don't expire mid-conversation, but still finite so a wedged spec
+  // doesn't hang forever. The Makefile sets the same value via
+  // --timeout, so both code paths agree.
+  test.setTimeout(1_200_000);
   const api = await request.newContext();
 
   // `say` and `pause` bake the display-hold multiplier into the two call
@@ -91,9 +103,10 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
   await loginViaMagicLink(page, api, DON_GMAIL_ALIAS);
   await narrate(
     page,
-    "Logged in. Notification emails still go to his @rebuildingtogether-aff.org address.",
+    "Logged in. No active volunteer calls shown.",
     900,
   );
+  await pauseForUser(page, "Don logged in");
 
   // ===========================================================================
   // STEP 2: Create a new call
@@ -112,6 +125,7 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
   );
   await page.waitForSelector(`text=${callTitle}`);
   await sleep(500);
+  await pauseForUser(page, "Call created");
 
   // ===========================================================================
   // STEP 3: Drill into the call and add two tasks manually
@@ -133,6 +147,7 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
     address: "44 Oak St",
     city: "Falls Church",
   });
+  await pauseForUser(page, "Two tasks added by hand");
 
   // ===========================================================================
   // STEP 3a: Bulk add the remaining 9 tasks (slots 2..10 of the schedule)
@@ -154,6 +169,7 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
   await say("Don sends the call out to volunteers.", 2000);
   await clickCallAction(page, callId, "send_invites");
   await pause(2000);
+  await pauseForUser(page, "Call sent — invites going out");
 
   // Don's role in this scene is done — log him out, then narrate over the
   // logged-out app while showing what every volunteer just received.
@@ -173,6 +189,7 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
   );
   const inviteMsg = await showEmailFor(api, page, VICK, /invite|call/i);
   await pause(3500);
+  await pauseForUser(page, "Vick's invite shown");
 
   // ===========================================================================
   // STEP 6: Vick clicks the invite link — auto-authenticates, lands on
@@ -234,11 +251,13 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
   // STEP 9: Admin logs back in, opens Assignment Dashboard
   // ===========================================================================
   await loginViaMagicLink(page, api, DON_GMAIL_ALIAS, { showInMailpit: false });
+  await pauseForUser(page, "Responses in — Don logs back in");
   await page.goto(`${BASE_URL}/volunteer-calls`);
   await say("Don opens the Assignment Dashboard, now full of responses.", 2000);
   await clickCallAction(page, callId, "assign");
   await page.waitForURL(/\/assign/);
   await pause(2500);
+  await pauseForUser(page, "Assignment pane open");
 
   // Auto-pick team leads — clears the "9 tasks need a team lead" gate in
   // one click using the new endpoint.
@@ -298,12 +317,14 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
   // STEP 10: Send Assignments — show one assignment + one team-lead roster
   // ===========================================================================
   await page.goto(`${BASE_URL}/volunteer-calls`);
+  await pauseForUser(page, "Assignments finished — back on Calls");
   await say(
     "Sending assignments. Volunteers get individual emails; team leads get rosters.",
     2400,
   );
   await clickCallAction(page, callId, "send_assignments");
   await pause(2500);
+  await pauseForUser(page, "Assignment notifications sent");
 
   // Best-effort peek at Vick's assignment email + a team-lead roster
   // email. Both swallow errors so a Mailpit hiccup doesn't tank the
@@ -322,6 +343,7 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
     () => showEmailMatching(api, page, /^Your team for /i),
     4500,
   );
+  await pauseForUser(page, "Assignment emails reviewed");
 
   // ===========================================================================
   // STEP 11: Vick logs in and sees the final assignment

@@ -122,8 +122,19 @@ types:
 # Demo.md. Assumes `make dev` is running in another shell (frontend on
 # 5173, backend on 8001, Mailpit on 8025). Output lands in
 # frontend/test-results/demo/.
+#
+# AUTODEMO controls whether the spec stops at each major beat for a
+# manual Continue/Cancel click (`AUTODEMO=0`, the default) or replays
+# straight through (`AUTODEMO=1`, used for video recording). Override
+# on the command line:
+#   make demo              # manual stepping
+#   make demo AUTODEMO=1   # auto-replay
+# Always runs headed — `make demo` is a live walkthrough, not a CI test.
+# 20-minute Playwright timeout absorbs long discussion pauses.
+AUTODEMO ?= 0
+
 demo:
-	cd frontend && pnpm exec playwright test e2e/demo.spec.ts
+	cd frontend && AUTODEMO=$(AUTODEMO) pnpm exec playwright test e2e/demo.spec.ts --headed --timeout=1200000
 
 clean:
 	make -C backend clean
