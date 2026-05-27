@@ -7,7 +7,7 @@ another user's profile via people routes). The conflicts endpoint is
 self-only — never expose someone else's calendar contents.
 """
 
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -121,7 +121,20 @@ async def call_conflicts(
     tasks_result = await db.execute(tasks_q)
     tasks = tasks_result.scalars().all()
 
-    events = await get_events_for_person(user.id, user.calendar_url)
+    # Window for recurrence expansion: bounded by the call's task dates
+    # with a one-day buffer either side, so an end-of-day event still
+    # surfaces as a conflict. Falls back to "today only" when the call
+    # has no dated tasks (the rest of the function will yield no
+    # conflicts anyway).
+    dated = [t.date for t in tasks if t.date is not None]
+    if dated:
+        start = datetime.combine(min(dated) - timedelta(days=1), time(0, 0), tzinfo=timezone.utc)
+        end = datetime.combine(max(dated) + timedelta(days=1), time(23, 59), tzinfo=timezone.utc)
+        window: tuple[datetime, datetime] | None = (start, end)
+    else:
+        window = None
+
+    events = await get_events_for_person(user.id, user.calendar_url, window)
 
     out: list[TaskConflictsResponse] = []
     for t in tasks:

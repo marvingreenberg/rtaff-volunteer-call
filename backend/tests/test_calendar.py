@@ -48,6 +48,57 @@ def test_parse_ics_event_without_dtend_falls_back_to_one_hour() -> None:
     assert untimed.end - untimed.start == dt.timedelta(hours=1)
 
 
+def test_parse_ics_in_window_expands_weekly_recurrence() -> None:
+    """Bug it catches: the original parser dropped RRULE, so a weekly
+    standing meeting conflicted only on its first occurrence. After
+    recurring-ical-events was pulled in, every occurrence inside the
+    window should appear — this test asserts four Mondays between
+    2026-06-01 and 2026-06-30."""
+    ics = b"""BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Test//EN
+BEGIN:VEVENT
+UID:weekly-standup@test
+DTSTART:20260601T140000Z
+DTEND:20260601T150000Z
+SUMMARY:Weekly standup
+RRULE:FREQ=WEEKLY;BYDAY=MO;COUNT=10
+END:VEVENT
+END:VCALENDAR
+"""
+    window_start = dt.datetime(2026, 6, 1, tzinfo=dt.timezone.utc)
+    window_end = dt.datetime(2026, 6, 30, 23, 59, tzinfo=dt.timezone.utc)
+    events = cal_svc.parse_ics_in_window(ics, window_start, window_end)
+    # Mondays in June 2026 inside the window: Jun 1, 8, 15, 22, 29.
+    assert len(events) == 5
+    starts = sorted(e.start for e in events)
+    assert starts[0] == dt.datetime(2026, 6, 1, 14, 0, tzinfo=dt.timezone.utc)
+    assert starts[1] == dt.datetime(2026, 6, 8, 14, 0, tzinfo=dt.timezone.utc)
+    assert starts[-1] == dt.datetime(2026, 6, 29, 14, 0, tzinfo=dt.timezone.utc)
+
+
+def test_parse_ics_in_window_excludes_outside_window() -> None:
+    """Bug it catches: a recurrence expander that ignores the window
+    bounds and returns the whole RRULE series — wastes work and
+    inflates the cache."""
+    ics = b"""BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Test//EN
+BEGIN:VEVENT
+UID:daily@test
+DTSTART:20260101T090000Z
+DTEND:20260101T100000Z
+SUMMARY:Daily
+RRULE:FREQ=DAILY;COUNT=365
+END:VEVENT
+END:VCALENDAR
+"""
+    window_start = dt.datetime(2026, 6, 1, tzinfo=dt.timezone.utc)
+    window_end = dt.datetime(2026, 6, 7, 23, 59, tzinfo=dt.timezone.utc)
+    events = cal_svc.parse_ics_in_window(ics, window_start, window_end)
+    assert len(events) == 7
+
+
 @pytest.mark.parametrize(
     ("task_time_start", "task_time_end", "expected"),
     [
@@ -117,7 +168,10 @@ async def test_get_events_for_person_caches_results() -> None:
     cal_svc._cache.clear()
     fetch_calls = 0
 
-    async def fake_fetch(_url: str) -> list[cal_svc.CalendarEvent]:
+    async def fake_fetch(
+        _url: str,
+        _window: tuple[object, object] | None = None,
+    ) -> list[cal_svc.CalendarEvent]:
         nonlocal fetch_calls
         fetch_calls += 1
         return _events()
@@ -212,7 +266,10 @@ async def test_invalidate_person_cache_forces_refetch() -> None:
     cal_svc._cache.clear()
     fetch_calls = 0
 
-    async def fake_fetch(_url: str) -> list[cal_svc.CalendarEvent]:
+    async def fake_fetch(
+        _url: str,
+        _window: tuple[object, object] | None = None,
+    ) -> list[cal_svc.CalendarEvent]:
         nonlocal fetch_calls
         fetch_calls += 1
         return []
