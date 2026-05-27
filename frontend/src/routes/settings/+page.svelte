@@ -7,6 +7,7 @@
     type SubscriptionStatus,
   } from "$lib/api/client";
   import CalendarConnectPanel from "$lib/components/CalendarConnectPanel.svelte";
+  import Select from "$lib/components/Select.svelte";
   import {
     settingsState,
     applySettings,
@@ -103,16 +104,24 @@
       <h2>Notifications</h2>
       <div class="row">
         <span class="lbl">Notify via</span>
-        <select bind:value={notificationPreference}>
-          <option value="email">Email</option>
-          <option value="sms">SMS</option>
-          <option value="both">Both</option>
-        </select>
+        <Select
+          bind:value={notificationPreference}
+          options={[
+            { value: "email", label: "Email" },
+            { value: "sms", label: "SMS" },
+            { value: "both", label: "Both" },
+          ]}
+          ariaLabel="Notification channel"
+        />
         <span class="lbl secondary">Detail</span>
-        <select bind:value={notificationDetailLevel}>
-          <option value="summary">Summary</option>
-          <option value="full">Full</option>
-        </select>
+        <Select
+          bind:value={notificationDetailLevel}
+          options={[
+            { value: "summary", label: "Summary" },
+            { value: "full", label: "Full" },
+          ]}
+          ariaLabel="Notification detail level"
+        />
       </div>
     </section>
 
@@ -124,11 +133,15 @@
       </p>
       <div class="row">
         <span class="lbl">Status</span>
-        <select bind:value={subscriptionStatus}>
-          <option value="active">Active</option>
-          <option value="paused">Paused</option>
-          <option value="unsubscribed">Unsubscribed</option>
-        </select>
+        <Select
+          bind:value={subscriptionStatus}
+          options={[
+            { value: "active", label: "Active" },
+            { value: "paused", label: "Paused" },
+            { value: "unsubscribed", label: "Unsubscribed" },
+          ]}
+          ariaLabel="Subscription status"
+        />
         {#if subscriptionStatus === "paused"}
           <span class="lbl secondary">Until</span>
           <input type="date" bind:value={pauseEnd} />
@@ -140,12 +153,16 @@
       <h2>Calendar</h2>
       <div class="row">
         <span class="lbl">Calendar sync</span>
-        <select bind:value={calendarKind}>
-          <option value="google">Google Calendar</option>
-          <option value="apple">Apple Calendar</option>
-          <option value="outlook">Outlook</option>
-          <option value="other">Other / .ics download</option>
-        </select>
+        <Select
+          bind:value={calendarKind}
+          options={[
+            { value: "google", label: "Google Calendar" },
+            { value: "apple", label: "Apple Calendar" },
+            { value: "outlook", label: "Outlook" },
+            { value: "other", label: "Other / .ics download" },
+          ]}
+          ariaLabel="Preferred calendar app"
+        />
       </div>
       <p class="hint">
         Chooses which app opens when you click <em>Add to Calendar</em> on

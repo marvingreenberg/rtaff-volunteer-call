@@ -25,6 +25,7 @@
   import ItemCard from '$lib/components/ItemCard.svelte';
   import ListViewToggle from '$lib/components/ListViewToggle.svelte';
   import DataTable from '$lib/components/DataTable.svelte';
+  import Select from '$lib/components/Select.svelte';
   import { settingsState, setListView } from '$lib/stores/settings.svelte';
   import { truncateText } from '$lib/components/data-table';
   import type { Column, SortDir } from '$lib/components/data-table';
@@ -469,28 +470,22 @@
                   <span class="max-week-label">Maximum tasks:</span>
                   <label class="week-pick">
                     <span class="week-pick-label">{showWeek2 ? 'Week 1' : 'per week'}</span>
-                    <select
+                    <Select
                       value={mpw}
-                      onchange={(e) => setMaxPerWeek(call.id, parseInt((e.currentTarget as HTMLSelectElement).value, 10))}
-                      aria-label={showWeek2 ? 'Maximum tasks, week 1' : 'Maximum tasks per week'}
-                    >
-                      {#each MAX_WEEK_OPTIONS as n (n)}
-                        <option value={n}>{n}</option>
-                      {/each}
-                    </select>
+                      options={MAX_WEEK_OPTIONS.map((n) => ({ value: n, label: String(n) }))}
+                      ariaLabel={showWeek2 ? 'Maximum tasks, week 1' : 'Maximum tasks per week'}
+                      onchange={(v) => setMaxPerWeek(call.id, Number(v))}
+                    />
                   </label>
                   {#if showWeek2}
                     <label class="week-pick">
                       <span class="week-pick-label">Week 2</span>
-                      <select
+                      <Select
                         value={mpw2}
-                        onchange={(e) => setMaxPerWeek2(call.id, parseInt((e.currentTarget as HTMLSelectElement).value, 10))}
-                        aria-label="Maximum tasks, week 2"
-                      >
-                        {#each MAX_WEEK_OPTIONS as n (n)}
-                          <option value={n}>{n}</option>
-                        {/each}
-                      </select>
+                        options={MAX_WEEK_OPTIONS.map((n) => ({ value: n, label: String(n) }))}
+                        ariaLabel="Maximum tasks, week 2"
+                        onchange={(v) => setMaxPerWeek2(call.id, Number(v))}
+                      />
                     </label>
                   {/if}
                 </div>
@@ -783,14 +778,6 @@
     color: var(--rt-text-muted, #777);
   }
 
-  .week-pick select {
-    padding: 2px var(--spacing-sm);
-    border: 1px solid var(--rt-gray-200, #e4dfda);
-    border-radius: var(--card-radius, 8px);
-    font: inherit;
-    background: var(--rt-white, #fff);
-    min-height: 28px;
-  }
 
   .list-header-row {
     display: flex;
