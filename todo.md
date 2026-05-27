@@ -63,6 +63,14 @@ of full subscription_status), and calendar connection into the
 Avatar menu (gear icon). Retain a one-line hint on `/volunteering`:
 "See user settings to connect your calendar to detect conflicts."
 
+Follow-ups on the same branch:
+- `feat/06b` — `calendar_kind` setting + provider-aware Add to Calendar.
+- `feat/06c` — AvatarMenu redesign per the user's reference screenshot:
+  email header line, icon+label rows with outline SVG icons,
+  horizontal dividers grouping (Settings · Inbox) | (staff: People ·
+  Inventory) | Logout. Display density relocates to `/settings`
+  since the new menu shape doesn't have a home for the radio group.
+
 ### [ ] feat/07-recurring-events
 
 Install `recurring-ical-events`. In
@@ -171,8 +179,6 @@ These need a decision before they can be executed unattended.
 - **UI design review** — "prettier, Notion-style header backgrounds,
   consistent with rtaff.org." Too open-ended for unattended work.
   Want a concrete spec — mockups, color palette, components to touch?
-- **Avatar menu "more Material Design."** Specifically: material-symbols
-  icons? Ripple effect? Card elevation? List preferred targets.
 - **Address autocomplete on TaskEntryForm.** Provider: Google Places
   (paid, polished), OpenStreetMap/Photon (free, NoVA coverage is
   fine), or a static dataset (RT-AFF's known client list)?
