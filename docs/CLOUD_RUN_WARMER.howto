@@ -1,0 +1,84 @@
+# Cloud Run scheduled warmer
+
+Keep one Cloud Run instance warm during expected usage windows
+(Fri/Sat/Sun 9am–8pm America/New_York) so volunteers don't hit a
+cold start. Cheaper than `min-instances=1` for a usage-window app
+because the container only handles real traffic + a tiny heartbeat
+poll the rest of the week.
+
+## Cost ceiling
+
+At a 5-minute poll every 11h × 3d/week ≈ 143 hours/month of being
+warm. Cloud Run's free tier covers this comfortably:
+
+- vCPU-seconds free: 180,000/month — we use < 400 (a poll burns ~200 ms).
+- GiB-seconds free: 360,000/month — 512 MiB × 143h ≈ 264k.
+- Requests: ~1,716/month from Scheduler + heartbeat traffic; free
+  tier is 2M.
+
+Net: $0/month. Holds only with Neon as the database — Cloud SQL adds
+$7–9 on its own.
+
+## Endpoints
+
+`backend/src/volunteer_call_api/main.py` exposes:
+
+- `GET /health` — liveness probe. Run on every deploy.
+- `GET /warm` — used by Cloud Scheduler and the in-app heartbeat.
+  Identical payload shape to `/health` but distinct so the
+  high-frequency access pattern is easy to filter out of analytics.
+
+The frontend layout starts a `setInterval` heartbeat at
+`HEARTBEAT_MS = 4 * 60 * 1000` while the user is authenticated; the
+poller below is the fallback when no one is using the app.
+
+## One-time setup
+
+Replace `$REGION` (e.g. `us-east4`) and `$SERVICE` (e.g.
+`volunteer-call-api`) with the values from `docs/GCP_SETUP.howto`.
+
+```bash
+SERVICE_URL=$(gcloud run services describe $SERVICE \
+  --region $REGION --format='value(status.url)')
+
+# Allow unauthenticated /warm — the response leaks no data, only the
+# version string. Skip if Cloud Run is already public.
+gcloud run services add-iam-policy-binding $SERVICE \
+  --region $REGION \
+  --member allUsers \
+  --role roles/run.invoker
+
+# Cron: every 5 minutes, 9am–7:59pm America/New_York, Fri+Sat+Sun.
+gcloud scheduler jobs create http rtaff-warmer \
+  --location $REGION \
+  --schedule="*/5 9-19 * * 5-0" \
+  --time-zone="America/New_York" \
+  --uri="$SERVICE_URL/warm" \
+  --http-method=GET
+```
+
+To narrow the schedule later, e.g. only Saturday + Sunday morning,
+edit the cron expression with `gcloud scheduler jobs update http
+rtaff-warmer --schedule=...`.
+
+## What to verify after deploying
+
+1. **Scheduler is firing.** `gcloud scheduler jobs describe
+   rtaff-warmer --location $REGION` — should show a recent
+   `lastAttemptTime`.
+2. **Cloud Run is staying warm during the window.** In Cloud
+   Logging, filter `httpRequest.requestUrl="/warm"` — there should
+   be a poll every 5 minutes during the schedule and gaps outside
+   it.
+3. **Cold starts only happen outside the window.** Filter
+   `httpRequest.latency>"1s"` for the first request of a session
+   outside Fri–Sun 9-19. A handful per week is fine; if you see
+   them inside the window, widen the schedule or shorten the poll.
+
+## When to abandon this and just use min-instances=1
+
+If usage spreads outside Fri–Sun, or if even a one-off 800ms cold
+start outside the window is unacceptable, set `min-instances=1` on
+the Cloud Run service. That's $5–10/month idle and deletes this
+whole knob. Keep the `/warm` endpoint either way — it's the same
+heartbeat target whether driven by Scheduler or by the frontend.

@@ -141,6 +141,19 @@ async def health_check() -> dict[str, str]:
     return {"status": "ok", "version": _version}
 
 
+@app.get("/warm")
+async def warm_check() -> dict[str, str]:
+    """Cold-start avoidance endpoint.
+
+    Hit by Cloud Scheduler on a cron during expected usage windows and
+    by the frontend's heartbeat while a session is active. The
+    endpoint exists separately from /health so its access pattern
+    (high-frequency, tolerates a 5xx without paging) is greppable in
+    request logs.
+    """
+    return {"status": "warm", "version": _version}
+
+
 static_dir = Path(__file__).parent / "static"
 if static_dir.exists():
     app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
