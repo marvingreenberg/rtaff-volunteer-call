@@ -16,6 +16,7 @@ from volunteer_call_api.models.person import (
 )
 from volunteer_call_api.routes.helpers import apply_partial_update
 from volunteer_call_api.schemas.person import (
+    PersonCalendarSummary,
     PersonCreate,
     PersonListResponse,
     PersonResponse,
@@ -55,8 +56,9 @@ def _person_response(person: Person) -> PersonResponse:
         notes=person.notes,
         roles=_person_roles(person),
         programs=_person_programs(person),
-        calendar_connected=person.calendar_url is not None,
-        calendar_provider=person.calendar_provider,
+        calendars=[
+            PersonCalendarSummary.model_validate(c, from_attributes=True) for c in person.calendars
+        ],
         calendar_kind=person.calendar_kind,
         created_at=person.created_at,
         updated_at=person.updated_at,
@@ -70,6 +72,7 @@ def _person_response(person: Person) -> PersonResponse:
 PERSON_LOAD_OPTIONS = (
     selectinload(Person.roles),
     selectinload(Person.program_memberships),
+    selectinload(Person.calendars),
 )
 
 

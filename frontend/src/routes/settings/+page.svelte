@@ -172,8 +172,7 @@
 
       <CalendarConnectPanel
         personId={authState.user.id}
-        calendarConnected={authState.user.calendar_connected}
-        calendarProvider={authState.user.calendar_provider}
+        calendars={authState.user.calendars}
         onChanged={refreshUser}
       />
     </section>

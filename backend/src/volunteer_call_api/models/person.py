@@ -89,12 +89,12 @@ class Person(Base, TimestampMixin):
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     notes: Mapped[str | None] = mapped_column(Text)
 
-    # Calendar integration. `calendar_url` is treated as a bearer secret —
-    # never returned in any API response. Only `calendar_connected` derives
-    # for the frontend.
-    calendar_url: Mapped[str | None] = mapped_column(String(2048))
-    calendar_provider: Mapped[str | None] = mapped_column(String(20))
-    calendar_url_added_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Calendar integration lives in the `person_calendars` child table —
+    # one row per connected calendar so a user can sync personal + work
+    # feeds simultaneously and have conflicts honor both. The `calendars`
+    # relationship is the canonical access path. ``calendar_url`` /
+    # ``calendar_provider`` columns retired in feat/15.
+
     # User's preferred calendar app for "Add to calendar" deeplinks.
     # Independent of calendar_url — a user without a connected URL can
     # still pick Google so their "Add to calendar" button opens in
@@ -133,6 +133,35 @@ class Person(Base, TimestampMixin):
     login_aliases: Mapped[list["PersonLoginAlias"]] = relationship(
         back_populates="person", cascade="all, delete-orphan"
     )
+    calendars: Mapped[list["PersonCalendar"]] = relationship(
+        back_populates="person",
+        cascade="all, delete-orphan",
+        order_by="PersonCalendar.added_at",
+    )
+
+
+class PersonCalendar(Base):
+    """One row per iCal feed the user has connected.
+
+    ``calendar_url`` is a bearer secret — never returned by the API.
+    ``label`` is user-supplied (e.g. "Work", "Personal") so the
+    Settings UI can show something more recognizable than the URL.
+    """
+
+    __tablename__ = "person_calendars"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True, default=generate_uuid)
+    person_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("people.id", ondelete="CASCADE"), nullable=False
+    )
+    calendar_url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    calendar_provider: Mapped[str | None] = mapped_column(String(20))
+    label: Mapped[str | None] = mapped_column(String(80))
+    added_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    person: Mapped["Person"] = relationship(back_populates="calendars")
 
 
 class VolunteerProgram(Base):

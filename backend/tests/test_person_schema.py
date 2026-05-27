@@ -6,6 +6,7 @@ from volunteer_call_api.models.person import (
     CalendarKind,
     NotificationDetailLevel,
     NotificationPreference,
+    PersonCalendar,
     Skill,
     SubscriptionStatus,
 )
@@ -31,10 +32,8 @@ class _StubPerson:
         self.subscription_status = SubscriptionStatus.ACTIVE
         self.pause_start = None
         self.pause_end = None
-        self.calendar_url: str | None = None
-        self.calendar_provider: str | None = None
-        self.calendar_url_added_at: dt.datetime | None = None
         self.calendar_kind: CalendarKind = CalendarKind.GOOGLE
+        self.calendars: list[PersonCalendar] = []
         self.created_at = dt.datetime(2026, 1, 1, tzinfo=dt.timezone.utc)
         self.updated_at = dt.datetime(2026, 1, 1, tzinfo=dt.timezone.utc)
         self.roles: list[object] = []
@@ -44,24 +43,32 @@ class _StubPerson:
 
 
 def test_person_response_excludes_calendar_url_when_set() -> None:
-    """Bug it catches: somebody adds `calendar_url=person.calendar_url` to _person_response."""
-    person = _StubPerson(
+    """Bug it catches: somebody surfaces ``calendar_url`` on the
+    PersonCalendarSummary or PersonResponse — the URL is a bearer
+    secret that must never leave the server.
+    """
+    cal = PersonCalendar(
+        id="cal1",
+        person_id="p1",
         calendar_url="https://calendar.example.com/secret/abcd1234",
         calendar_provider="google",
+        label="Personal",
+        added_at=dt.datetime(2026, 1, 1, tzinfo=dt.timezone.utc),
     )
+    person = _StubPerson(calendars=[cal])
     resp = _person_response(person)  # type: ignore[arg-type]
     serialized = resp.model_dump_json()
     assert "abcd1234" not in serialized
     assert "secret" not in serialized
-    assert resp.calendar_connected is True
-    assert resp.calendar_provider == "google"
+    assert len(resp.calendars) == 1
+    assert resp.calendars[0].calendar_provider == "google"
+    assert resp.calendars[0].label == "Personal"
 
 
-def test_person_response_calendar_connected_false_when_url_absent() -> None:
+def test_person_response_calendars_empty_when_none_connected() -> None:
     person = _StubPerson()
     resp = _person_response(person)  # type: ignore[arg-type]
-    assert resp.calendar_connected is False
-    assert resp.calendar_provider is None
+    assert resp.calendars == []
 
 
 def test_person_response_schema_does_not_declare_calendar_url() -> None:

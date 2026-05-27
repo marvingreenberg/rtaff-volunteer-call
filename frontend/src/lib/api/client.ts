@@ -27,7 +27,7 @@ import type {
   AutoAssignTeamLeadsResponse,
   AssignmentOverviewResponse,
   CalendarConnect,
-  CalendarStatus,
+  PersonCalendarSummary,
   TaskConflicts,
   LoginRequest,
   LoginResponse,
@@ -169,14 +169,17 @@ export const people = {
       body: JSON.stringify(data),
     }),
 
-  connectCalendar: (id: string, data: CalendarConnect) =>
-    request<CalendarStatus>(`/people/${id}/calendar`, {
-      method: "PUT",
+  listCalendars: (id: string) =>
+    request<PersonCalendarSummary[]>(`/people/${id}/calendars`),
+
+  addCalendar: (id: string, data: CalendarConnect) =>
+    request<PersonCalendarSummary>(`/people/${id}/calendars`, {
+      method: "POST",
       body: JSON.stringify(data),
     }),
 
-  disconnectCalendar: (id: string) =>
-    request<CalendarStatus>(`/people/${id}/calendar`, {
+  removeCalendar: (id: string, calendarId: string) =>
+    request<void>(`/people/${id}/calendars/${calendarId}`, {
       method: "DELETE",
     }),
 };

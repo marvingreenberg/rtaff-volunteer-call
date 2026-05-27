@@ -200,25 +200,33 @@ async def test_send_assignment_notices_requires_assigned(
 async def test_people_get_never_serializes_calendar_url(
     client: AsyncClient, db: AsyncSession
 ) -> None:
-    """Bug it catches: a refactor adds calendar_url to the people response
-    serializer. The URL is a bearer secret — never expose it."""
-    p = Person(
-        first_name="P",
-        last_name="Cal",
-        email="cal@example.com",
-        active=True,
-        calendar_url="https://calendar.example.com/secret/abc123",
-        calendar_provider="google",
-    )
+    """Bug it catches: a refactor adds calendar_url to the people
+    response serializer or PersonCalendarSummary. The URL is a bearer
+    secret — never expose it."""
+    from volunteer_call_api.models.person import PersonCalendar
+
+    p = Person(first_name="P", last_name="Cal", email="cal@example.com", active=True)
     db.add(p)
+    await db.flush()
+    db.add(
+        PersonCalendar(
+            person_id=p.id,
+            calendar_url="https://calendar.example.com/secret/abc123",
+            calendar_provider="google",
+            label="Personal",
+        )
+    )
     await db.commit()
 
     resp = await client.get(f"/api/people/{p.id}")
     assert resp.status_code == 200, resp.text
     body = resp.text
     assert "abc123" not in body
-    assert "calendar_url" not in resp.json()
-    assert resp.json()["calendar_connected"] is True
+    body_json = resp.json()
+    assert "calendar_url" not in body_json
+    assert len(body_json["calendars"]) == 1
+    assert "calendar_url" not in body_json["calendars"][0]
+    assert body_json["calendars"][0]["calendar_provider"] == "google"
 
 
 # --- DELETE call cascades ---
@@ -267,8 +275,8 @@ async def test_calendar_connect_unreachable_returns_422(
 
     app.dependency_overrides[get_current_user] = _user_p
     with patch.object(cal_svc, "validate_calendar_url", AsyncMock(side_effect=stub_validate)):
-        resp = await client.put(
-            f"/api/people/{p.id}/calendar",
+        resp = await client.post(
+            f"/api/people/{p.id}/calendars",
             json={"calendar_url": "https://no.such.host.example/cal.ics"},
         )
     assert resp.status_code == 422
@@ -286,15 +294,19 @@ async def test_calendar_conflicts_self_only(client: AsyncClient, db: AsyncSessio
     accidentally widened to global it would return a populated list
     when other users have connected calendars.
     """
-    other = Person(
-        first_name="O",
-        last_name="Ther",
-        email="o@example.com",
-        active=True,
-        calendar_url="https://calendar.example.com/abc.ics",
-    )
+    from volunteer_call_api.models.person import PersonCalendar
+
+    other = Person(first_name="O", last_name="Ther", email="o@example.com", active=True)
     me = Person(first_name="M", last_name="E", email="m@example.com", active=True)
     db.add_all([me, other])
+    await db.flush()
+    db.add(
+        PersonCalendar(
+            person_id=other.id,
+            calendar_url="https://calendar.example.com/abc.ics",
+            calendar_provider="google",
+        )
+    )
     await db.commit()
 
     call_id = await _seed_call(db, CallStatus.WAITING)

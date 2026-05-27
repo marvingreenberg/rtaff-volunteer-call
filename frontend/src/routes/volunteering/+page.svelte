@@ -425,7 +425,7 @@
   {:else}
     <section class="section">
       <h2>Volunteer Calls <em class="section-sub">waiting for volunteers</em></h2>
-      {#if authState.user && !authState.user.calendar_connected}
+      {#if authState.user && authState.user.calendars.length === 0}
         <p class="settings-hint">
           See <a href="/settings">Settings</a> to connect your calendar and detect conflicts.
         </p>
