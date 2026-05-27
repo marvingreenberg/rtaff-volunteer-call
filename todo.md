@@ -32,7 +32,7 @@ role). Staff still see every program.
 POST when `today ∈ [pause_start, pause_end]` for the calling person.
 Reuses the pause check already in `services/notifications.is_subscribed`.
 
-### [ ] feat/03-referrer-policy
+### [/] feat/03-referrer-policy
 
 `main.py` adds a middleware emitting `Referrer-Policy:
 no-referrer-when-downgrade` on every response. Keeps URL tokens from
