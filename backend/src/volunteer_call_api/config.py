@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     # Lifetime for magic-link and invite tokens.
     jwt_ttl_days: int = 14
 
+    # SMS provider. "stub" logs the outbound message; "disabled" silently
+    # drops it. Real provider integration (Twilio etc.) will land as a
+    # new value here.
+    sms_provider: str = "stub"
+
     # Demo mode: skip the magic-link email step and return the access token
     # directly in the /login response. For local demos only.
     demo_mode: bool = False
