@@ -1,10 +1,11 @@
 import { auth as authApi, type PersonResponse } from "$lib/api/client";
 
-const TOKEN_KEY = "volunteer_call_token";
-
 let _user = $state<PersonResponse | null>(null);
 let _loading = $state(true);
 let _error = $state<string | null>(null);
+// Set when the user landed via a per-call invite link; consumed by the
+// /volunteering page to deep-link to that call. Cleared after one read.
+let _invitedCallId = $state<string | null>(null);
 
 export const authState = {
   get user() {
@@ -25,7 +26,17 @@ export const authState = {
   set error(v: string | null) {
     _error = v;
   },
+  get invitedCallId() {
+    return _invitedCallId;
+  },
 };
+
+/** Read and clear the invite-call deep-link target. */
+export function consumeInvitedCallId(): string | null {
+  const id = _invitedCallId;
+  _invitedCallId = null;
+  return id;
+}
 
 export interface LoginResult {
   message: string;
@@ -51,55 +62,48 @@ export async function verify(token: string): Promise<PersonResponse> {
   authState.loading = true;
   authState.error = null;
   try {
-    const person = await authApi.verify({ token });
-    authState.user = person;
-    if (typeof localStorage !== "undefined")
-      localStorage.setItem(TOKEN_KEY, token);
+    const resp = await authApi.verify({ token });
+    authState.user = resp.person;
+    _invitedCallId = resp.invited_call_id;
     authState.loading = false;
-    return person;
+    return resp.person;
   } catch (e) {
     authState.loading = false;
     const msg = e instanceof Error ? e.message : "Invalid or expired token";
     authState.error = msg;
     authState.user = null;
-    if (typeof localStorage !== "undefined") localStorage.removeItem(TOKEN_KEY);
     throw new Error(msg);
   }
 }
 
-export function logout() {
+export async function logout() {
   authState.user = null;
-  if (typeof localStorage !== "undefined") localStorage.removeItem(TOKEN_KEY);
+  _invitedCallId = null;
+  try {
+    await authApi.logout();
+  } catch {
+    // Clearing the cookie is best-effort; the in-memory state is gone
+    // regardless.
+  }
 }
 
 export async function initFromToken(
   urlToken?: string | null,
 ): Promise<PersonResponse | null> {
-  const token =
-    urlToken ||
-    (typeof localStorage !== "undefined"
-      ? localStorage.getItem(TOKEN_KEY)
-      : null);
-  if (!token) {
-    authState.loading = false;
-    return null;
-  }
-
   authState.loading = true;
   authState.error = null;
 
   try {
-    const person = await authApi.me(token);
+    const person = await authApi.me(urlToken ?? undefined);
     authState.user = person;
-    if (typeof localStorage !== "undefined")
-      localStorage.setItem(TOKEN_KEY, token);
     authState.loading = false;
     return person;
   } catch {
-    authState.error =
-      "Invalid or expired link. Please contact the office for a new one.";
+    if (urlToken) {
+      authState.error =
+        "Invalid or expired link. Please contact the office for a new one.";
+    }
     authState.user = null;
-    if (typeof localStorage !== "undefined") localStorage.removeItem(TOKEN_KEY);
     authState.loading = false;
     return null;
   }

@@ -799,7 +799,10 @@ export async function fillTaskCards(
   // Fill a single card up to its target. Returns true if the card hit its
   // target. Extracted so the second-pass sweep below can reuse the logic
   // without duplicating the read/click cadence.
-  const fillOne = async (i: number, allowNarrate: boolean): Promise<boolean> => {
+  const fillOne = async (
+    i: number,
+    allowNarrate: boolean,
+  ): Promise<boolean> => {
     const card = cards.nth(i);
     await card.scrollIntoViewIfNeeded().catch(() => {});
     const progressText =
@@ -824,7 +827,8 @@ export async function fillTaskCards(
       // happen, not at the top of the iteration — otherwise the "adding
       // one extra here" line plays during the routine fills and the
       // viewer can't connect narration to action.
-      const isExtraClick = overFill.has(i) && k === toClick - 1 && target > needed;
+      const isExtraClick =
+        overFill.has(i) && k === toClick - 1 && target > needed;
       if (allowNarrate && isExtraClick && options.narrateOver) {
         await options.narrateOver(i);
       }

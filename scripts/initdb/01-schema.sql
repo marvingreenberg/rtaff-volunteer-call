@@ -29,7 +29,6 @@ CREATE TABLE people (
     skills skill[] NOT NULL DEFAULT '{}',
     active BOOLEAN NOT NULL DEFAULT TRUE,
     notes TEXT,
-    access_token VARCHAR(64) UNIQUE,
     notification_preference notificationpreference NOT NULL DEFAULT 'email',
     notification_detail_level notificationdetaillevel NOT NULL DEFAULT 'full',
     subscription_status subscriptionstatus NOT NULL DEFAULT 'active',
@@ -43,8 +42,6 @@ CREATE TABLE people (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
-CREATE INDEX idx_people_access_token ON people(access_token);
 
 -- Alternate login email addresses. Primary email on `people` remains the
 -- channel for all outbound notifications; aliases only widen the set of

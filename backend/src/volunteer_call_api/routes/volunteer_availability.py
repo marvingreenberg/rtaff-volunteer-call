@@ -46,9 +46,12 @@ async def submit_availability(
     call = await get_one_or_404(
         db, select(VolunteerCall).where(VolunteerCall.id == call_id), "Volunteer call not found"
     )
-    # Volunteers can only submit availability after invites have been sent
-    # (status=WAITING) and before the admin closes assigning (assigned/archived).
-    if call.status != CallStatus.WAITING:
+    # Availability is collectable while volunteers are still being recruited
+    # (WAITING) and while the call is in the assigned phase but not yet
+    # archived — late "standby" entries are useful if the roster has to
+    # change. Once the call is archived (or hasn't been sent yet), the
+    # submission is rejected.
+    if call.status not in (CallStatus.WAITING, CallStatus.ASSIGNED):
         raise HTTPException(status_code=400, detail="Call is not open for availability")
     person_result = await db.execute(select(Person).where(Person.id == body.person_id))
     if person_result.scalar_one_or_none() is None:

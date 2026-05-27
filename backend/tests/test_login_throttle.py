@@ -12,6 +12,7 @@ from volunteer_call_api.database import get_db
 from volunteer_call_api.main import app
 from volunteer_call_api.models import Base, Person
 from volunteer_call_api.services.login_throttle import LoginThrottle, login_throttle
+from volunteer_call_api.services.tokens import issue_login_token
 
 # ---------------------------------------------------------------------------
 # Unit tests for LoginThrottle
@@ -176,10 +177,9 @@ async def test_valid_email_in_throttled_mode_sends_email_generic_message(
     resp = await throttle_client.post("/api/auth/login", json={"email": "alice@example.com"})
     assert resp.status_code == 200
     assert "If alice@example.com is registered" in resp.json()["message"]
-
-    # Verify token was still generated (email was still sent)
+    # Person row remains untouched — there's no per-person token to persist now.
     await throttle_db.refresh(person)
-    assert person.access_token is not None
+    assert person.active is True
 
 
 @pytest.mark.asyncio
@@ -204,7 +204,6 @@ async def test_verify_magic_link_serializes_full_person(
         last_name="Verifier",
         email="vera@example.com",
         active=True,
-        access_token="tok-vera",
     )
     throttle_db.add(person)
     await throttle_db.flush()
@@ -212,15 +211,22 @@ async def test_verify_magic_link_serializes_full_person(
     throttle_db.add(VolunteerProgram(person_id=person.id, program=Program.RTX))
     await throttle_db.commit()
 
-    resp = await throttle_client.post("/api/auth/verify", json={"token": "tok-vera"})
+    token = issue_login_token(person.id)
+    resp = await throttle_client.post("/api/auth/verify", json={"token": token})
     assert resp.status_code == 200, resp.text
     body = resp.json()
-    assert body["id"] == person.id
+    assert body["invited_call_id"] is None
+    serialized = body["person"]
+    assert serialized["id"] == person.id
     # Both relationships must be present, proving they were eager-loaded.
-    assert "volunteer" in body["roles"]
-    assert any(m["program"] == "RTX" for m in body["programs"])
+    assert "volunteer" in serialized["roles"]
+    assert any(m["program"] == "RTX" for m in serialized["programs"])
     # And the bearer secret must not have leaked.
-    assert "calendar_url" not in body
+    assert "calendar_url" not in serialized
+    # The HttpOnly session cookie must have been set on the response.
+    cookie_header = resp.headers.get("set-cookie", "")
+    assert "session=" in cookie_header
+    assert "HttpOnly" in cookie_header
 
 
 @pytest.mark.asyncio

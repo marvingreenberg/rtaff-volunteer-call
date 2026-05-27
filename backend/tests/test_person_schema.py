@@ -25,7 +25,6 @@ class _StubPerson:
         self.skills: list[Skill] = []
         self.active = True
         self.notes = None
-        self.access_token = None
         self.notification_preference = NotificationPreference.EMAIL
         self.notification_detail_level = NotificationDetailLevel.FULL
         self.subscription_status = SubscriptionStatus.ACTIVE

@@ -5,10 +5,7 @@
  * policy decisions can be tested directly without the SvelteKit runtime.
  */
 
-import {
-  ASSIGNMENT_POLICY_LABELS,
-  type AssignmentPolicy,
-} from "$lib/api/types";
+import { type AssignmentPolicy } from "$lib/api/types";
 
 /** Subset of `TaskOverviewItem` that the gate cares about. */
 export interface PolicyTask {

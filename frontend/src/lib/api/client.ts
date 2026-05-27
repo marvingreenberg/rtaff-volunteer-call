@@ -32,6 +32,7 @@ import type {
   LoginRequest,
   LoginResponse,
   VerifyRequest,
+  VerifyResponse,
   MyAssignment,
   NotificationResponse,
   Program,
@@ -40,14 +41,6 @@ import type {
 } from "./types";
 
 const API_BASE = "/api";
-
-function authHeaders(): Record<string, string> {
-  if (typeof localStorage !== "undefined") {
-    const token = localStorage.getItem("volunteer_call_token");
-    if (token) return { Authorization: `Bearer ${token}` };
-  }
-  return {};
-}
 
 export class ApiError extends Error {
   constructor(
@@ -62,9 +55,12 @@ export class ApiError extends Error {
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
+    // The session cookie is HttpOnly; the fetch needs `credentials: 'include'`
+    // so the browser actually sends it cross-origin (dev) and same-origin
+    // (prod).
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      ...authHeaders(),
       ...options.headers,
     },
     ...options,
@@ -98,13 +94,24 @@ export const auth = {
     }),
 
   verify: (data: VerifyRequest) =>
-    request<PersonResponse>("/auth/verify", {
+    request<VerifyResponse>("/auth/verify", {
       method: "POST",
       body: JSON.stringify(data),
     }),
 
-  me: (token: string) =>
-    request<PersonResponse>(`/auth/me?token=${encodeURIComponent(token)}`),
+  /**
+   * Hydrate the current user from the session cookie. Pass `urlToken` to
+   * also bootstrap the cookie from a magic-link / invite token in the URL
+   * (the backend will set the cookie on first hit). Returns null if no
+   * session.
+   */
+  me: (urlToken?: string | null) => {
+    const qs = urlToken ? `?token=${encodeURIComponent(urlToken)}` : "";
+    return request<PersonResponse>(`/auth/me${qs}`);
+  },
+
+  logout: () =>
+    request<{ message: string }>("/auth/logout", { method: "POST" }),
 };
 
 // People endpoints

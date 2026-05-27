@@ -18,6 +18,13 @@ class Settings(BaseSettings):
 
     app_base_url: str = "http://localhost:5173"
 
+    # Secret for signing magic-link / invite JWTs (HS256). MUST be overridden
+    # in production via env var. The dev default is fine for local work but
+    # tokens issued against it are obviously not safe to ship.
+    jwt_secret: str = "dev-jwt-secret-change-me"
+    # Lifetime for magic-link and invite tokens.
+    jwt_ttl_days: int = 14
+
     # Demo mode: skip the magic-link email step and return the access token
     # directly in the /login response. For local demos only.
     demo_mode: bool = False

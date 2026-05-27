@@ -22,6 +22,7 @@ from volunteer_call_api.services.email import send_email
 from volunteer_call_api.services.email_render import jinja_env as _jinja_env
 from volunteer_call_api.services.roster_diff import Roster, diff_rosters
 from volunteer_call_api.services.sms import send_sms
+from volunteer_call_api.services.tokens import issue_invite_token, issue_login_token
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +63,9 @@ def deliver_notification(
 
     if pref in (NotificationPreference.EMAIL, NotificationPreference.BOTH):
         if person.email:
-            unsubscribe_url = f"{settings.app_base_url}/unsubscribe?token={person.access_token}"
+            unsubscribe_url = (
+                f"{settings.app_base_url}/unsubscribe?token={issue_login_token(person.id)}"
+            )
             send_email(
                 to=person.email,
                 subject=subject,
@@ -249,7 +252,12 @@ async def generate_call_notifications(call_id: str, db: AsyncSession) -> tuple[i
     removal_emails = 0
 
     def volunteering_url_for(person: Person) -> str:
-        return f"{settings.app_base_url}/volunteering?token={person.access_token}"
+        token = issue_invite_token(person.id, call.id)
+        return f"{settings.app_base_url}/volunteering?token={token}"
+
+    def volunteering_link_for(person: Person) -> str:
+        token = issue_invite_token(person.id, call.id)
+        return f"/volunteering?token={token}"
 
     # Group changed-task ids by recipient: who needs an assignment/update
     # email, and what list of tasks goes in that email.
@@ -271,7 +279,7 @@ async def generate_call_notifications(call_id: str, db: AsyncSession) -> tuple[i
     # --- Assignment / update emails ---
     for pid, changed_tasks in person_to_changed_tasks.items():
         person = people_by_id.get(pid)
-        if person is None or not is_subscribed(person) or not person.access_token:
+        if person is None or not is_subscribed(person):
             continue
         task_views = [task_view(t, include_full_details=True) for t in changed_tasks]
         subject = f"Your assignments for {call.title}"
@@ -295,7 +303,7 @@ async def generate_call_notifications(call_id: str, db: AsyncSession) -> tuple[i
             subject=subject,
             full_body=full_body,
             summary_body=summary_body,
-            link=f"/volunteering?token={person.access_token}",
+            link=volunteering_link_for(person),
             inline_images=EMAIL_INLINE_IMAGES,
         ):
             assignment_emails += 1
@@ -303,7 +311,7 @@ async def generate_call_notifications(call_id: str, db: AsyncSession) -> tuple[i
     # --- Removal emails ---
     for pid, removed_tasks in person_to_removed_tasks.items():
         person = people_by_id.get(pid)
-        if person is None or not is_subscribed(person) or not person.access_token:
+        if person is None or not is_subscribed(person):
             continue
         # For tasks that still exist, include their full label; for
         # deleted tasks (None) skip and just note the count.
@@ -335,7 +343,7 @@ async def generate_call_notifications(call_id: str, db: AsyncSession) -> tuple[i
             subject=subject,
             full_body=full_body,
             summary_body=summary_body,
-            link=f"/volunteering?token={person.access_token}",
+            link=volunteering_link_for(person),
             inline_images=EMAIL_INLINE_IMAGES,
         ):
             removal_emails += 1
@@ -346,7 +354,7 @@ async def generate_call_notifications(call_id: str, db: AsyncSession) -> tuple[i
         if lead_task is None or lead_task.team_lead is None:
             continue
         lead = lead_task.team_lead
-        if not is_subscribed(lead) or not lead.access_token:
+        if not is_subscribed(lead):
             continue
         roster = [
             {
@@ -376,7 +384,7 @@ async def generate_call_notifications(call_id: str, db: AsyncSession) -> tuple[i
             subject=subject,
             full_body=full_body,
             summary_body=summary_body,
-            link=f"/volunteering?token={lead.access_token}",
+            link=volunteering_link_for(lead),
             inline_images=EMAIL_INLINE_IMAGES,
         ):
             team_lead_emails += 1
@@ -387,7 +395,7 @@ async def generate_call_notifications(call_id: str, db: AsyncSession) -> tuple[i
         avail_people: dict[str, Person] = {a.person_id: a.person for a in availabilities}
         for person_id in set(avail_people.keys()) - assigned_ids:
             person = avail_people[person_id]
-            if not is_subscribed(person) or not person.access_token:
+            if not is_subscribed(person):
                 continue
             subject = f"Thank you for volunteering for {call.title}"
             full_body = thanks_template.render(
@@ -406,7 +414,7 @@ async def generate_call_notifications(call_id: str, db: AsyncSession) -> tuple[i
                 subject=subject,
                 full_body=full_body,
                 summary_body=summary_body,
-                link=f"/volunteering?token={person.access_token}",
+                link=volunteering_link_for(person),
                 inline_images=EMAIL_INLINE_IMAGES,
             ):
                 thanks_emails += 1

@@ -35,8 +35,8 @@
     return currentPath.startsWith(href);
   }
 
-  function handleLogout() {
-    logout();
+  async function handleLogout() {
+    await logout();
     goto('/login');
   }
 

@@ -37,7 +37,6 @@ from volunteer_call_api.schemas.volunteer_call import (
     VolunteerCallUpdate,
     VolunteerOverviewItem,
 )
-from volunteer_call_api.services.auth import generate_access_token
 from volunteer_call_api.services.email_render import jinja_env
 from volunteer_call_api.services.notifications import (
     EMAIL_INLINE_IMAGES,
@@ -46,6 +45,7 @@ from volunteer_call_api.services.notifications import (
     is_subscribed,
     task_view,
 )
+from volunteer_call_api.services.tokens import issue_invite_token
 from volunteer_call_api.services.volunteer_call_helpers import (
     _initials,
     call_list_response,
@@ -256,10 +256,8 @@ async def send_invites(call_id: str, db: AsyncSession = Depends(get_db)) -> Send
             skipped += 1
             continue
 
-        if not v.access_token:
-            v.access_token = generate_access_token()
-
-        volunteering_url = f"{settings.app_base_url}/volunteering?token={v.access_token}"
+        invite_token = issue_invite_token(v.id, call.id)
+        volunteering_url = f"{settings.app_base_url}/volunteering?token={invite_token}"
         subject = f"Volunteer Call: {call.title}"
         full_body = template.render(
             subject=subject,
@@ -277,7 +275,7 @@ async def send_invites(call_id: str, db: AsyncSession = Depends(get_db)) -> Send
             subject=subject,
             full_body=full_body,
             summary_body=summary_body,
-            link=f"/volunteering?token={v.access_token}",
+            link=f"/volunteering?token={invite_token}",
             inline_images=EMAIL_INLINE_IMAGES,
         )
         if delivered:

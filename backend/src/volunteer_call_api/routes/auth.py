@@ -1,8 +1,8 @@
-"""Auth routes for token-based volunteer identity."""
+"""Auth routes — JWT-based magic-link login + cookie session."""
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Request, Response
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,19 +10,54 @@ from volunteer_call_api.config import settings
 from volunteer_call_api.database import get_db
 from volunteer_call_api.models.person import Person, PersonLoginAlias
 from volunteer_call_api.routes.people import PERSON_LOAD_OPTIONS, _person_response
-from volunteer_call_api.schemas.auth import LoginRequest, LoginResponse, VerifyRequest
+from volunteer_call_api.schemas.auth import (
+    LoginRequest,
+    LoginResponse,
+    VerifyRequest,
+    VerifyResponse,
+)
 from volunteer_call_api.schemas.person import PersonResponse
-from volunteer_call_api.services.auth import generate_access_token
 from volunteer_call_api.services.email import send_email
 from volunteer_call_api.services.email_render import jinja_env
 from volunteer_call_api.services.login_throttle import login_throttle
 from volunteer_call_api.services.notifications import EMAIL_INLINE_IMAGES
+from volunteer_call_api.services.tokens import (
+    TokenError,
+    decode_token,
+    issue_login_token,
+)
 
 logger = logging.getLogger(__name__)
 
 GENERIC_LOGIN_MSG = "If {email} is registered, a login link has been sent."
 
+# Name of the HttpOnly session cookie set on /verify.
+SESSION_COOKIE = "session"
+# Cookie lifetime mirrors the JWT TTL — clients won't carry a longer
+# cookie than the token inside it is valid.
+SESSION_COOKIE_MAX_AGE = 60 * 60 * 24 * 14  # 14 days
+
 router = APIRouter()
+
+
+def _set_session_cookie(request: Request, response: Response, token: str) -> None:
+    """Set the session JWT as an HttpOnly cookie.
+
+    SameSite=Lax is enough to block cross-site POST CSRF on cookie-only
+    auth; a follow-up should add explicit CSRF tokens before any
+    state-changing public form lands. ``secure`` follows the request
+    scheme so dev (http://localhost) works and production (https) is
+    correctly hardened.
+    """
+    response.set_cookie(
+        key=SESSION_COOKIE,
+        value=token,
+        max_age=SESSION_COOKIE_MAX_AGE,
+        httponly=True,
+        secure=request.url.scheme == "https",
+        samesite="lax",
+        path="/",
+    )
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -30,7 +65,7 @@ async def request_magic_link(
     req: LoginRequest,
     db: AsyncSession = Depends(get_db),
 ) -> LoginResponse:
-    """Request a magic link for login."""
+    """Request a magic-link email. Mints a login JWT."""
     logger.info("Magic link requested for: %s", req.email)
     lookup_email = req.email.strip().lower()
     result = await db.execute(select(Person).where(func.lower(Person.email) == lookup_email))
@@ -59,21 +94,17 @@ async def request_magic_link(
     if not person.active:
         raise HTTPException(status_code=403, detail="Account is inactive")
 
-    if not person.access_token:
-        person.access_token = generate_access_token()
-        await db.commit()
+    token = issue_login_token(person.id)
 
     if settings.demo_mode:
         logger.warning(
             "DEMO_MODE: skipping magic-link email and returning token directly for %s",
             req.email,
         )
-        return LoginResponse(
-            message="Demo mode — logging in directly.", demo_token=person.access_token
-        )
+        return LoginResponse(message="Demo mode — logging in directly.", demo_token=token)
 
     template = jinja_env.get_template("magic_link_login.html")
-    login_url = f"{settings.app_base_url}/verify?token={person.access_token}"
+    login_url = f"{settings.app_base_url}/verify?token={token}"
     subject = "Log in to RT-AFF"
     html_body = template.render(
         subject=subject,
@@ -95,38 +126,61 @@ async def request_magic_link(
     return LoginResponse(message="Magic link sent!")
 
 
-@router.post("/verify", response_model=PersonResponse)
-async def verify_magic_link(
-    req: VerifyRequest,
-    db: AsyncSession = Depends(get_db),
-) -> PersonResponse:
-    """Verify a magic link token and return person info."""
+async def _person_by_token(token: str, db: AsyncSession) -> tuple[Person, str | None]:
+    """Decode a session/invite JWT and load the person. Returns (person, call_id)."""
+    try:
+        claims = decode_token(token)
+    except TokenError:
+        raise HTTPException(status_code=401, detail="Invalid or expired token") from None
+
     result = await db.execute(
-        select(Person).options(*PERSON_LOAD_OPTIONS).where(Person.access_token == req.token)
+        select(Person).options(*PERSON_LOAD_OPTIONS).where(Person.id == claims.person_id)
     )
     person = result.scalar_one_or_none()
-
     if person is None:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
-
     if not person.active:
         raise HTTPException(status_code=403, detail="Account is inactive")
+    return person, claims.call_id
 
-    return _person_response(person)
+
+@router.post("/verify", response_model=VerifyResponse)
+async def verify_magic_link(
+    req: VerifyRequest,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+) -> VerifyResponse:
+    """Verify a magic-link/invite JWT, set the session cookie, return person + call context."""
+    person, call_id = await _person_by_token(req.token, db)
+    _set_session_cookie(request, response, req.token)
+    return VerifyResponse(person=_person_response(person), invited_call_id=call_id)
 
 
 @router.get("/me", response_model=PersonResponse)
-async def get_current_user(
-    token: str = Query(..., min_length=1),
+async def get_me(
+    request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db),
+    token: str | None = Query(default=None, min_length=1),
+    session: str | None = Cookie(default=None),
 ) -> PersonResponse:
-    """Look up a person by their access token."""
-    result = await db.execute(
-        select(Person).options(*PERSON_LOAD_OPTIONS).where(Person.access_token == token)
-    )
-    person = result.scalar_one_or_none()
-    if person is None:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    if not person.active:
-        raise HTTPException(status_code=403, detail="Account is inactive")
+    """Return the current user. Prefer the session cookie; fall back to the
+    legacy ``?token=`` query param so existing magic links still hydrate
+    when the cookie hasn't been set yet."""
+    raw = session or token
+    if not raw:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    person, _ = await _person_by_token(raw, db)
+    if token and not session:
+        # First hit via URL-token — set the cookie so subsequent requests
+        # don't need the URL credential.
+        _set_session_cookie(request, response, token)
     return _person_response(person)
+
+
+@router.post("/logout")
+async def logout(response: Response) -> dict[str, str]:
+    """Clear the session cookie."""
+    response.delete_cookie(SESSION_COOKIE, path="/")
+    return {"message": "Logged out"}

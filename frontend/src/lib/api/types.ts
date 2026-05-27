@@ -17,6 +17,11 @@ export interface VerifyRequest {
   token: string;
 }
 
+export interface VerifyResponse {
+  person: PersonResponse;
+  invited_call_id: string | null;
+}
+
 // --- People ---
 
 export type Skill = "plumbing" | "electrical" | "carpentry" | "hvac";

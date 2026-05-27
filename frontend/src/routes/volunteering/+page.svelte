@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { page } from '$app/state';
-  import { authState, initFromToken } from '$lib/stores/auth.svelte';
+  import { authState, consumeInvitedCallId, initFromToken } from '$lib/stores/auth.svelte';
   import {
     volunteering,
     volunteerCalls,
@@ -12,6 +12,7 @@
     type AvailabilityResponse,
     type AvailabilityCreate,
     type TaskConflicts,
+    type CallStatus,
   } from '$lib/api/client';
   import { formatDate } from '$lib/utils/format';
   import { tasksSpanMultipleWeeks } from '$lib/utils/task-weeks';
@@ -69,10 +70,17 @@
     return formatTime(start) || formatTime(end);
   }
 
+  // The call this user was deep-linked to from an invite email. Pulled
+  // off the auth store once at mount; consumed (cleared) so it doesn't
+  // re-fire on subsequent navigations within the SPA.
+  let deepLinkCallId = $state<string | null>(null);
+
   onMount(async () => {
     const token = page.url.searchParams.get('token');
     await initFromToken(token);
     if (!authState.user) return;
+
+    deepLinkCallId = consumeInvitedCallId();
 
     try {
       const [a, c] = await Promise.all([
@@ -84,13 +92,65 @@
       ]);
       assignments = a;
       openCalls = c;
+
+      // If the user followed an invite link for a call that is no longer
+      // WAITING (typically ASSIGNED, occasionally ARCHIVED), it won't be
+      // in the list above — fetch it explicitly so we can still show it
+      // with the appropriate banner.
+      if (deepLinkCallId && !openCalls.some((c) => c.id === deepLinkCallId)) {
+        try {
+          const linked = await volunteerCalls.get(deepLinkCallId);
+          openCalls = [
+            {
+              id: linked.id,
+              title: linked.title,
+              program: linked.program,
+              status: linked.status,
+              task_count: 0,
+              created_at: linked.created_at,
+              updated_at: linked.updated_at,
+            } as VolunteerCallListResponse,
+            ...openCalls,
+          ];
+        } catch {
+          // Token verified ok but call lookup failed — surface nothing;
+          // the page still loads the user's normal calls below.
+        }
+      }
+
       await Promise.all(openCalls.map((call) => loadCallData(call.id)));
+
+      // After render, scroll the deep-linked call into view.
+      if (deepLinkCallId) {
+        await tick();
+        const el = document.getElementById(`call-${deepLinkCallId}`);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load';
     } finally {
       loading = false;
     }
   });
+
+  function canSubmitAvailability(status: CallStatus): boolean {
+    return status === 'waiting' || status === 'assigned';
+  }
+
+  function bannerFor(status: CallStatus): { tone: 'amber' | 'gray'; text: string } | null {
+    if (status === 'assigned') {
+      return {
+        tone: 'amber',
+        text:
+          'This call has already been assigned. You can still indicate availability ' +
+          'in case volunteer needs change.',
+      };
+    }
+    if (status === 'archived' || status === 'open') {
+      return { tone: 'gray', text: 'This call is closed.' };
+    }
+    return null;
+  }
 
   async function loadCallData(callId: string) {
     loadingCalls.add(callId);
@@ -384,13 +444,27 @@
         <p class="empty-text">No volunteer calls are looking for volunteers right now.</p>
       {:else}
         {#each openCalls as call (call.id)}
-          <div class="call-section">
+          {@const banner = bannerFor(call.status)}
+          {@const canSubmit = canSubmitAvailability(call.status)}
+          <div
+            class="call-section"
+            class:call-section-deeplink={deepLinkCallId === call.id}
+            id={`call-${call.id}`}
+          >
             <div class="call-header">
               <span class="call-title">{call.title}</span>
               <span class="call-meta">{call.task_count} task{call.task_count === 1 ? '' : 's'}</span>
             </div>
 
-            {#if loadingCalls.has(call.id)}
+            {#if banner}
+              <div class="call-banner call-banner-{banner.tone}" role="status">
+                {banner.text}
+              </div>
+            {/if}
+
+            {#if !canSubmit}
+              <!-- Archived/open: banner says enough; suppress task list & controls. -->
+            {:else if loadingCalls.has(call.id)}
               <p class="loading-text">Loading tasks...</p>
             {:else}
               {@const jobs = callJobs[call.id] || []}
@@ -542,19 +616,21 @@
                   <div class="success-banner">{saveMessage[call.id]}</div>
                 {/if}
 
-                <button
-                  class="btn btn-primary submit-btn"
-                  onclick={() => submitAvailability(call.id)}
-                  disabled={saving[call.id]}
-                >
-                  {#if saving[call.id]}
-                    Saving...
-                  {:else if hasExistingAvailability(call.id)}
-                    Update Availability
-                  {:else}
-                    Submit Availability
-                  {/if}
-                </button>
+                {#if canSubmit}
+                  <button
+                    class="btn btn-primary submit-btn"
+                    onclick={() => submitAvailability(call.id)}
+                    disabled={saving[call.id]}
+                  >
+                    {#if saving[call.id]}
+                      Saving...
+                    {:else if hasExistingAvailability(call.id)}
+                      Update Availability
+                    {:else}
+                      Submit Availability
+                    {/if}
+                  </button>
+                {/if}
               {/if}
             {/if}
           </div>
@@ -633,6 +709,31 @@
     padding: var(--spacing-md);
     background: var(--rt-gray-50, #f8f6f3);
     border-radius: var(--card-radius, 8px);
+    border: 1px solid var(--rt-gray-200, #e4dfda);
+  }
+
+  .call-section-deeplink {
+    border-color: var(--color-primary, #3a6db5);
+    box-shadow: 0 0 0 2px rgba(58, 109, 181, 0.12);
+  }
+
+  .call-banner {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--card-radius, 8px);
+    margin-bottom: var(--spacing-md);
+    font-size: var(--font-size-sm);
+    line-height: 1.4;
+  }
+
+  .call-banner-amber {
+    background: var(--rt-warning-bg, #fff5e6);
+    color: var(--rt-warning-text, #b35900);
+    border: 1px solid #f0c476;
+  }
+
+  .call-banner-gray {
+    background: var(--rt-gray-100, #f0ece8);
+    color: var(--rt-text-light, #555);
     border: 1px solid var(--rt-gray-200, #e4dfda);
   }
 

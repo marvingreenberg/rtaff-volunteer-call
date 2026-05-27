@@ -72,7 +72,6 @@ class Person(Base, TimestampMixin):
     )
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     notes: Mapped[str | None] = mapped_column(Text)
-    access_token: Mapped[str | None] = mapped_column(String(64), unique=True, index=True)
 
     # Calendar integration. `calendar_url` is treated as a bearer secret —
     # never returned in any API response. Only `calendar_connected` derives

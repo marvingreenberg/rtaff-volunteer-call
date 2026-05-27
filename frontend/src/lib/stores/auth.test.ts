@@ -1,10 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { authState, initFromToken, login } from "./auth.svelte";
+import {
+  authState,
+  consumeInvitedCallId,
+  initFromToken,
+  login,
+  verify,
+} from "./auth.svelte";
 
 vi.mock("$lib/api/client", () => ({
   auth: {
     me: vi.fn(),
     login: vi.fn(),
+    verify: vi.fn(),
+    logout: vi.fn(),
   },
 }));
 
@@ -14,60 +22,52 @@ beforeEach(() => {
   authState.user = null;
   authState.loading = true;
   authState.error = null;
+  // Flush any leaked invite id from a prior test.
+  consumeInvitedCallId();
   vi.mocked(auth.me).mockReset();
-  if (typeof localStorage !== "undefined") {
-    localStorage.removeItem("volunteer_call_token");
-  }
+  vi.mocked(auth.verify).mockReset();
 });
 
 describe("initFromToken", () => {
-  it("returns null and sets loading false when no token", async () => {
+  it("hits /auth/me with no token when cookie should already be present", async () => {
+    vi.mocked(auth.me).mockResolvedValue({ id: "p1" } as any);
     const result = await initFromToken(null);
-    expect(result).toBeNull();
+    expect(auth.me).toHaveBeenCalledWith(undefined);
+    expect(result).toEqual({ id: "p1" });
     expect(authState.loading).toBe(false);
-    expect(authState.user).toBeNull();
   });
 
-  it("calls auth.me with token and sets user on success", async () => {
-    const mockPerson = {
-      id: "p1",
-      first_name: "Jane",
-      last_name: "Doe",
-      skills: ["plumbing"],
-      active: true,
-      roles: ["volunteer"],
-    };
-    vi.mocked(auth.me).mockResolvedValue(mockPerson as any);
+  it("passes urlToken to /auth/me to bootstrap the cookie", async () => {
+    vi.mocked(auth.me).mockResolvedValue({ id: "p1" } as any);
+    await initFromToken("magic-link-token");
+    expect(auth.me).toHaveBeenCalledWith("magic-link-token");
+    expect(authState.user).toEqual({ id: "p1" });
+  });
 
-    const result = await initFromToken("test-token");
-    expect(auth.me).toHaveBeenCalledWith("test-token");
-    expect(result).toEqual(mockPerson);
-    expect(authState.user).toEqual(mockPerson);
-    expect(authState.loading).toBe(false);
+  it("sets error only when a urlToken was supplied and rejected", async () => {
+    vi.mocked(auth.me).mockRejectedValue(new Error("401"));
+    await initFromToken("bad-token");
+    expect(authState.error).toContain("Invalid or expired");
+  });
+
+  it("does not set error when no urlToken (cookie absent is not an error)", async () => {
+    vi.mocked(auth.me).mockRejectedValue(new Error("401"));
+    await initFromToken(null);
+    expect(authState.user).toBeNull();
     expect(authState.error).toBeNull();
   });
+});
 
-  it("sets error on failure", async () => {
-    vi.mocked(auth.me).mockRejectedValue(new Error("401"));
-
-    const result = await initFromToken("bad-token");
-    expect(result).toBeNull();
-    expect(authState.user).toBeNull();
-    expect(authState.error).toContain("Invalid or expired");
-    expect(authState.loading).toBe(false);
-  });
-
-  it("stores token in localStorage on success", async () => {
-    vi.mocked(auth.me).mockResolvedValue({ id: "p1" } as any);
-    await initFromToken("persist-token");
-    expect(localStorage.getItem("volunteer_call_token")).toBe("persist-token");
-  });
-
-  it("removes token from localStorage on failure", async () => {
-    localStorage.setItem("volunteer_call_token", "old-token");
-    vi.mocked(auth.me).mockRejectedValue(new Error("401"));
-    await initFromToken("old-token");
-    expect(localStorage.getItem("volunteer_call_token")).toBeNull();
+describe("verify", () => {
+  it("captures invited_call_id for the deep-link consumer to read once", async () => {
+    vi.mocked(auth.verify).mockResolvedValue({
+      person: { id: "p1" } as any,
+      invited_call_id: "call-42",
+    });
+    await verify("invite-jwt");
+    expect(consumeInvitedCallId()).toBe("call-42");
+    // Second read returns null — the value is single-use.
+    expect(consumeInvitedCallId()).toBeNull();
   });
 });
 
@@ -86,7 +86,6 @@ describe("login", () => {
       demo_token: "demo-token-abc",
     } as any);
     const result = await login("sarah@rtaff.org");
-    // demoToken must be populated so the login page can redirect to /verify.
     expect(result.demoToken).toBe("demo-token-abc");
   });
 });
