@@ -16,7 +16,7 @@ export DEMO_MODE
 
 .PHONY: help check-prereqs setup setup-backend setup-frontend \
         dev dev-db-reset db-snapshot mailpit \
-        test test-backend test-frontend types \
+        test test-backend test-frontend test-e2e types \
         lint lint-be lint-fe format format-be format-fe \
         demo build clean
 
@@ -40,6 +40,7 @@ help:
 	@echo "  test           - Run all tests"
 	@echo "  test-backend   - Run backend tests"
 	@echo "  test-frontend  - Run frontend tests"
+	@echo "  test-e2e       - Headless Playwright run of the demo spec (needs make dev)"
 	@echo ""
 	@echo "Other:"
 	@echo "  types          - Generate TypeScript types from OpenAPI"
@@ -135,6 +136,14 @@ AUTODEMO ?= 0
 
 demo:
 	cd frontend && AUTODEMO=$(AUTODEMO) pnpm exec playwright test e2e/demo.spec.ts --headed --timeout=1200000
+
+# Headless smoke run of the demo spec. Runs in AUTODEMO=1 (no Continue
+# overlay, no headed window) so a refactor that breaks the demo path
+# fails CI quickly. Same prerequisites as `make demo`: requires `make
+# dev` running in another shell (frontend on 5173, backend on 8001,
+# Mailpit on 8025).
+test-e2e:
+	cd frontend && AUTODEMO=1 pnpm exec playwright test e2e/demo.spec.ts
 
 clean:
 	make -C backend clean
