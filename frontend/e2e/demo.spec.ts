@@ -101,11 +101,7 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
     2000,
   );
   await loginViaMagicLink(page, api, DON_GMAIL_ALIAS);
-  await narrate(
-    page,
-    "Logged in. No active volunteer calls shown.",
-    900,
-  );
+  await narrate(page, "Logged in. No active volunteer calls shown.", 900);
   await pauseForUser(page, "Don logged in");
 
   // ===========================================================================

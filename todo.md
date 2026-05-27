@@ -15,7 +15,7 @@ Deleted `call-ux-phase1`, `feat/email-redesign`,
 patch-id-unique commits, and the "unique" commits had subject/date
 matches with the rebased main commits).
 
-### [ ] feat/01-program-membership-filter
+### [/] feat/01-program-membership-filter
 
 Backend filters the volunteer-call list by the caller's program
 memberships when the caller is volunteer-only (no staff/team-leader
