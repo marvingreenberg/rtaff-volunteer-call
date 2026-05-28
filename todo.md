@@ -177,16 +177,59 @@ admin clicking "Send invites" sees "Called: 57 notifications sent"
 on a People page that only ever showed 21 of them — confusing
 mismatch surfaced during the demo on 2026-05-28.
 
-- Backend: replace the bare `.limit(25)` with `?page=N&size=M`
-  query params (default size 25) and return `{ items: […], total: N,
-  page, size }`.
-- Frontend `/people`: render a footer "showing 25 of N — Next →"
-  with previous/next paging. Search input keeps working against the
-  full table.
-- Add a backend test that the count comes from the unfiltered
-  `select(func.count(Person.id))` against the same WHERE, not from
-  `len(items)`, so a future regression that scopes the count to the
-  page is caught.
+Compounding bug on the same page: the "25 people · 4 staff · 3
+leaders · 21 volunteers" header is derived **client-side** off the
+truncated list (`personList.filter(...).length`) so the per-role
+counts never add up to the total, and they shift wildly as the role
+filter changes (e.g. "Volunteer" filter → "25 people · 0 staff · 4
+leaders · 25 volunteers").
+
+**Decision recorded**: drop the per-role breakdown. One count per
+query, labeled by the active filter — "people" when no role filter,
+otherwise the pluralized role name ("staff", "team leaders",
+"volunteers").
+
+- Backend: pagination via `?start=N&count=M` (default `start=0`,
+  `count=25`). Response shape: `{ items, total, start, count }`.
+  `total` is a separate `SELECT COUNT(*)` against the same WHERE,
+  not `len(items)`.
+- Frontend `/people`:
+  - Header reads "N people" / "N staff" / "N team leaders" /
+    "N volunteers" depending on the active role filter.
+  - Footer "showing N–M of TOTAL" with Previous / Next buttons.
+  - Search input keeps working against the full table.
+- Backend test: `total` reflects the filter (`role`, `program`,
+  `search`, `active`) and is independent of `start` / `count`.
+
+### [ ] feat/17-convert-remaining-native-selects
+
+The Select.svelte component (feat/09) only got adopted in a few
+spots; eight native `<select>`s remain that still pop the OS-native
+option list. The global CSS rule restyles their trigger so they look
+right at rest, but the dropdown surface is jarringly different from
+the rest of the app. Convert all eight to `Select.svelte`.
+
+Inventory:
+- `routes/people/+page.svelte:218` — "All Roles" filter (the one
+  flagged on 2026-05-28).
+- `routes/people/[id]/+page.svelte:236, :242, :250` — staff editor:
+  notification preference, detail level, subscription status.
+- `routes/volunteer-calls/[id]/assign/+page.svelte:344` — Desired
+  policy picker.
+- `routes/volunteer-calls/[id]/assign/+page.svelte:443` — per-task
+  team-lead override inside the assign view.
+- `lib/components/TaskEntryForm.svelte:306` — City picker.
+- `lib/components/TaskEntryForm.svelte:359` — Team-lead picker.
+
+Notes:
+- City + team-lead pickers have dynamic option lists — pass through
+  `options={...}`.
+- Empty-state options (e.g. `<option value="">City</option>`,
+  `<option value={null}>Team lead (optional)</option>`) need a
+  `placeholder` prop on `Select` so the empty/null sentinel renders
+  consistently.
+- Update the demo helpers (`pickComboboxByAriaLabel` already exists)
+  for any new aria-label introduced by the conversion.
 
 ## Deferred — questions for the user
 
