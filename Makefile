@@ -16,7 +16,7 @@ export DEMO_MODE
 
 .PHONY: help check-prereqs setup setup-backend setup-frontend \
         dev dev-db-reset db-snapshot mailpit \
-        test test-backend test-frontend test-e2e types \
+        test test-backend test-frontend test-e2e test-mobile-smoke types \
         lint lint-be lint-fe format format-be format-fe \
         demo build clean
 
@@ -41,6 +41,7 @@ help:
 	@echo "  test-backend   - Run backend tests"
 	@echo "  test-frontend  - Run frontend tests"
 	@echo "  test-e2e       - Headless Playwright run of the demo spec (needs make dev)"
+	@echo "  test-mobile-smoke - Phone-viewport smoke for /volunteering (needs make dev; skips if not up)"
 	@echo ""
 	@echo "Other:"
 	@echo "  types          - Generate TypeScript types from OpenAPI"
@@ -144,6 +145,19 @@ demo:
 # Mailpit on 8025).
 test-e2e:
 	cd frontend && AUTODEMO=1 pnpm exec playwright test e2e/demo.spec.ts
+
+# Smoke check that /volunteering renders cleanly at iPhone-SE width
+# (375x667). Same dev-stack prereqs as test-e2e — backend + frontend +
+# Mailpit must be up via `make dev`. When the backend isn't reachable
+# the target prints a hint and exits 0 so a routine run is a quiet
+# no-op instead of timing out.
+test-mobile-smoke:
+	@if ! curl -sf http://localhost:$(BACKEND_PORT)/health >/dev/null 2>&1; then \
+	  echo "make test-mobile-smoke: backend not reachable at http://localhost:$(BACKEND_PORT)."; \
+	  echo "Start the dev stack with 'make dev' in another shell, then re-run."; \
+	  exit 0; \
+	fi
+	cd frontend && pnpm exec playwright test e2e/mobile-smoke.spec.ts
 
 clean:
 	make -C backend clean
