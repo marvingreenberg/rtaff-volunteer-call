@@ -19,7 +19,9 @@
    */
   import { tick } from "svelte";
 
-  type Primitive = string | number;
+  // null is allowed so callers like the team-lead picker can model
+  // "no team lead" without smuggling an empty-string sentinel.
+  type Primitive = string | number | null;
   interface Option {
     value: Primitive;
     label: string;
@@ -31,12 +33,19 @@
     ariaLabel,
     disabled = false,
     onchange,
+    placeholder,
   }: {
     value: Primitive;
     options: Option[];
     ariaLabel?: string;
     disabled?: boolean;
     onchange?: (value: Primitive) => void;
+    /**
+     * Label shown on the trigger when ``value`` doesn't match any
+     * option (e.g. when the bound value is null/"" and no option
+     * carries that sentinel). The popup itself is unaffected.
+     */
+    placeholder?: string;
   } = $props();
 
   let open = $state(false);
@@ -52,19 +61,21 @@
   let typeBuffer = "";
   let typeBufferTimer: ReturnType<typeof setTimeout> | null = null;
 
-  let selectedIdx = $derived(
-    Math.max(
-      0,
-      options.findIndex((o) => o.value === value),
-    ),
+  // -1 when the current value doesn't match any option — used to drive
+  // the placeholder fallback rather than silently snapping to the
+  // first option's label.
+  let selectedIdx = $derived(options.findIndex((o) => o.value === value));
+
+  let selectedLabel = $derived(
+    selectedIdx >= 0 ? options[selectedIdx].label : (placeholder ?? ""),
   );
 
-  let selectedLabel = $derived(options[selectedIdx]?.label ?? "");
+  let isPlaceholderShown = $derived(selectedIdx < 0 && !!placeholder);
 
   async function openPopup() {
     if (disabled || open) return;
     open = true;
-    highlightIdx = selectedIdx;
+    highlightIdx = selectedIdx >= 0 ? selectedIdx : 0;
     await tick();
     scrollHighlightIntoView();
   }
@@ -195,7 +206,9 @@
     onclick={() => (open ? closePopup() : openPopup())}
     onkeydown={handleTriggerKey}
   >
-    <span class="app-select-label">{selectedLabel}</span>
+    <span class="app-select-label" class:placeholder={isPlaceholderShown}>
+      {selectedLabel}
+    </span>
     <span class="app-select-chevron" aria-hidden="true">▾</span>
   </button>
 
@@ -281,6 +294,10 @@
     text-align: left;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .app-select-label.placeholder {
+    color: var(--rt-text-muted, #777);
   }
 
   .app-select-chevron {

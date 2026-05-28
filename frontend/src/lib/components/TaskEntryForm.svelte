@@ -2,6 +2,7 @@
   import { untrack } from "svelte";
   import { CITIES } from "$lib/constants/cities";
   import type { TaskCreate } from "$lib/api/client";
+  import Select from "$lib/components/Select.svelte";
 
   // Structural shape — accepts both TaskCreate and TaskResponse.
   type InitialTask = {
@@ -303,19 +304,19 @@
           <rect x="15" y="13" width="6" height="8" />
         </svg>
       </span>
-      <select
-        data-testid="task-city"
-        bind:value={city}
-        aria-label="City"
+      <div
+        class="city-wrap"
+        data-testid="task-city-wrap"
         class:invalid={cityMissing}
-        aria-invalid={cityMissing}
         data-empty={!city}
       >
-        <option value="">City</option>
-        {#each CITIES as c (c)}
-          <option value={c}>{c}</option>
-        {/each}
-      </select>
+        <Select
+          bind:value={city}
+          options={CITIES.map((c) => ({ value: c, label: c }))}
+          placeholder="City"
+          ariaLabel="City"
+        />
+      </div>
     </div>
   </div>
 
@@ -355,17 +356,16 @@
   </div>
 
   <div class="form-row">
-    <div class="field">
-      <select
+    <div class="field" data-empty={teamLeadId === null}>
+      <Select
         bind:value={teamLeadId}
-        aria-label="Team lead"
-        data-empty={teamLeadId === null}
-      >
-        <option value={null}>Team lead (optional)</option>
-        {#each teamLeads as lead (lead.id)}
-          <option value={lead.id}>{lead.first_name} {lead.last_name}</option>
-        {/each}
-      </select>
+        options={teamLeads.map((lead) => ({
+          value: lead.id,
+          label: `${lead.first_name} ${lead.last_name}`,
+        }))}
+        placeholder="Team lead (optional)"
+        ariaLabel="Team lead"
+      />
     </div>
   </div>
 
@@ -398,8 +398,7 @@
     min-width: 0;
   }
 
-  .field input,
-  .field select {
+  .field input {
     width: 100%;
     padding: var(--spacing-sm) var(--spacing-md);
     min-height: var(--btn-min-height);
@@ -412,17 +411,16 @@
     box-sizing: border-box;
   }
 
-  .field input:focus,
-  .field select:focus {
+  .field input:focus {
     outline: none;
     border-color: var(--color-primary, #3a6db5);
     box-shadow: 0 0 0 2px rgba(58, 109, 181, 0.2);
   }
 
   /* Empty/default-value inputs render in muted gray so a still-default
-     value is visually distinct from one the user has actively confirmed. */
-  .field input[data-empty="true"],
-  .field select[data-empty="true"] {
+     value is visually distinct from one the user has actively confirmed.
+     The Select component handles its own placeholder state. */
+  .field input[data-empty="true"] {
     color: var(--rt-text-muted, #777);
   }
   .inline-num input[data-default="true"] {
@@ -452,8 +450,7 @@
     display: block;
   }
 
-  .icon-field input,
-  .icon-field select {
+  .icon-field input {
     padding-left: calc(var(--spacing-sm) * 2 + 18px);
   }
 
@@ -512,8 +509,13 @@
   }
 
   input.invalid,
-  select.invalid,
   textarea.invalid {
+    border-color: var(--rt-error, #c53030);
+  }
+
+  /* City wrapper turns red when the Select inside is in an invalid
+     state — pierces into the child component's trigger border. */
+  .city-wrap.invalid :global(.app-select-trigger) {
     border-color: var(--rt-error, #c53030);
   }
 

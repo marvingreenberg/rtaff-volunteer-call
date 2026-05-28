@@ -3,6 +3,7 @@
   import { people, type PersonListResponse, type Skill, type RoleType } from '$lib/api/client';
   import { ALL_SKILLS } from '$lib/api/types';
   import Breadcrumb from '$lib/components/Breadcrumb.svelte';
+  import Select from '$lib/components/Select.svelte';
   import { roleLabel, skillLabel } from '$lib/utils/badges';
 
   let personList: PersonListResponse[] = $state([]);
@@ -241,12 +242,15 @@
       oninput={handleSearch}
       class="search-input"
     />
-    <select bind:value={roleFilter} onchange={handleSearch} class="role-select">
-      <option value="">All Roles</option>
-      {#each ROLES as role (role.value)}
-        <option value={role.value}>{role.label}</option>
-      {/each}
-    </select>
+    <Select
+      bind:value={roleFilter}
+      options={[
+        { value: '', label: 'All Roles' },
+        ...ROLES.map((r) => ({ value: r.value, label: r.label })),
+      ]}
+      ariaLabel="Role filter"
+      onchange={handleSearch}
+    />
   </div>
 
   {#if loading}
@@ -416,15 +420,6 @@
     font-family: inherit;
   }
 
-  .role-select {
-    padding: var(--spacing-sm) var(--spacing-md);
-    min-height: var(--btn-min-height);
-    border: 1px solid var(--rt-gray-200);
-    border-radius: var(--card-radius);
-    font-size: var(--btn-font-size);
-    min-width: 150px;
-    font-family: inherit;
-  }
 
   .people-list {
     display: flex;
