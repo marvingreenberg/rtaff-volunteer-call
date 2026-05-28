@@ -169,7 +169,7 @@ connected calendar (so personal + work meetings both block a task).
   adding/removing a calendar invalidates correctly. Continue to use
   the existing per-URL fetcher under the hood.
 
-### [ ] feat/16-people-pagination
+### [/] feat/16-people-pagination
 
 `routes/people.py::list_people` silently truncates results at
 `.limit(25)`. With 57 volunteers in the seed and 25 visible, an
@@ -201,7 +201,7 @@ otherwise the pluralized role name ("staff", "team leaders",
 - Backend test: `total` reflects the filter (`role`, `program`,
   `search`, `active`) and is independent of `start` / `count`.
 
-### [ ] feat/17-convert-remaining-native-selects
+### [/] feat/17-convert-remaining-native-selects
 
 The Select.svelte component (feat/09) only got adopted in a few
 spots; eight native `<select>`s remain that still pop the OS-native
