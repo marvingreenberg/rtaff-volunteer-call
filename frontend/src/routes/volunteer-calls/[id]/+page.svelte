@@ -41,7 +41,7 @@
     // TaskRow + the new-task form rather than re-fetching per row.
     try {
       const leads = await people.list({ role: 'team_leader', active: true });
-      teamLeads = leads.map((p) => ({
+      teamLeads = leads.items.map((p) => ({
         id: p.id,
         first_name: p.first_name,
         last_name: p.last_name,

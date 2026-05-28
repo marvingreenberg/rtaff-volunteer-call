@@ -3,7 +3,7 @@
  */
 
 import type {
-  PersonListResponse,
+  PersonPageResponse,
   PersonResponse,
   PersonCreate,
   PersonUpdate,
@@ -143,6 +143,8 @@ export const people = {
     program?: Program;
     active?: boolean;
     search?: string;
+    start?: number;
+    count?: number;
   }) => {
     const query = new URLSearchParams();
     if (params?.role) query.set("role", params.role);
@@ -151,8 +153,10 @@ export const people = {
     if (params?.active !== undefined)
       query.set("active", String(params.active));
     if (params?.search) query.set("search", params.search);
+    if (params?.start !== undefined) query.set("start", String(params.start));
+    if (params?.count !== undefined) query.set("count", String(params.count));
     const qs = query.toString();
-    return request<PersonListResponse[]>(`/people${qs ? "?" + qs : ""}`);
+    return request<PersonPageResponse>(`/people${qs ? "?" + qs : ""}`);
   },
 
   get: (id: string) => request<PersonResponse>(`/people/${id}`),

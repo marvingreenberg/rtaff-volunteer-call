@@ -6,6 +6,9 @@
   import { roleLabel, skillLabel } from '$lib/utils/badges';
 
   let personList: PersonListResponse[] = $state([]);
+  let total = $state(0);
+  let pageStart = $state(0);
+  const PAGE_SIZE = 25;
   let loading = $state(true);
   let error: string | null = $state(null);
 
@@ -33,12 +36,21 @@
     volunteer: '#5aad44',
   };
 
-  let roleCounts = $derived({
-    total: personList.length,
-    staff: personList.filter(p => p.roles.includes('staff')).length,
-    team_leader: personList.filter(p => p.roles.includes('team_leader')).length,
-    volunteer: personList.filter(p => p.roles.includes('volunteer')).length,
+  // Label for the count in the header. One count per query — the
+  // filter dictates the noun. Singular when total === 1.
+  let headerLabel = $derived.by(() => {
+    const n = total;
+    const plural = (s: string) => (n === 1 ? s : `${s}s`);
+    if (!roleFilter) return plural('person').replace('persons', 'people');
+    if (roleFilter === 'staff') return plural('staff member');
+    if (roleFilter === 'team_leader') return plural('team leader');
+    if (roleFilter === 'volunteer') return plural('volunteer');
+    return plural('person').replace('persons', 'people');
   });
+
+  let pageEnd = $derived(Math.min(pageStart + personList.length, total));
+  let canPrev = $derived(pageStart > 0);
+  let canNext = $derived(pageStart + personList.length < total);
 
   onMount(() => loadPeople());
 
@@ -46,10 +58,14 @@
     loading = true;
     error = null;
     try {
-      personList = await people.list({
+      const resp = await people.list({
         search: searchQuery || undefined,
         role: roleFilter || undefined,
+        start: pageStart,
+        count: PAGE_SIZE,
       });
+      personList = resp.items;
+      total = resp.total;
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load people';
     } finally {
@@ -58,6 +74,21 @@
   }
 
   function handleSearch() {
+    // Resetting to start=0 keeps the user from getting stuck on an
+    // out-of-range page when the filter narrows results.
+    pageStart = 0;
+    loadPeople();
+  }
+
+  function nextPage() {
+    if (!canNext) return;
+    pageStart += PAGE_SIZE;
+    loadPeople();
+  }
+
+  function prevPage() {
+    if (!canPrev) return;
+    pageStart = Math.max(0, pageStart - PAGE_SIZE);
     loadPeople();
   }
 
@@ -126,13 +157,8 @@
   <div class="page-header">
     <div>
       <h1>People</h1>
-      {#if !loading && personList.length > 0}
-        <p class="header-stats">
-          {roleCounts.total} people &middot;
-          {roleCounts.staff} staff &middot;
-          {roleCounts.team_leader} leaders &middot;
-          {roleCounts.volunteer} volunteers
-        </p>
+      {#if !loading}
+        <p class="header-stats">{total} {headerLabel}</p>
       {/if}
     </div>
     <button class="btn btn-primary" onclick={() => showAddForm = !showAddForm}>
@@ -249,6 +275,32 @@
         </a>
       {/each}
     </div>
+
+    {#if total > PAGE_SIZE}
+      <div class="pagination">
+        <span class="page-range">
+          Showing {pageStart + 1}–{pageEnd} of {total}
+        </span>
+        <div class="page-buttons">
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            onclick={prevPage}
+            disabled={!canPrev}
+          >
+            ← Previous
+          </button>
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            onclick={nextPage}
+            disabled={!canNext}
+          >
+            Next →
+          </button>
+        </div>
+      </div>
+    {/if}
   {/if}
 
 </div>
@@ -258,6 +310,35 @@
     margin: var(--spacing-xs) 0 0 0;
     font-size: var(--font-size-sm);
     color: var(--rt-text-muted);
+  }
+
+  .pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: var(--spacing-md);
+    padding-top: var(--spacing-md);
+    border-top: 1px solid var(--rt-gray-200, #e4dfda);
+    font-size: var(--font-size-sm);
+  }
+
+  .page-range {
+    color: var(--rt-text-muted, #777);
+  }
+
+  .page-buttons {
+    display: flex;
+    gap: var(--spacing-sm);
+  }
+
+  .pagination .btn-sm {
+    padding: var(--spacing-xs) var(--spacing-md);
+    font-size: var(--font-size-sm);
+  }
+
+  .pagination button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
 
   .add-form {

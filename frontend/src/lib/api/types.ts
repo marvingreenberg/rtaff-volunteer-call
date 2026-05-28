@@ -201,6 +201,14 @@ export interface PersonListResponse {
   programs: Program[];
 }
 
+export interface PersonPageResponse {
+  items: PersonListResponse[];
+  /** Matching-records count for the same WHERE — not limited by start/count. */
+  total: number;
+  start: number;
+  count: number;
+}
+
 // --- Calendar ---
 
 export interface CalendarConnect {

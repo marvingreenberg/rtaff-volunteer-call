@@ -53,7 +53,7 @@
           program,
         });
         if (teamLeadsForProgram !== program) return; // raced past us
-        teamLeads = list.map((p) => ({
+        teamLeads = list.items.map((p) => ({
           id: p.id,
           first_name: p.first_name,
           last_name: p.last_name,

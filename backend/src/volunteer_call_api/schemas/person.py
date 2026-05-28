@@ -111,6 +111,23 @@ class PersonListResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class PersonPageResponse(BaseModel):
+    """Paginated People response.
+
+    ``total`` is the unfiltered-by-pagination row count for the same
+    WHERE the query used — i.e. the matching-records count, not
+    ``len(items)``. Frontend renders "showing N–M of TOTAL" and the
+    filter-aware header label from it.
+    """
+
+    items: list[PersonListResponse]
+    total: int
+    start: int
+    count: int
+
+    model_config = {"from_attributes": True}
+
+
 class CalendarConnect(BaseModel):
     """User pastes their private iCal URL. Provider + label are optional."""
 
