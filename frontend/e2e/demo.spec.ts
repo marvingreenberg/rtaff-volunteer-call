@@ -101,11 +101,7 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
     2000,
   );
   await loginViaMagicLink(page, api, DON_GMAIL_ALIAS);
-  await narrate(
-    page,
-    "Logged in. No active volunteer calls shown.",
-    900,
-  );
+  await narrate(page, "Logged in. No active volunteer calls shown.", 900);
   await pauseForUser(page, "Don logged in");
 
   // ===========================================================================
@@ -242,10 +238,10 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
   // ===========================================================================
   await page.goto(`${BASE_URL}/login`);
   await say(
-    "Selection continues for the remaining tasks (24 more volunteers respond).",
+    "Selection continues for the remaining tasks (23 more volunteers respond).",
     2200,
   );
-  await bulkRespondAvailability(callId, 24);
+  await bulkRespondAvailability(callId, 23);
 
   // ===========================================================================
   // STEP 9: Admin logs back in, opens Assignment Dashboard

@@ -141,11 +141,19 @@ async def _respond_availability(call_id: str, count: int) -> int:
         )
         excluded = {row[0] for row in already}
 
+        # Volunteer-only: exclude anyone who also has a staff or
+        # team_leader role. Real RT-AFF team leads coordinate from the
+        # admin side and don't typically submit availability through the
+        # same flow, so the demo dataset should reflect that.
+        admin_role_subq = select(PersonRole.person_id).where(
+            PersonRole.role.in_([RoleType.STAFF, RoleType.TEAM_LEADER])
+        )
         candidates_rows = await session.execute(
             select(Person)
             .join(PersonRole, PersonRole.person_id == Person.id)
             .where(PersonRole.role == RoleType.VOLUNTEER)
             .where(Person.active.is_(True))
+            .where(Person.id.notin_(admin_role_subq))
         )
         candidates = [p for p in candidates_rows.scalars().unique().all() if p.id not in excluded]
 
@@ -157,8 +165,14 @@ async def _respond_availability(call_id: str, count: int) -> int:
                 f"Only {len(picks)} eligible volunteers (requested {count})."
             )
 
+        n_tasks = len(tasks)
         for person in picks:
-            subset = rng.sample(tasks, rng.randint(1, len(tasks)))
+            # Most volunteers pick 4–6 tasks; a long tail goes lower or
+            # higher. Triangular(1, n, mode≈5) gives the right shape — a
+            # clear peak around the mode with thin tails toward 1 and N.
+            mode = min(5, n_tasks)
+            pick_count = max(1, min(n_tasks, round(rng.triangular(1, n_tasks, mode))))
+            subset = rng.sample(tasks, pick_count)
             for task in subset:
                 session.add(
                     VolunteerAvailability(
@@ -196,9 +210,11 @@ def add_tasks_cmd(call_id: str, count: int, offset: int) -> None:
 
 @cli.command("respond-availability")
 @click.option("--call-id", required=True, help="VolunteerCall.id to respond against")
-@click.option("--count", type=int, default=24, show_default=True)
+@click.option("--count", type=int, default=23, show_default=True)
 def respond_availability_cmd(call_id: str, count: int) -> None:
-    """Have COUNT random volunteers submit availability for the call."""
+    """Have COUNT random volunteer-only people (no staff / team-leads)
+    submit availability for the call. Each picks ~4–6 tasks via a
+    triangular distribution rather than uniformly across the schedule."""
     responded = asyncio.run(_respond_availability(call_id, count))
     click.echo(f"{responded} volunteer(s) responded to call {call_id}.")
 
