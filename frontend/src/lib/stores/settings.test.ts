@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { settingsState, applySettings, loadSettings } from "./settings.svelte";
+import {
+  settingsState,
+  applySettings,
+  loadSettings,
+  setDensity,
+} from "./settings.svelte";
 
 beforeEach(() => {
   localStorage.clear();
@@ -41,6 +46,14 @@ describe("applySettings", () => {
     settingsState.density = "standard";
     applySettings();
     expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
+  });
+});
+
+describe("setDensity", () => {
+  it("setDensity mutates state and applies", () => {
+    setDensity("large");
+    expect(settingsState.density).toBe("large");
+    expect(document.documentElement.getAttribute("data-density")).toBe("large");
   });
 });
 

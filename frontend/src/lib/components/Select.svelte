@@ -266,33 +266,49 @@
     -webkit-appearance: none;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 4px 8px 4px 12px;
-    border: 1px solid var(--rt-gray-200, #e4dfda);
-    border-radius: var(--card-radius, 8px);
-    background: var(--rt-white, #fff);
-    color: inherit;
+    gap: 8px;
+    padding: 6px 28px 6px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    border-radius: 999px;
     font: inherit;
-    min-height: 32px;
+    font-weight: 600;
+    color: var(--rt-dark);
+    min-height: var(--btn-h);
     cursor: pointer;
     white-space: nowrap;
+    background-image:
+      linear-gradient(45deg, transparent 50%, var(--rt-text-muted) 50%),
+      linear-gradient(135deg, var(--rt-text-muted) 50%, transparent 50%);
+    background-position:
+      calc(100% - 14px) 50%,
+      calc(100% - 9px) 50%;
+    background-size:
+      5px 5px,
+      5px 5px;
+    background-repeat: no-repeat;
   }
 
+  .app-select-trigger:hover {
+    background-color: var(--surface-1);
+  }
+
+  .app-select-trigger:focus,
   .app-select-trigger:focus-visible {
     outline: none;
-    border-color: var(--color-primary, #3a6db5);
-    box-shadow: 0 0 0 2px rgba(58, 109, 181, 0.2);
+    border-color: var(--rt-blue);
+    box-shadow: 0 0 0 3px rgba(58, 109, 181, 0.18);
   }
 
   .app-select.open .app-select-trigger {
-    border-color: var(--color-primary, #3a6db5);
-    box-shadow: 0 0 0 2px rgba(58, 109, 181, 0.2);
+    border-color: var(--rt-blue);
+    box-shadow: 0 0 0 3px rgba(58, 109, 181, 0.18);
   }
 
   .app-select-trigger:disabled {
-    background: var(--rt-gray-100, #f5f3ef);
+    background-color: var(--surface-3);
     cursor: not-allowed;
-    color: var(--rt-text-muted, #777);
+    color: var(--rt-text-muted);
   }
 
   .app-select-label {
@@ -303,13 +319,14 @@
   }
 
   .app-select-label.placeholder {
-    color: var(--rt-text-muted, #777);
+    color: var(--rt-text-muted);
+    font-weight: 500;
   }
 
+  /* The pill-trigger uses CSS-painted chevrons in the background; the
+     glyph is suppressed to avoid a doubled indicator. */
   .app-select-chevron {
-    font-size: 10px;
-    color: var(--rt-text-muted, #777);
-    line-height: 1;
+    display: none;
   }
 
   .app-select-list {
@@ -321,28 +338,30 @@
     max-height: 280px;
     overflow-y: auto;
     margin: 0;
-    padding: 4px 0;
+    padding: 4px;
     list-style: none;
-    background: var(--rt-white, #fff);
-    border: 1px solid var(--rt-gray-200, #e4dfda);
-    border-radius: var(--card-radius, 8px);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+    background: var(--surface-1);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 12px 32px -16px rgba(30, 47, 61, 0.3);
   }
 
   .app-select-opt {
-    padding: 6px 12px;
+    padding: 8px 12px;
+    border-radius: calc(var(--radius-sm) - 4px);
     font: inherit;
     cursor: pointer;
-    color: var(--rt-dark, #222);
+    color: var(--rt-dark);
     white-space: nowrap;
   }
 
-  .app-select-opt.highlighted {
-    background: var(--rt-gray-100, #f5f3ef);
+  .app-select-opt.highlighted,
+  .app-select-opt[aria-selected="true"] {
+    background: var(--surface-2);
   }
 
   .app-select-opt.selected {
-    color: var(--color-primary, #3a6db5);
+    color: var(--rt-blue);
     font-weight: 600;
   }
 

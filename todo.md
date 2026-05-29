@@ -246,12 +246,6 @@ These need a decision before they can be executed unattended.
   heavily. Two paths: (1) build-time CSS extraction (cleaner, larger
   refactor); (2) per-request nonces threaded through SvelteKit
   rendering (smaller, more runtime complexity). Which?
-- **UI design review** — "prettier, Notion-style header backgrounds,
-  consistent with rtaff.org." Too open-ended for unattended work.
-  Want a concrete spec — mockups, color palette, components to touch?
-- **Address autocomplete on TaskEntryForm.** Provider: Google Places
-  (paid, polished), OpenStreetMap/Photon (free, NoVA coverage is
-  fine), or a static dataset (RT-AFF's known client list)?
 - **Cross-timezone correctness.** Project TZ should be
   `America/New_York`? Make it a settings value or hardcoded?
 - **Multi-instance cache** for calendar conflicts. Deferred per

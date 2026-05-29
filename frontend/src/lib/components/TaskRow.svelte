@@ -1,281 +1,281 @@
 <script lang="ts">
-  import TaskEntryForm from "./TaskEntryForm.svelte";
-  import { formatDate, volunteersLabel } from "$lib/utils/format";
-  import type { TaskCreate, TaskResponse } from "$lib/api/client";
-
-  type TeamLead = { id: string; first_name: string; last_name: string };
-
-  type Props = {
-    task: TaskResponse;
-    expanded: boolean;
-    teamLeads?: TeamLead[];
-    ontoggle: () => void;
-    onupdate: (taskId: string, value: TaskCreate) => Promise<void> | void;
-    ondelete: (taskId: string) => void;
-  };
-
   let {
-    task,
-    expanded,
-    teamLeads = [],
-    ontoggle,
-    onupdate,
-    ondelete,
-  }: Props = $props();
+    name,
+    summary,
+    description,
+    city,
+    date,
+    time,
+    volunteersNeeded,
+    skilledNeeded = 0,
+    notes,
+    checked = false,
+    expanded = false,
+    conflict = false,
+    conflictTitle = "",
+    onToggleChecked,
+    onToggleExpanded,
+  }: {
+    name: string;
+    summary: string;
+    description?: string;
+    city?: string;
+    date?: string;
+    time?: string;
+    volunteersNeeded?: number;
+    skilledNeeded?: number;
+    notes?: string;
+    checked?: boolean;
+    expanded?: boolean;
+    conflict?: boolean;
+    conflictTitle?: string;
+    onToggleChecked?: () => void;
+    onToggleExpanded?: () => void;
+  } = $props();
 
-  // Track the form's most recent payload + dirty flag so the Update button
-  // in the summary row can enable/disable correctly and the click handler
-  // has something to send. Cleared when the row collapses so reopening the
-  // row starts fresh.
-  let pendingPayload = $state<TaskCreate | null>(null);
-  let dirty = $state(false);
-  let saving = $state(false);
-
-  function handleFormChange(value: TaskCreate | null, isDirty: boolean) {
-    pendingPayload = value;
-    dirty = isDirty;
-  }
-
-  $effect(() => {
-    if (!expanded) {
-      pendingPayload = null;
-      dirty = false;
-    }
-  });
-
-  let canUpdate = $derived(expanded && !!pendingPayload && dirty);
-
-  async function handleUpdateClick(e: MouseEvent) {
-    e.stopPropagation();
-    if (!canUpdate || !pendingPayload || saving) return;
-    saving = true;
-    try {
-      await onupdate(task.id, pendingPayload);
-    } finally {
-      saving = false;
-    }
-  }
-
-  function handleDeleteClick(e: MouseEvent) {
-    e.stopPropagation();
-    const dateText = task.date
-      ? `on ${formatDate(task.date)}`
-      : task.short_description;
-    if (window.confirm(`Delete task ${dateText}?`)) {
-      ondelete(task.id);
+  function bodyKey(e: KeyboardEvent) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onToggleExpanded?.();
     }
   }
 </script>
 
-<div class="task-row" class:expanded>
-  <div class="summary-row">
-    <button
-      type="button"
-      class="summary"
-      aria-expanded={expanded}
-      onclick={ontoggle}
-    >
-      <span class="caret" aria-hidden="true">{expanded ? "▾" : "▸"}</span>
-      <span class="date">{task.date ? formatDate(task.date) : "—"}</span>
-      <span class="volunteers">
-        {volunteersLabel(task.volunteers_needed, task.skilled_needed)}
-      </span>
-      <span class="city">{task.city ?? ""}</span>
-      <span class="description">{task.short_description}</span>
-      {#if task.assignees && task.assignees.length > 0}
-        <span class="assignees" aria-label="Assigned volunteers">
-          {#each task.assignees as a (a.person_id)}
-            <span
-              class="assignee-chip"
-              class:assignee-lead={a.is_team_lead}
-              title={`${a.first_name} ${a.last_name}${a.is_team_lead ? " (team lead)" : ""}`}
-            >
-              {a.initials}
-            </span>
-          {/each}
-        </span>
+<li class="task" class:checked class:expanded>
+  <input
+    type="checkbox"
+    class="task-check"
+    {checked}
+    onchange={() => onToggleChecked?.()}
+    aria-label={`Toggle ${name}`}
+  />
+
+  <div
+    class="task-body"
+    role="button"
+    tabindex="0"
+    aria-expanded={expanded}
+    onclick={() => onToggleExpanded?.()}
+    onkeydown={bodyKey}
+  >
+    <div class="task-name">
+      {name}
+      {#if conflict}
+        <span class="conflict-flag" title={conflictTitle}>⚠ calendar conflict</span>
       {/if}
-    </button>
-    {#if expanded}
-      <button
-        type="button"
-        class="action-btn"
-        disabled={!canUpdate || saving}
-        onclick={handleUpdateClick}
-        aria-label="Update task"
-      >
-        {saving ? "Saving..." : "Update"}
-      </button>
-    {/if}
-    <button
-      type="button"
-      class="trash-btn"
-      onclick={handleDeleteClick}
-      aria-label="Delete task"
-      title="Delete task"
-    >
-      🗑️
-    </button>
+    </div>
+    <div class="task-summary">{summary}</div>
+    <div class="task-meta">
+      {#if city}{city}{/if}
+      {#if city && date} · {/if}
+      {#if date}{date}{/if}
+    </div>
   </div>
 
-  {#if expanded}
-    <div class="form-wrapper">
-      <TaskEntryForm
-        initial={task}
-        mode="edit"
-        {teamLeads}
-        onchange={handleFormChange}
-      />
-    </div>
-  {/if}
-</div>
+  <button
+    type="button"
+    class="task-expand"
+    aria-label={expanded ? "Collapse" : "Expand"}
+    onclick={() => onToggleExpanded?.()}
+  >
+    <span class="chev" class:open={expanded} aria-hidden="true">▾</span>
+  </button>
+
+  <dl class="task-detail">
+    {#if description}
+      <dd class="task-description">{description}</dd>
+    {/if}
+    {#if time}<dt>Time</dt>
+      <dd>{time}</dd>{/if}
+    {#if volunteersNeeded != null}<dt>Volunteers needed</dt>
+      <dd>{volunteersNeeded}</dd>{/if}
+    {#if skilledNeeded > 0}<dt>Skilled needed</dt>
+      <dd>{skilledNeeded}</dd>{/if}
+    {#if notes}<dt>Notes</dt>
+      <dd>{notes}</dd>{/if}
+  </dl>
+</li>
 
 <style>
-  .task-row {
-    border: 1px solid var(--rt-gray-200, #e4dfda);
-    border-radius: var(--card-radius);
-    background: var(--rt-white, #ffffff);
-    margin-bottom: var(--spacing-sm);
-    overflow: hidden;
-  }
-
-  /* Expanded row reads as one unit: light-green background flowing through
-     summary and form, no internal divider. */
-  .task-row.expanded {
-    background: var(--rt-success-bg, #e6f4ea);
-    border-color: var(--rt-success-text, #2f7a45);
-  }
-
-  .summary-row {
-    display: flex;
-    align-items: stretch;
-  }
-
-  .summary {
-    display: flex;
+  .task {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
     align-items: center;
-    gap: var(--spacing-sm);
-    flex: 1;
-    min-width: 0;
-    padding: var(--spacing-sm) var(--spacing-md);
-    background: none;
-    border: none;
+    gap: var(--sp-3);
+    padding: var(--task-pad-y) var(--task-pad-x);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    border: 1px solid transparent;
+    transition:
+      background 0.15s,
+      border-color 0.15s,
+      transform 0.15s;
+  }
+  .task:hover {
+    background: var(--surface-1);
+    border-color: var(--hairline);
+  }
+  .task.checked {
+    background:
+      linear-gradient(180deg, var(--tint-green), transparent), var(--surface-1);
+    border-color: rgba(90, 173, 68, 0.35);
+  }
+
+  .task-check {
+    appearance: none;
+    -webkit-appearance: none;
+    width: var(--check-size);
+    height: var(--check-size);
+    border-radius: 6px;
+    border: 1.5px solid #c5cad2;
+    background: var(--surface-1);
     cursor: pointer;
-    font: inherit;
-    color: inherit;
-    text-align: left;
-    min-height: var(--btn-min-height);
+    display: grid;
+    place-items: center;
+    transition:
+      background 0.15s,
+      border-color 0.15s;
   }
-
-  .task-row:not(.expanded) .summary:hover {
-    background: var(--rt-gray-100, #f5f3ef);
+  .task-check:checked {
+    background: linear-gradient(135deg, var(--rt-green), var(--rt-green-dark));
+    border-color: var(--rt-green-dark);
   }
-
-  /* Assignee chips — compact initials beside the description so an admin
-     can see "who's on this task" without expanding. Team lead is the dark
-     pill, regular volunteers are light. */
-  .assignees {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    margin-left: auto;
-    flex-wrap: wrap;
-  }
-
-  .assignee-chip {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 24px;
-    height: 24px;
-    padding: 0 6px;
-    border-radius: 12px;
-    background: var(--rt-gray-100, #f0ece8);
-    color: var(--rt-text-light, #555);
-    font-size: 11px;
-    font-weight: 600;
-    line-height: 1;
-    border: 1px solid var(--rt-gray-200, #e4dfda);
-  }
-
-  .assignee-chip.assignee-lead {
-    background: var(--color-primary, #3a6db5);
-    color: #fff;
-    border-color: var(--color-primary, #3a6db5);
-  }
-
-  .action-btn {
-    align-self: center;
-    margin-right: var(--spacing-sm);
-    padding: var(--spacing-xs) var(--spacing-md);
-    background: var(--color-primary, #3a6db5);
+  .task-check:checked::after {
+    content: "✓";
     color: white;
-    border: none;
-    border-radius: var(--card-radius);
-    font: inherit;
-    font-weight: 600;
-    cursor: pointer;
-    min-height: 32px;
-    flex-shrink: 0;
+    font-size: 0.78em;
+    font-weight: 800;
   }
 
-  .action-btn:disabled {
-    background: var(--rt-gray-200, #e4dfda);
-    color: var(--rt-text-muted, #888);
-    cursor: not-allowed;
-  }
-
-  .action-btn:not(:disabled):hover {
-    opacity: 0.9;
-  }
-
-  .trash-btn {
-    background: none;
-    border: none;
-    padding: 0 var(--spacing-md);
-    font-size: 1.2em;
-    line-height: 1;
-    cursor: pointer;
-    flex-shrink: 0;
-    color: var(--rt-text-muted, #888);
-  }
-
-  .trash-btn:hover {
-    background: var(--rt-danger-bg, #fdecea);
-  }
-
-  .caret {
-    width: 1em;
-    color: var(--rt-text-muted, #777);
-    flex-shrink: 0;
-  }
-
-  .date {
-    font-variant-numeric: tabular-nums;
-    font-weight: 600;
-    flex-shrink: 0;
-  }
-
-  .volunteers {
-    color: var(--rt-text-muted, #777);
-    font-variant-numeric: tabular-nums;
-    flex-shrink: 0;
-  }
-
-  .city {
-    flex-shrink: 0;
-    color: var(--rt-text-muted, #777);
-  }
-
-  .description {
-    flex: 1;
+  .task-body {
     min-width: 0;
+    cursor: pointer;
+  }
+  .task-name {
+    font-weight: 600;
+    color: var(--rt-dark);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .task-summary {
+    font-size: 0.92em;
+    color: var(--rt-text);
+    margin-top: 2px;
     overflow: hidden;
     text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+    -webkit-box-orient: vertical;
+  }
+  .task.expanded .task-summary {
+    display: none;
+  }
+  .task-meta {
+    font-size: 0.82em;
+    color: var(--rt-text-muted);
+    margin-top: 2px;
+  }
+  .conflict-flag {
+    font-size: 0.7rem;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: var(--tint-orange);
+    color: #8c5a10;
+    font-weight: 600;
+  }
+
+  .task-expand {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    color: var(--rt-text-muted);
+    display: grid;
+    place-items: center;
+    transition: background 0.15s;
+  }
+  .task-expand:hover {
+    background: var(--surface-3);
+  }
+  .chev {
+    display: inline-block;
+    transition: transform 0.2s;
+  }
+  .chev.open {
+    transform: rotate(180deg);
+  }
+
+  .task-detail {
+    grid-column: 1 / -1;
+    margin: var(--sp-3) 0 0;
+    padding: var(--sp-3) 0 0;
+    border-top: 1px solid var(--hairline);
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 4px var(--sp-4);
+    font-size: 0.9em;
+  }
+  .task-detail dt {
+    color: var(--rt-text-muted);
+    font-weight: 500;
+  }
+  .task-detail dd {
+    margin: 0;
+    color: var(--rt-text);
+  }
+  .task-description {
+    grid-column: 1 / -1;
+    margin: 0 0 var(--sp-3) 0;
+    color: var(--rt-text);
+    line-height: 1.55;
+    white-space: pre-line;
+  }
+  .task:not(.expanded) .task-detail {
+    display: none;
+  }
+
+  /* Density: compact = flat borderless row, inline meta */
+  :global([data-density="compact"]) .task {
+    background: transparent;
+    border-radius: 0;
+    border-top: 1px solid var(--hairline);
+    padding: var(--task-pad-y) var(--task-pad-x);
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+  }
+  :global([data-density="compact"]) .task.checked {
+    background: rgba(90, 173, 68, 0.08);
+  }
+  :global([data-density="compact"]) .task-body {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  :global([data-density="compact"]) .task-summary {
+    display: none;
+  }
+  :global([data-density="compact"]) .task-meta {
+    margin: 0 0 0 auto;
     white-space: nowrap;
   }
 
-  .form-wrapper {
-    padding: var(--spacing-md);
+  /* Density: large = floating card with shadow halo */
+  :global([data-density="large"]) .task {
+    background: var(--surface-1);
+    border: 1px solid var(--hairline);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 1),
+      0 2px 8px -6px rgba(30, 47, 61, 0.15);
+  }
+  :global([data-density="large"]) .task:hover {
+    transform: translateY(-1px);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 1),
+      0 6px 18px -10px rgba(30, 47, 61, 0.25);
   }
 </style>

@@ -45,36 +45,40 @@
 <style>
   .view-toggle {
     display: inline-flex;
-    border: 1px solid var(--rt-gray-200, #e4dfda);
-    border-radius: 6px;
-    overflow: hidden;
+    gap: 2px;
+    background: var(--surface-2);
+    padding: 3px;
+    border-radius: 8px;
   }
 
   .toggle-btn {
+    appearance: none;
     display: flex;
     align-items: center;
     justify-content: center;
-    min-width: 36px;
-    min-height: 36px;
-    padding: var(--spacing-xs);
-    border: none;
-    background: var(--rt-white, white);
+    min-width: 30px;
+    min-height: 28px;
+    padding: 5px 12px;
+    border: 0;
+    background: transparent;
+    color: var(--rt-text-muted);
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    border-radius: 6px;
     cursor: pointer;
-    color: var(--rt-text-muted, #777);
-    transition: background 0.15s, color 0.15s;
-  }
-
-  .toggle-btn:not(:last-child) {
-    border-right: 1px solid var(--rt-gray-200, #e4dfda);
+    transition:
+      background 0.15s,
+      color 0.15s;
   }
 
   .toggle-btn:hover {
-    background: var(--rt-gray-100, #f5f3ef);
+    color: var(--rt-dark);
   }
 
   .toggle-btn.active {
-    background: var(--color-primary, #3a6db5);
-    color: var(--rt-white, white);
+    background: var(--surface-1);
+    color: var(--rt-dark);
   }
 
   .toggle-btn svg {

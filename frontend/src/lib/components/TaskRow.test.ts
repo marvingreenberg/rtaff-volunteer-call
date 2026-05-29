@@ -1,214 +1,127 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/svelte";
+import { describe, expect, it, vi } from "vitest";
+import { render, fireEvent } from "@testing-library/svelte";
 import TaskRow from "./TaskRow.svelte";
-import type { TaskResponse } from "$lib/api/client";
 
-function makeTask(overrides: Partial<TaskResponse> = {}): TaskResponse {
-  return {
-    id: "task-1",
-    volunteer_call_id: "call-1",
-    short_description: "Install two lights, repair drywall",
-    date: "2026-07-01",
-    time_start: "09:00",
-    time_end: null,
-    address: "123 Oak St",
-    city: "Alexandria",
-    team_lead_id: null,
-    team_lead_name: null,
-    volunteers_needed: 4,
-    skilled_needed: 0,
-    status: "open",
-    notes: null,
-    assigned_count: 0,
-    assignees: [],
-    created_at: "2026-05-05T00:00:00Z",
-    updated_at: "2026-05-05T00:00:00Z",
-    ...overrides,
-  };
-}
-
-function makeProps(overrides: Record<string, unknown> = {}) {
-  return {
-    task: makeTask(),
-    expanded: false,
-    teamLeads: [],
-    ontoggle: vi.fn(),
-    onupdate: vi.fn(),
-    ondelete: vi.fn(),
-    ...overrides,
-  };
-}
+const baseProps = {
+  name: "Driftwood collection",
+  summary: "Stage driftwood pulled from the upper beach into the sort pile…",
+  description:
+    "Stage driftwood pulled from the upper beach into the sort pile by the lot.\n\nAnything over 6 ft. goes to the structural side.",
+  city: "Pacifica",
+  date: "Sat Jun 21",
+  checked: false,
+  expanded: false,
+};
 
 describe("TaskRow", () => {
-  it("renders weekday + month + day in the summary", () => {
-    render(TaskRow, {
-      props: makeProps({ task: makeTask({ date: "2026-07-01" }) }),
-    });
-    expect(screen.getByText("Wednesday, July 1")).toBeInTheDocument();
+  it("renders the summary text in the .task-summary slot when collapsed", () => {
+    const { container } = render(TaskRow, { props: baseProps });
+    const summary = container.querySelector(".task-summary") as HTMLElement;
+    expect(summary).not.toBeNull();
+    expect(summary.textContent).toContain(
+      "Stage driftwood pulled from the upper beach",
+    );
   });
 
-  it("shows the trash glyph (not an ×)", () => {
-    // User explicitly asked for a trash can, not an X. Pin both directions
-    // so a stylistic regression to "×" gets caught.
-    render(TaskRow, { props: makeProps() });
-    const trash = screen.getByRole("button", { name: /delete task/i });
-    expect(trash.textContent?.trim()).toBe("🗑️");
-    expect(trash.textContent?.trim()).not.toBe("×");
+  it("collapsed: .task wrapper does NOT carry .expanded (CSS hides the detail dl)", () => {
+    const { container } = render(TaskRow, { props: baseProps });
+    const li = container.querySelector("li.task") as HTMLElement;
+    expect(li.classList.contains("expanded")).toBe(false);
   });
 
-  it("only renders the Update button when expanded", () => {
-    const { rerender } = render(TaskRow, { props: makeProps() });
-    expect(
-      screen.queryByRole("button", { name: /update task/i }),
-    ).not.toBeInTheDocument();
-    rerender(makeProps({ expanded: true }));
-    expect(
-      screen.getByRole("button", { name: /update task/i }),
-    ).toBeInTheDocument();
-  });
-
-  it("Update is disabled until the form is dirty AND valid", async () => {
-    // Without dirty-gating, Update would be active the moment the row
-    // opens (since the task is already valid). Without valid-gating, the
-    // user could wipe a required field and still click Update, which would
-    // silently fail or persist garbage.
+  it("expanded: .task wrapper carries .expanded and the description renders in .task-description", () => {
     const { container } = render(TaskRow, {
-      props: makeProps({ expanded: true }),
+      props: { ...baseProps, expanded: true },
     });
-    const update = screen.getByRole("button", { name: /update task/i });
-    expect(update).toBeDisabled();
-
-    const description = container.querySelector(
-      "textarea",
-    ) as HTMLTextAreaElement;
-    await fireEvent.input(description, { target: { value: "Roof rebuild" } });
-    expect(update).not.toBeDisabled();
-
-    // Wipe a required field → Update goes back to disabled.
-    await fireEvent.input(description, { target: { value: "" } });
-    expect(update).toBeDisabled();
+    const li = container.querySelector("li.task") as HTMLElement;
+    expect(li.classList.contains("expanded")).toBe(true);
+    const desc = container.querySelector(".task-description") as HTMLElement;
+    expect(desc.textContent).toContain("structural side");
   });
 
-  it("clicking Update fires onupdate(taskId, payload)", async () => {
-    const onupdate = vi.fn();
+  it("does NOT show time in the collapsed meta (lives in expanded detail only)", () => {
+    const props = { ...baseProps, time: "10:00–13:00" };
+    const { container } = render(TaskRow, { props });
+    const meta = container.querySelector(".task-meta")!;
+    expect(meta.textContent).not.toContain("10:00");
+  });
+
+  it("renders time inside .task-detail when expanded", () => {
     const { container } = render(TaskRow, {
-      props: makeProps({ expanded: true, onupdate }),
+      props: { ...baseProps, expanded: true, time: "10:00–13:00" },
     });
-    const description = container.querySelector(
-      "textarea",
-    ) as HTMLTextAreaElement;
-    await fireEvent.input(description, { target: { value: "Rewired text" } });
-    await fireEvent.click(screen.getByRole("button", { name: /update task/i }));
-    expect(onupdate).toHaveBeenCalledTimes(1);
-    expect(onupdate.mock.calls[0][0]).toBe("task-1");
-    expect(onupdate.mock.calls[0][1]).toMatchObject({
-      short_description: "Rewired text",
-    });
+    const detail = container.querySelector(".task-detail") as HTMLElement;
+    expect(detail.textContent).toContain("10:00");
   });
 
-  it("clicking the trash does not toggle the row expand", async () => {
-    // The trash sits in the summary row alongside the toggle button; its
-    // click handler stops propagation so trash-confirmed-cancel doesn't
-    // accidentally fold/unfold the row.
-    const ontoggle = vi.fn();
-    const ondelete = vi.fn();
-    const confirmSpy = vi
-      .spyOn(window, "confirm")
-      .mockImplementation(() => false);
-    render(TaskRow, { props: makeProps({ ontoggle, ondelete }) });
-    await fireEvent.click(screen.getByRole("button", { name: /delete task/i }));
-    expect(ontoggle).not.toHaveBeenCalled();
-    expect(ondelete).not.toHaveBeenCalled();
-    confirmSpy.mockRestore();
-  });
-
-  it("trash confirm uses the formatted task date in its prompt", async () => {
-    const ondelete = vi.fn();
-    let promptedText = "";
-    const confirmSpy = vi.spyOn(window, "confirm").mockImplementation((msg) => {
-      promptedText = msg ?? "";
-      return true;
-    });
-    render(TaskRow, {
-      props: makeProps({
-        task: makeTask({ date: "2026-07-01" }),
-        ondelete,
-      }),
-    });
-    await fireEvent.click(screen.getByRole("button", { name: /delete task/i }));
-    expect(promptedText).toContain("Wednesday, July 1");
-    expect(ondelete).toHaveBeenCalledWith("task-1");
-    confirmSpy.mockRestore();
-  });
-
-  it("renders assignee chips with team-lead marker", () => {
-    // Bug it catches: the assignee chip block silently skips
-    // is_team_lead, so the admin can't see at a glance who's leading.
-    render(TaskRow, {
-      props: makeProps({
-        task: makeTask({
-          assignees: [
-            {
-              person_id: "p1",
-              first_name: "Ada",
-              last_name: "Lovelace",
-              initials: "AL",
-              is_team_lead: true,
-            },
-            {
-              person_id: "p2",
-              first_name: "Bob",
-              last_name: "Test",
-              initials: "BT",
-              is_team_lead: false,
-            },
-          ],
-        }),
-      }),
-    });
-    const lead = screen.getByText("AL");
-    const crew = screen.getByText("BT");
-    expect(lead).toHaveClass("assignee-lead");
-    expect(crew).not.toHaveClass("assignee-lead");
-  });
-
-  it("renders no chip block when assignees is empty", () => {
-    // Bug it catches: the {#if assignees && length} guard is dropped,
-    // so an empty list paints a stray container with no contents.
+  it("fires onToggleChecked when the checkbox changes", async () => {
+    const onToggleChecked = vi.fn();
     const { container } = render(TaskRow, {
-      props: makeProps({ task: makeTask({ assignees: [] }) }),
+      props: { ...baseProps, onToggleChecked },
     });
-    expect(container.querySelector(".assignees")).toBeNull();
+    const cb = container.querySelector(
+      "input[type=checkbox]",
+    ) as HTMLInputElement;
+    await fireEvent.click(cb);
+    expect(onToggleChecked).toHaveBeenCalledOnce();
   });
 
-  it("does not call ondelete when the confirm dialog is dismissed", async () => {
-    const ondelete = vi.fn();
-    const confirmSpy = vi
-      .spyOn(window, "confirm")
-      .mockImplementation(() => false);
-    render(TaskRow, { props: makeProps({ expanded: true, ondelete }) });
-    await fireEvent.click(screen.getByRole("button", { name: /delete task/i }));
-    expect(ondelete).not.toHaveBeenCalled();
-    confirmSpy.mockRestore();
+  it("fires onToggleExpanded when the row body is clicked", async () => {
+    const onToggleExpanded = vi.fn();
+    const { container } = render(TaskRow, {
+      props: { ...baseProps, onToggleExpanded },
+    });
+    const body = container.querySelector(".task-body") as HTMLElement;
+    await fireEvent.click(body);
+    expect(onToggleExpanded).toHaveBeenCalledOnce();
   });
 
-  it("collapsing the row clears in-flight edits (Update becomes disabled on reopen)", async () => {
-    // Closing without clicking Update discards the changes — pin that
-    // the pending payload + dirty flag don't survive a collapse/reopen.
-    const onupdate = vi.fn();
-    const { container, rerender } = render(TaskRow, {
-      props: makeProps({ expanded: true, onupdate }),
+  it("fires onToggleExpanded on Enter keydown in the body", async () => {
+    const onToggleExpanded = vi.fn();
+    const { container } = render(TaskRow, {
+      props: { ...baseProps, onToggleExpanded },
     });
-    const description = container.querySelector(
-      "textarea",
-    ) as HTMLTextAreaElement;
-    await fireEvent.input(description, { target: { value: "Changed" } });
-    expect(
-      screen.getByRole("button", { name: /update task/i }),
-    ).not.toBeDisabled();
+    const body = container.querySelector(".task-body") as HTMLElement;
+    await fireEvent.keyDown(body, { key: "Enter" });
+    expect(onToggleExpanded).toHaveBeenCalledOnce();
+  });
 
-    rerender(makeProps({ expanded: false, onupdate }));
-    rerender(makeProps({ expanded: true, onupdate }));
-    expect(screen.getByRole("button", { name: /update task/i })).toBeDisabled();
+  it("fires onToggleExpanded on Space keydown in the body and prevents page scroll", async () => {
+    const onToggleExpanded = vi.fn();
+    const { container } = render(TaskRow, {
+      props: { ...baseProps, onToggleExpanded },
+    });
+    const body = container.querySelector(".task-body") as HTMLElement;
+    const event = new KeyboardEvent("keydown", {
+      key: " ",
+      cancelable: true,
+      bubbles: true,
+    });
+    body.dispatchEvent(event);
+    expect(onToggleExpanded).toHaveBeenCalledOnce();
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it("fires onToggleExpanded when the chevron button is clicked", async () => {
+    const onToggleExpanded = vi.fn();
+    const { container } = render(TaskRow, {
+      props: { ...baseProps, onToggleExpanded },
+    });
+    const expand = container.querySelector(".task-expand") as HTMLButtonElement;
+    await fireEvent.click(expand);
+    expect(onToggleExpanded).toHaveBeenCalledOnce();
+  });
+
+  it("renders the conflict pill only when conflict=true", () => {
+    const { container, rerender } = render(TaskRow, { props: baseProps });
+    expect(container.querySelector(".conflict-flag")).toBeNull();
+    rerender({
+      ...baseProps,
+      conflict: true,
+      conflictTitle: "Overlaps with X",
+    });
+    const flag = container.querySelector(".conflict-flag") as HTMLElement;
+    expect(flag).not.toBeNull();
+    expect(flag.getAttribute("title")).toBe("Overlaps with X");
   });
 });

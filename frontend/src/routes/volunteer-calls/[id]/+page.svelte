@@ -10,7 +10,7 @@
   } from '$lib/api/client';
   import Breadcrumb from '$lib/components/Breadcrumb.svelte';
   import TaskEntryForm from '$lib/components/TaskEntryForm.svelte';
-  import TaskRow from '$lib/components/TaskRow.svelte';
+  import TaskEditorRow from '$lib/components/TaskEditorRow.svelte';
   import { callStatusBadgeClass, programLabel } from '$lib/utils/badges';
   import { SINGLE_TASK_PROGRAMS } from '$lib/api/types';
 
@@ -26,7 +26,7 @@
   let expandedTaskId: string | null = $state(null);
 
   // Whether the "- Add new task -" affordance has been expanded into the
-  // entry form. The form is contained in a TaskRow-shaped expando with its
+  // entry form. The form is contained in a TaskEditorRow-shaped expando with its
   // own Add + trash buttons in the header strip.
   let addOpen = $state(false);
   let addPayload = $state<TaskCreate | null>(null);
@@ -38,7 +38,7 @@
   onMount(async () => {
     await loadCall();
     // Fetch team-lead candidates once for the whole page; pass into every
-    // TaskRow + the new-task form rather than re-fetching per row.
+    // TaskEditorRow + the new-task form rather than re-fetching per row.
     try {
       const leads = await people.list({ role: 'team_leader', active: true });
       teamLeads = leads.items.map((p) => ({
@@ -155,7 +155,7 @@
       {#if call.tasks.length > 0}
         <div class="task-list">
           {#each call.tasks as task (task.id)}
-            <TaskRow
+            <TaskEditorRow
               {task}
               {teamLeads}
               expanded={expandedTaskId === task.id}
@@ -271,8 +271,8 @@
     flex-direction: column;
   }
 
-  /* New-task affordance: visual shell matches TaskRow.expanded. The header
-     strip mirrors TaskRow's summary-row layout so the Add + trash buttons
+  /* New-task affordance: visual shell matches TaskEditorRow.expanded. The header
+     strip mirrors TaskEditorRow's summary-row layout so the Add + trash buttons
      line up where the Update + trash live for existing rows. */
   .task-row-add {
     border: 1px solid var(--rt-success-text, #2f7a45);

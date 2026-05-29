@@ -1,6 +1,9 @@
 <script lang="ts">
   import { notifications } from '$lib/api/client';
   import type { PersonResponse } from '$lib/api/types';
+  import { settingsState, setDensity } from '$lib/stores/settings.svelte';
+
+  type Density = 'compact' | 'standard' | 'large';
 
   let { user, onlogout }: { user: PersonResponse; onlogout: () => void } = $props();
 
@@ -84,6 +87,28 @@
         </a>
       </div>
 
+      <div class="drawer-divider"></div>
+
+      {#snippet densitySeg(value: Density, label: string)}
+        <button
+          type="button"
+          class="density-opt"
+          class:active={settingsState.density === value}
+          role="radio"
+          aria-checked={settingsState.density === value}
+          onclick={() => setDensity(value)}
+        >{label}</button>
+      {/snippet}
+
+      <div class="drawer-group density-group">
+        <div class="group-label">Display density</div>
+        <div class="density-seg" role="radiogroup" aria-label="Display density">
+          {@render densitySeg('compact', 'Compact')}
+          {@render densitySeg('standard', 'Standard')}
+          {@render densitySeg('large', 'Large')}
+        </div>
+      </div>
+
       {#if isStaff}
         <div class="drawer-divider"></div>
         <div class="drawer-group">
@@ -161,19 +186,19 @@
     position: absolute;
     top: calc(100% + 8px);
     right: 0;
-    background: var(--rt-white, white);
-    border: 1px solid var(--rt-gray-200);
-    border-radius: var(--card-radius);
-    padding: var(--spacing-sm) 0;
+    background: var(--surface-1);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius);
+    padding: 6px;
     min-width: 260px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 16px 40px -16px rgba(30, 47, 61, 0.35);
     z-index: 100;
   }
 
   .drawer-email {
-    padding: var(--spacing-sm) var(--spacing-lg, 1.25rem) var(--spacing-md);
+    padding: 8px 10px 6px;
     font-size: var(--font-size-sm);
-    color: var(--rt-text-muted, #777);
+    color: var(--rt-text-muted);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -182,29 +207,31 @@
   .drawer-group {
     display: flex;
     flex-direction: column;
+    padding: 4px 0;
   }
 
   .drawer-row {
     display: flex;
     align-items: center;
-    gap: var(--spacing-md, 0.75rem);
-    padding: 10px var(--spacing-lg, 1.25rem);
-    color: var(--rt-dark, #222);
-    background: none;
-    border: none;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    border: 0;
+    color: var(--rt-text);
     text-decoration: none;
     font: inherit;
-    font-size: var(--btn-font-size, 0.95rem);
-    cursor: pointer;
+    font-weight: 500;
     text-align: left;
-    min-height: 40px;
-    width: 100%;
-    transition: background-color 0.12s;
+    cursor: pointer;
+    min-height: 36px;
+    transition: background-color 0.15s;
   }
 
   .drawer-row:hover,
   .drawer-row:focus-visible {
-    background: var(--rt-gray-100, #f5f3ef);
+    background: var(--surface-2);
     text-decoration: none;
     outline: none;
   }
@@ -239,11 +266,57 @@
 
   .drawer-divider {
     height: 1px;
-    background: var(--rt-gray-200, #e4dfda);
-    margin: var(--spacing-sm) 0;
+    background: var(--hairline);
+    margin: 4px 0;
   }
 
   .drawer-logout {
-    color: var(--rt-dark, #222);
+    color: var(--rt-text);
+  }
+
+  .group-label {
+    padding: 0 8px 4px;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--rt-text-muted);
+    font-weight: 600;
+  }
+
+  .density-group {
+    padding: 4px 6px 6px;
+  }
+
+  .density-seg {
+    display: inline-flex;
+    background: var(--surface-2);
+    border-radius: 999px;
+    padding: 3px;
+    width: 100%;
+  }
+
+  .density-opt {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    flex: 1;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--rt-text-muted);
+    cursor: pointer;
+    transition:
+      background 0.15s,
+      color 0.15s;
+  }
+
+  .density-opt.active {
+    background: var(--surface-1);
+    color: var(--rt-dark);
+    box-shadow:
+      0 1px 0 var(--hairline),
+      0 1px 3px rgba(0, 0, 0, 0.04);
   }
 </style>
