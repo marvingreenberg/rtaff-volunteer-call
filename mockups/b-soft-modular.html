@@ -1,0 +1,702 @@
+<!doctype html>
+<html lang="en" data-density="standard">
+<head>
+  <meta charset="utf-8">
+  <title>Mockup B · Soft-modular</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
+  <style>
+    /* ─────────── tokens — soft-modular ─────────── */
+    :root {
+      --font-display: "DM Serif Display", Georgia, serif;
+      --font-body: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+
+      --rt-green: #5aad44;
+      --rt-green-dark: #478a36;
+      --rt-blue: #3a6db5;
+      --rt-blue-dark: #2e5a96;
+      --rt-orange: #f5b74e;
+      --rt-dark: #1e2f3d;
+      --rt-text: #2a3340;
+      --rt-text-muted: #7a8290;
+      --surface-1: #ffffff;
+      --surface-2: #faf7f1;
+      --surface-3: #f1ece2;
+      --hairline: rgba(30,47,61,.08);
+
+      --tint-blue: rgba(58,109,181,.07);
+      --tint-green: rgba(90,173,68,.10);
+      --tint-orange: rgba(245,183,78,.14);
+
+      /* density-driven */
+      --fz-body: 15px;
+      --fz-h1: 2rem;
+      --fz-h2: 1.05rem;
+      --lh: 1.55;
+      --sp-2: 6px;
+      --sp-3: 10px;
+      --sp-4: 14px;
+      --sp-5: 20px;
+      --sp-6: 28px;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --card-pad-y: 14px;
+      --card-pad-x: 18px;
+      --task-pad-y: 12px;
+      --task-pad-x: 16px;
+      --task-gap: 8px;
+      --check-size: 22px;
+      --btn-h: 40px;
+      --btn-pad-x: 16px;
+      --btn-fz: 0.92rem;
+      --heading-weight: 400;
+    }
+    [data-density="compact"] {
+      --fz-body: 13.5px;
+      --fz-h1: 1.55rem;
+      --fz-h2: 0.95rem;
+      --lh: 1.45;
+      --sp-2: 4px; --sp-3: 6px; --sp-4: 10px; --sp-5: 14px; --sp-6: 20px;
+      --radius: 10px; --radius-sm: 6px;
+      --card-pad-y: 10px; --card-pad-x: 14px;
+      --task-pad-y: 7px; --task-pad-x: 12px;
+      --task-gap: 2px;
+      --check-size: 18px;
+      --btn-h: 34px; --btn-pad-x: 12px; --btn-fz: 0.85rem;
+    }
+    [data-density="large"] {
+      --fz-body: 17px;
+      --fz-h1: 2.5rem;
+      --fz-h2: 1.2rem;
+      --lh: 1.65;
+      --sp-2: 8px; --sp-3: 14px; --sp-4: 18px; --sp-5: 26px; --sp-6: 36px;
+      --radius: 16px; --radius-sm: 12px;
+      --card-pad-y: 20px; --card-pad-x: 24px;
+      --task-pad-y: 18px; --task-pad-x: 22px;
+      --task-gap: 12px;
+      --check-size: 26px;
+      --btn-h: 48px; --btn-pad-x: 22px; --btn-fz: 1rem;
+      --heading-weight: 700;
+    }
+
+    *,*::before,*::after { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      font-family: var(--font-body);
+      font-size: var(--fz-body);
+      line-height: var(--lh);
+      color: var(--rt-text);
+      background:
+        radial-gradient(1200px 600px at 90% -10%, var(--tint-green), transparent 60%),
+        radial-gradient(900px 500px at -10% 30%, var(--tint-blue), transparent 60%),
+        var(--surface-2);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+    h1, h2, h3 { font-family: var(--font-display); font-weight: var(--heading-weight); letter-spacing: -0.4px; color: var(--rt-dark); margin: 0; }
+    h1 { font-size: var(--fz-h1); }
+    h2 { font-size: var(--fz-h2); letter-spacing: 0.04em; text-transform: uppercase; font-family: var(--font-body); font-weight: 600; color: var(--rt-text-muted); }
+    em { font-style: normal; color: var(--rt-text-muted); font-weight: 400; text-transform: none; letter-spacing: 0; font-size: 0.85em; }
+
+    /* ─────────── chrome ─────────── */
+    .chrome {
+      position: sticky; top: 0; z-index: 10;
+      display: flex; align-items: center; gap: var(--sp-5);
+      padding: 10px 24px;
+      background: rgba(255,255,255,.78);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--hairline);
+    }
+    .chrome .brand {
+      font-family: var(--font-display);
+      font-size: 1.15rem;
+      color: var(--rt-dark);
+    }
+    .chrome .brand em { color: var(--rt-text-muted); font-size: 0.7em; margin-left: 6px; }
+    .chrome .spacer { flex: 1; }
+    .seg {
+      display: inline-flex;
+      padding: 3px;
+      background: var(--surface-3);
+      border-radius: 999px;
+      font-size: 0.8rem;
+    }
+    .seg button {
+      appearance: none; border: 0; background: transparent;
+      padding: 6px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+      color: var(--rt-text-muted);
+      font: inherit; font-weight: 600;
+      transition: background .15s, color .15s;
+    }
+    .seg button[aria-pressed="true"] {
+      background: var(--surface-1);
+      color: var(--rt-dark);
+      box-shadow: 0 1px 0 var(--hairline), 0 1px 3px rgba(0,0,0,.04);
+    }
+
+    /* ─────────── canvas layout ─────────── */
+    .frames { display: grid; grid-template-columns: 1fr 410px; gap: 28px; padding: 28px; align-items: start; max-width: 1480px; margin: 0 auto; }
+    @media (max-width: 1100px) { .frames { grid-template-columns: 1fr; } }
+    .frame {
+      background: var(--surface-1);
+      border-radius: 20px;
+      border: 1px solid var(--hairline);
+      overflow: hidden;
+      box-shadow: 0 1px 0 rgba(255,255,255,.6) inset, 0 8px 24px -16px rgba(30,47,61,.18);
+    }
+    .frame-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--rt-text-muted);
+      font-weight: 600;
+      padding: 10px 14px;
+      background: var(--surface-2);
+      border-bottom: 1px solid var(--hairline);
+    }
+    .frame-body { padding: var(--sp-5); }
+    .frame.mobile { max-width: 410px; }
+    .frame.mobile .frame-body { padding: 16px; font-size: 14.5px; }
+
+    /* page sections */
+    .page-title { display: flex; align-items: baseline; gap: 12px; margin-bottom: var(--sp-5); }
+    .page-title h1 { color: var(--rt-dark); }
+    .page-title .accent {
+      width: 22px; height: 4px; border-radius: 2px; background: var(--rt-green); display: inline-block; margin-bottom: 4px;
+    }
+
+    section.block { margin-bottom: var(--sp-6); }
+    section.block > h2 { margin-bottom: var(--sp-4); }
+
+    /* ─────────── call card ─────────── */
+    .call {
+      background: var(--surface-1);
+      border-radius: var(--radius);
+      border: 1px solid var(--hairline);
+      box-shadow: 0 2px 12px -8px rgba(30,47,61,.15);
+      overflow: hidden;
+    }
+    .call-head {
+      display: flex; align-items: center; gap: var(--sp-3);
+      padding: var(--card-pad-y) var(--card-pad-x);
+      background: linear-gradient(180deg, var(--tint-blue), transparent);
+      border-bottom: 1px solid var(--hairline);
+    }
+    .call-title { font-family: var(--font-display); font-size: 1.18rem; color: var(--rt-dark); font-weight: var(--heading-weight); }
+    .call-meta {
+      margin-left: auto;
+      font-size: 0.78rem;
+      color: var(--rt-text-muted);
+      background: var(--surface-3);
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-weight: 600;
+    }
+
+    .call-controls {
+      display: flex; align-items: center; gap: var(--sp-4);
+      padding: var(--sp-3) var(--card-pad-x);
+      border-bottom: 1px solid var(--hairline);
+      flex-wrap: wrap;
+      font-size: 0.88em;
+    }
+    .pill-select {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 10px 6px 12px;
+      background: var(--surface-2);
+      border-radius: 999px;
+      border: 1px solid var(--hairline);
+      font-weight: 500;
+    }
+    .pill-select label { color: var(--rt-text-muted); font-size: 0.85em; }
+    .pill-select select {
+      appearance: none; -webkit-appearance: none; border: 0; background: transparent;
+      font: inherit; font-weight: 600; color: var(--rt-dark); padding-right: 16px;
+      background-image:
+        linear-gradient(45deg, transparent 50%, var(--rt-text-muted) 50%),
+        linear-gradient(135deg, var(--rt-text-muted) 50%, transparent 50%);
+      background-position: calc(100% - 8px) 50%, calc(100% - 4px) 50%;
+      background-size: 4px 4px, 4px 4px; background-repeat: no-repeat;
+    }
+    .view-toggle {
+      margin-left: auto; display: inline-flex; gap: 2px; background: var(--surface-2); padding: 3px; border-radius: 8px;
+    }
+    .view-toggle button {
+      appearance: none; border: 0; padding: 5px 12px; font: inherit; font-size: 0.82rem; font-weight: 600;
+      background: transparent; color: var(--rt-text-muted); border-radius: 6px; cursor: pointer;
+    }
+    .view-toggle button.active { background: var(--surface-1); color: var(--rt-dark); }
+
+    /* ─────────── task list (default = cards) ─────────── */
+    .task-list { list-style: none; margin: 0; padding: var(--sp-3) var(--sp-4) var(--sp-4); display: flex; flex-direction: column; gap: var(--task-gap); }
+    .task {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: var(--sp-3);
+      padding: var(--task-pad-y) var(--task-pad-x);
+      border-radius: var(--radius-sm);
+      background: var(--surface-2);
+      border: 1px solid transparent;
+      transition: background .15s, border-color .15s, transform .15s;
+    }
+    .task:hover { background: var(--surface-1); border-color: var(--hairline); }
+    .task.checked {
+      background: linear-gradient(180deg, var(--tint-green), transparent), var(--surface-1);
+      border-color: rgba(90,173,68,.35);
+    }
+    .check {
+      appearance: none; -webkit-appearance: none; -moz-appearance: none;
+      width: var(--check-size); height: var(--check-size);
+      border-radius: 6px;
+      border: 1.5px solid #c5cad2;
+      background: var(--surface-1);
+      cursor: pointer;
+      display: grid; place-items: center;
+      transition: background .15s, border-color .15s;
+    }
+    .check:checked {
+      background: var(--rt-green); border-color: var(--rt-green-dark);
+      background-image: linear-gradient(135deg, var(--rt-green), var(--rt-green-dark));
+    }
+    .check:checked::after { content: "✓"; color: white; font-size: 0.78em; font-weight: 800; }
+    .task .body { min-width: 0; }
+    .task .name { font-weight: 600; color: var(--rt-dark); display: flex; align-items: center; gap: 6px; }
+    /* Collapsed summary: one-line ellipsis that truncates a multi-line description. */
+    .task .summary {
+      font-size: 0.92em;
+      color: var(--rt-text);
+      margin-top: 2px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 1;
+      line-clamp: 1;
+      -webkit-box-orient: vertical;
+    }
+    .task .meta { font-size: 0.82em; color: var(--rt-text-muted); margin-top: 2px; }
+    .task .meta .sep::before { content: " · "; opacity: 0.5; }
+    /* Hide the collapsed summary once the task is expanded — the full wrapped
+       description lives in .task-detail and would otherwise duplicate. */
+    .task.expanded .summary { display: none; }
+    /* Full wrapped description inside the detail panel. Spans both columns
+       of the dl so it can use the natural reading measure. */
+    .task-detail .description {
+      grid-column: 1 / -1;
+      margin: 0 0 var(--sp-3) 0;
+      color: var(--rt-text);
+      line-height: 1.55;
+      white-space: pre-line;
+    }
+    .conflict {
+      font-size: 0.7rem; padding: 2px 7px; border-radius: 999px;
+      background: var(--tint-orange); color: #8c5a10; font-weight: 600;
+    }
+    .expand {
+      appearance: none; border: 0; background: transparent; cursor: pointer;
+      width: 32px; height: 32px; border-radius: 8px; color: var(--rt-text-muted);
+      display: grid; place-items: center; transition: background .15s;
+    }
+    .expand:hover { background: var(--surface-3); }
+    .chev { display: inline-block; transition: transform .2s; }
+    .task.expanded .chev { transform: rotate(180deg); }
+    .task-detail {
+      grid-column: 1 / -1;
+      margin-top: var(--sp-3);
+      padding: var(--sp-3) var(--sp-3) 2px var(--sp-3);
+      border-top: 1px solid var(--hairline);
+      display: grid; grid-template-columns: max-content 1fr; gap: 4px var(--sp-4);
+      font-size: 0.9em;
+    }
+    .task-detail dt { color: var(--rt-text-muted); font-weight: 500; }
+    .task-detail dd { margin: 0; color: var(--rt-text); }
+    .task:not(.expanded) .task-detail { display: none; }
+
+    /* ─────── density: compact collapses to flat list ─────── */
+    [data-density="compact"] .task-list {
+      padding: 0;
+      gap: 0;
+      background: var(--surface-1);
+    }
+    [data-density="compact"] .task {
+      background: transparent;
+      border-radius: 0;
+      border-top: 1px solid var(--hairline);
+      border-bottom: none;
+      padding: 8px 14px;
+      gap: 10px;
+    }
+    [data-density="compact"] .task:first-child { border-top: 0; }
+    [data-density="compact"] .task .meta { margin-top: 0; display: inline; font-size: 0.82em; }
+    [data-density="compact"] .task .body { display: flex; align-items: baseline; gap: 8px; }
+    [data-density="compact"] .task .meta { margin-left: auto; white-space: nowrap; }
+    [data-density="compact"] .task.checked { background: rgba(90,173,68,.08); }
+    [data-density="compact"] .expand { width: 24px; height: 24px; }
+
+    /* ─────── density: large = airy with per-task card halo ─────── */
+    [data-density="large"] .task {
+      background: var(--surface-1);
+      border: 1px solid var(--hairline);
+      box-shadow: 0 1px 0 rgba(255,255,255,1), 0 2px 8px -6px rgba(30,47,61,.15);
+    }
+    [data-density="large"] .task:hover { transform: translateY(-1px); box-shadow: 0 1px 0 rgba(255,255,255,1), 0 6px 18px -10px rgba(30,47,61,.25); }
+    [data-density="large"] .task.checked {
+      background: linear-gradient(180deg, var(--tint-green), var(--surface-1));
+      border-color: rgba(90,173,68,.4);
+    }
+
+    /* ─────── submit ─────── */
+    .submit-row {
+      padding: var(--sp-4) var(--card-pad-x) var(--card-pad-y);
+      border-top: 1px solid var(--hairline);
+      display: flex; gap: var(--sp-3); justify-content: flex-end;
+    }
+    .btn {
+      appearance: none; border: 0; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 8px;
+      min-height: var(--btn-h); padding: 0 var(--btn-pad-x);
+      border-radius: 999px;
+      font: inherit; font-weight: 600; font-size: var(--btn-fz);
+      background: var(--rt-blue); color: white;
+      transition: transform .1s, box-shadow .15s, background .15s;
+      box-shadow: 0 1px 0 rgba(0,0,0,.04), 0 4px 12px -6px rgba(58,109,181,.5);
+    }
+    .btn:hover { background: var(--rt-blue-dark); transform: translateY(-1px); }
+    .btn.ghost { background: transparent; color: var(--rt-text-muted); box-shadow: none; }
+    .btn.ghost:hover { background: var(--surface-3); color: var(--rt-dark); transform: none; }
+
+    /* ─────── assignments + tasks ─────── */
+    .assignment {
+      display: grid;
+      grid-template-columns: 4px 1fr;
+      background: var(--surface-1);
+      border: 1px solid var(--hairline);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-bottom: var(--sp-3);
+    }
+    .assignment .accent-bar { background: linear-gradient(180deg, var(--rt-blue), var(--rt-green)); }
+    .assignment .inner { padding: var(--card-pad-y) var(--card-pad-x); }
+    .assignment-head { display: flex; align-items: baseline; gap: var(--sp-3); margin-bottom: 6px; }
+    .assignment-title { font-family: var(--font-display); font-size: 1.1rem; color: var(--rt-dark); font-weight: var(--heading-weight); }
+    .assignment-when {
+      margin-left: auto;
+      font-size: 0.82rem; color: var(--rt-text-muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .assignment-meta { display: flex; gap: var(--sp-4); flex-wrap: wrap; color: var(--rt-text-muted); font-size: 0.88em; margin-bottom: var(--sp-3); }
+    .assignment-meta b { color: var(--rt-text); font-weight: 600; }
+    .assignment-actions { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+    .chip-btn {
+      appearance: none; border: 1px solid var(--hairline); background: var(--surface-2);
+      padding: 6px 12px; border-radius: 999px; cursor: pointer; font: inherit; font-size: 0.82rem; font-weight: 600;
+      color: var(--rt-text); display: inline-flex; align-items: center; gap: 6px;
+    }
+    .chip-btn:hover { background: var(--surface-1); border-color: var(--rt-blue); color: var(--rt-blue); }
+    .chip-btn .ico { width: 14px; height: 14px; display: inline-grid; place-items: center; opacity: .7; }
+
+    /* compact assignment: flatten to row */
+    [data-density="compact"] .assignment {
+      grid-template-columns: 3px 1fr;
+      border-radius: 8px;
+      margin-bottom: 4px;
+    }
+    [data-density="compact"] .assignment .inner { padding: 8px 12px; display: flex; align-items: center; gap: 12px; }
+    [data-density="compact"] .assignment-head { margin: 0; flex: 1; }
+    [data-density="compact"] .assignment-meta { display: none; }
+    [data-density="compact"] .assignment-actions { margin: 0; }
+
+    /* large assignment: each task is its own subcard */
+    [data-density="large"] .assignment { box-shadow: 0 2px 18px -10px rgba(30,47,61,.18); }
+  </style>
+</head>
+<body>
+  <div class="chrome">
+    <div class="brand">volunteer-call <em>· mockup B · soft-modular</em></div>
+    <div class="spacer"></div>
+    <div class="seg" role="radiogroup" aria-label="Density">
+      <button data-d="compact"  aria-pressed="false">Compact</button>
+      <button data-d="standard" aria-pressed="true">Standard</button>
+      <button data-d="large"    aria-pressed="false">Large</button>
+    </div>
+    <a href="./index.html" style="color:#7a8290;text-decoration:none;font-size:.8rem;">← all mockups</a>
+  </div>
+
+  <div class="frames">
+    <!-- ──────────── DESKTOP ──────────── -->
+    <div class="frame desktop">
+      <div class="frame-label">Desktop / tablet — 980px</div>
+      <div class="frame-body">
+
+        <div class="page-title"><span class="accent"></span><h1>Volunteering</h1></div>
+
+        <section class="block">
+          <h2>Volunteer Calls <em>waiting for volunteers</em></h2>
+
+          <article class="call">
+            <header class="call-head">
+              <span class="call-title">June 21 — Coastal cleanup, Pacifica</span>
+              <span class="call-meta">5 tasks</span>
+            </header>
+
+            <div class="call-controls">
+              <span class="pill-select">
+                <label>Max per week</label>
+                <select><option>2</option><option selected>3</option><option>4</option></select>
+              </span>
+              <div class="view-toggle">
+                <button class="active">Cards</button>
+                <button>Table</button>
+              </div>
+            </div>
+
+            <ul class="task-list">
+              <li class="task checked">
+                <input type="checkbox" class="check" checked>
+                <div class="body">
+                  <div class="name">Saturday morning beach sweep</div>
+                  <div class="summary">Walk the south stretch with bags &amp; pickers — focus on micro-plastics above the high-water line. Two-hour shift.</div>
+                  <div class="meta">Pacifica<span class="sep"></span>Sat Jun 21</div>
+                </div>
+                <button class="expand"><span class="chev">▾</span></button>
+              </li>
+              <li class="task expanded">
+                <input type="checkbox" class="check" checked>
+                <div class="body">
+                  <div class="name">
+                    Driftwood collection &amp; sort
+                    <span class="conflict">⚠ calendar conflict</span>
+                  </div>
+                  <div class="summary">Stage driftwood pulled from the upper beach into the sort pile by the lot — separating burnable vs. structural pieces…</div>
+                  <div class="meta">Pacifica<span class="sep"></span>Sat Jun 21</div>
+                </div>
+                <button class="expand"><span class="chev">▾</span></button>
+                <dl class="task-detail">
+                  <dd class="description">Stage driftwood pulled from the upper beach into the sort pile by the lot — separating burnable vs. structural pieces. Anything over 6 ft. or with intact hardware (nails, brackets) goes to the structural side; the rest stacks under the canopy for the Tuesday firewood pickup.
+
+Pace yourselves — this is a moving shift across about a quarter mile of beach. Crew lead will mark the sort zones with cones before the shift starts.</dd>
+                  <dt>Time</dt>            <dd>10:00 AM – 1:00 PM</dd>
+                  <dt>Volunteers needed</dt><dd>4</dd>
+                  <dt>Skilled needed</dt>  <dd>1 (chainsaw cert)</dd>
+                  <dt>Notes</dt>           <dd>Bring gloves, wear closed-toe shoes. Tide is out at 11:30.</dd>
+                </dl>
+              </li>
+              <li class="task">
+                <input type="checkbox" class="check">
+                <div class="body">
+                  <div class="name">Mobile dunny resupply</div>
+                  <div class="summary">Restock the two portable toilets at the north and south lots — TP, hand-sanitizer, fresh garbage liners. About 30 min per stop.</div>
+                  <div class="meta">Pacifica<span class="sep"></span>Sun Jun 22</div>
+                </div>
+                <button class="expand"><span class="chev">▾</span></button>
+              </li>
+              <li class="task">
+                <input type="checkbox" class="check">
+                <div class="body">
+                  <div class="name">Recycling sorter — afternoon shift</div>
+                  <div class="summary">Sort collected bags at the recycling tent: glass, aluminum, mixed plastic. Standing work; sturdy gloves provided.</div>
+                  <div class="meta">Pacifica<span class="sep"></span>Sun Jun 22</div>
+                </div>
+                <button class="expand"><span class="chev">▾</span></button>
+              </li>
+              <li class="task">
+                <input type="checkbox" class="check">
+                <div class="body">
+                  <div class="name">Hot drinks &amp; check-in table</div>
+                  <div class="summary">Welcome volunteers, hand out high-vis vests &amp; bin assignments, keep the coffee urn full. Conversational role — good for first-timers.</div>
+                  <div class="meta">Pacifica<span class="sep"></span>Sat Jun 21</div>
+                </div>
+                <button class="expand"><span class="chev">▾</span></button>
+              </li>
+            </ul>
+
+            <div class="submit-row">
+              <button class="btn">Submit availability →</button>
+            </div>
+          </article>
+        </section>
+
+        <section class="block">
+          <h2>My Assignments</h2>
+
+          <article class="assignment">
+            <div class="accent-bar"></div>
+            <div class="inner">
+              <div class="assignment-head">
+                <span class="assignment-title">Driftwood collection &amp; sort</span>
+                <span class="assignment-when">Sat Jun 21 · 10:00 – 13:00</span>
+              </div>
+              <div class="assignment-meta">
+                <span><b>Crew lead:</b> Tania M.</span>
+                <span><b>Location:</b> Pacifica north lot</span>
+                <span><b>Status:</b> confirmed</span>
+              </div>
+              <div class="assignment-actions">
+                <button class="chip-btn"><span class="ico">📅</span> Add to calendar</button>
+                <button class="chip-btn"><span class="ico">📎</span> Pre-shift checklist</button>
+                <button class="chip-btn"><span class="ico">↩</span> Withdraw</button>
+              </div>
+            </div>
+          </article>
+
+          <article class="assignment">
+            <div class="accent-bar"></div>
+            <div class="inner">
+              <div class="assignment-head">
+                <span class="assignment-title">Hot drinks &amp; check-in table</span>
+                <span class="assignment-when">Sat Jun 21 · 08:30 – 12:00</span>
+              </div>
+              <div class="assignment-meta">
+                <span><b>Crew lead:</b> Pat O.</span>
+                <span><b>Location:</b> Pacifica check-in tent</span>
+                <span><b>Status:</b> waitlisted</span>
+              </div>
+              <div class="assignment-actions">
+                <button class="chip-btn"><span class="ico">📅</span> Add to calendar</button>
+                <button class="chip-btn"><span class="ico">↩</span> Withdraw</button>
+              </div>
+            </div>
+          </article>
+
+          <article class="assignment">
+            <div class="accent-bar"></div>
+            <div class="inner">
+              <div class="assignment-head">
+                <span class="assignment-title">Mobile dunny resupply</span>
+                <span class="assignment-when">Sun Jun 22 · 14:00 – 17:00</span>
+              </div>
+              <div class="assignment-meta">
+                <span><b>Crew lead:</b> —</span>
+                <span><b>Location:</b> Pacifica south lot</span>
+                <span><b>Status:</b> confirmed</span>
+              </div>
+              <div class="assignment-actions">
+                <button class="chip-btn"><span class="ico">📅</span> Add to calendar</button>
+                <button class="chip-btn"><span class="ico">↩</span> Withdraw</button>
+              </div>
+            </div>
+          </article>
+        </section>
+
+      </div>
+    </div>
+
+    <!-- ──────────── MOBILE ──────────── -->
+    <div class="frame mobile">
+      <div class="frame-label">Mobile — 375px</div>
+      <div class="frame-body">
+        <div class="page-title"><span class="accent"></span><h1>Volunteering</h1></div>
+        <section class="block">
+          <h2>Calls <em>waiting</em></h2>
+          <article class="call">
+            <header class="call-head">
+              <span class="call-title" style="font-size:1.05rem;">Coastal cleanup</span>
+              <span class="call-meta">5</span>
+            </header>
+            <div class="call-controls" style="gap:8px;">
+              <span class="pill-select">
+                <label>Max/wk</label>
+                <select><option>2</option><option selected>3</option><option>4</option></select>
+              </span>
+            </div>
+            <ul class="task-list">
+              <li class="task checked">
+                <input type="checkbox" class="check" checked>
+                <div class="body">
+                  <div class="name">Sat morning sweep</div>
+                  <div class="summary">Walk the south stretch with bags &amp; pickers — focus on micro-plastics above the high-water line.</div>
+                  <div class="meta">Sat Jun 21</div>
+                </div>
+                <button class="expand"><span class="chev">▾</span></button>
+              </li>
+              <li class="task expanded">
+                <input type="checkbox" class="check" checked>
+                <div class="body">
+                  <div class="name">Driftwood collection</div>
+                  <div class="summary">Stage driftwood pulled from the upper beach into the sort pile — separating burnable vs. structural…</div>
+                  <div class="meta">Sat Jun 21</div>
+                </div>
+                <button class="expand"><span class="chev">▾</span></button>
+                <dl class="task-detail">
+                  <dd class="description">Stage driftwood pulled from the upper beach into the sort pile by the lot — separating burnable vs. structural pieces.
+
+Anything over 6 ft. or with intact hardware (nails, brackets) goes to the structural side; the rest stacks under the canopy for the Tuesday firewood pickup.</dd>
+                  <dt>Time</dt><dd>10:00 – 13:00</dd>
+                  <dt>Crew</dt><dd>4 needed</dd>
+                  <dt>Notes</dt><dd>Closed-toe shoes</dd>
+                </dl>
+              </li>
+              <li class="task">
+                <input type="checkbox" class="check">
+                <div class="body">
+                  <div class="name">Dunny resupply</div>
+                  <div class="summary">Restock the two portable toilets — TP, hand-sanitizer, fresh garbage liners.</div>
+                  <div class="meta">Sun Jun 22</div>
+                </div>
+                <button class="expand"><span class="chev">▾</span></button>
+              </li>
+              <li class="task">
+                <input type="checkbox" class="check">
+                <div class="body">
+                  <div class="name">Recycling sort</div>
+                  <div class="summary">Sort collected bags at the recycling tent: glass, aluminum, mixed plastic.</div>
+                  <div class="meta">Sun Jun 22</div>
+                </div>
+                <button class="expand"><span class="chev">▾</span></button>
+              </li>
+            </ul>
+            <div class="submit-row">
+              <button class="btn" style="width:100%;justify-content:center;">Submit availability</button>
+            </div>
+          </article>
+        </section>
+        <section class="block">
+          <h2>Assignments</h2>
+          <article class="assignment">
+            <div class="accent-bar"></div>
+            <div class="inner">
+              <div class="assignment-head">
+                <span class="assignment-title" style="font-size:1rem;">Driftwood</span>
+                <span class="assignment-when">Sat 10–1</span>
+              </div>
+              <div class="assignment-actions">
+                <button class="chip-btn">📅 Calendar</button>
+                <button class="chip-btn">↩ Withdraw</button>
+              </div>
+            </div>
+          </article>
+          <article class="assignment">
+            <div class="accent-bar"></div>
+            <div class="inner">
+              <div class="assignment-head">
+                <span class="assignment-title" style="font-size:1rem;">Check-in tent</span>
+                <span class="assignment-when">Sat 8:30–12</span>
+              </div>
+              <div class="assignment-actions">
+                <button class="chip-btn">📅 Calendar</button>
+                <button class="chip-btn">↩ Withdraw</button>
+              </div>
+            </div>
+          </article>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const root = document.documentElement;
+    document.querySelectorAll('.seg button').forEach(b => {
+      b.addEventListener('click', () => {
+        const d = b.dataset.d;
+        root.setAttribute('data-density', d);
+        document.querySelectorAll('.seg button').forEach(x =>
+          x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+      });
+    });
+  </script>
+</body>
+</html>

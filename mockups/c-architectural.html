@@ -1,0 +1,648 @@
+<!doctype html>
+<html lang="en" data-density="standard">
+<head>
+  <meta charset="utf-8">
+  <title>Mockup C · Architectural</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap">
+  <style>
+    /* ─────────── tokens — architectural ─────────── */
+    :root {
+      --font-display: "Manrope", ui-sans-serif, system-ui, sans-serif;
+      --font-body: "Manrope", ui-sans-serif, system-ui, sans-serif;
+      --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+
+      --bg: #0e1015;
+      --surface: #161922;
+      --surface-2: #1c2030;
+      --surface-3: #232838;
+      --border: #2a3045;
+      --border-strong: #3a4060;
+      --text: #e6e9f0;
+      --text-2: #b3b9cb;
+      --text-3: #7a8195;
+      --accent: #6fe1c2;    /* mint */
+      --accent-2: #b39cff;  /* lilac */
+      --warn: #ffc467;
+      --bad: #ff8a8a;
+
+      --fz-body: 14.5px;
+      --fz-h1: 1.75rem;
+      --fz-h2: 0.7rem;
+      --lh: 1.5;
+      --sp-2: 6px; --sp-3: 8px; --sp-4: 12px; --sp-5: 18px; --sp-6: 26px;
+      --row-h: 40px;
+      --task-pad: 10px 12px;
+      --check-size: 18px;
+      --radius: 4px;
+      --btn-h: 36px;
+      --btn-pad-x: 14px;
+      --btn-fz: 0.82rem;
+    }
+    [data-density="compact"] {
+      --fz-body: 13px;
+      --fz-h1: 1.4rem;
+      --sp-2: 4px; --sp-3: 6px; --sp-4: 8px; --sp-5: 14px; --sp-6: 18px;
+      --row-h: 32px;
+      --task-pad: 5px 10px;
+      --check-size: 14px;
+      --btn-h: 30px; --btn-pad-x: 10px; --btn-fz: 0.78rem;
+      --radius: 3px;
+    }
+    [data-density="large"] {
+      --fz-body: 16px;
+      --fz-h1: 2.2rem;
+      --sp-2: 8px; --sp-3: 12px; --sp-4: 18px; --sp-5: 26px; --sp-6: 38px;
+      --row-h: 56px;
+      --task-pad: 18px 20px;
+      --check-size: 22px;
+      --btn-h: 44px; --btn-pad-x: 18px; --btn-fz: 0.92rem;
+      --radius: 6px;
+    }
+
+    *,*::before,*::after { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      font-family: var(--font-body);
+      font-size: var(--fz-body);
+      line-height: var(--lh);
+      color: var(--text);
+      background:
+        linear-gradient(to bottom, rgba(20,24,34,.9), rgba(14,16,21,1)),
+        var(--bg);
+      background-image:
+        linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px);
+      background-size: 28px 28px;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      font-feature-settings: "ss01" on, "ss02" on, "cv11" on;
+    }
+    h1, h2, h3 { margin: 0; color: var(--text); font-family: var(--font-display); }
+    h1 { font-size: var(--fz-h1); font-weight: 800; letter-spacing: -0.02em; }
+    h2 {
+      font-size: var(--fz-h2);
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-3);
+    }
+    em { font-style: normal; color: var(--text-3); font-weight: 500; text-transform: none; letter-spacing: 0; font-size: 0.85em; }
+
+    /* ─────────── chrome ─────────── */
+    .chrome {
+      position: sticky; top: 0; z-index: 10;
+      display: flex; align-items: center; gap: var(--sp-5);
+      padding: 10px 20px;
+      background: rgba(14,16,21,.78);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .brand {
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      color: var(--text);
+      font-weight: 500;
+    }
+    .brand b { color: var(--accent); font-weight: 700; }
+    .brand em { color: var(--text-3); font-family: var(--font-body); margin-left: 8px; font-size: 0.85em; }
+    .spacer { flex: 1; }
+    .seg {
+      display: inline-flex;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      padding: 2px;
+    }
+    .seg button {
+      appearance: none; border: 0; background: transparent;
+      padding: 5px 12px; cursor: pointer; color: var(--text-3); font: inherit;
+      border-radius: 3px;
+    }
+    .seg button[aria-pressed="true"] {
+      background: var(--surface-3); color: var(--text); box-shadow: inset 0 0 0 1px var(--border-strong);
+    }
+
+    /* ─────────── canvas ─────────── */
+    .frames {
+      display: grid; grid-template-columns: 1fr 400px; gap: 24px;
+      padding: 24px;
+      max-width: 1480px; margin: 0 auto;
+      align-items: start;
+    }
+    @media (max-width: 1100px) { .frames { grid-template-columns: 1fr; } }
+    .frame {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .frame-label {
+      font-family: var(--font-mono); font-size: 0.72rem;
+      letter-spacing: 0.04em; color: var(--text-3);
+      padding: 10px 14px;
+      background: var(--surface-2);
+      border-bottom: 1px solid var(--border);
+    }
+    .frame-body { padding: var(--sp-5); }
+    .frame.mobile { max-width: 400px; }
+    .frame.mobile .frame-body { padding: 16px; font-size: 13.5px; }
+
+    /* ─────────── page header ─────────── */
+    .page-title {
+      display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 12px;
+      padding-bottom: var(--sp-4);
+      border-bottom: 1px solid var(--border);
+      margin-bottom: var(--sp-5);
+    }
+    .crumb {
+      font-family: var(--font-mono); font-size: 0.72rem;
+      color: var(--text-3); margin-bottom: 6px;
+    }
+    .crumb b { color: var(--text); font-weight: 500; }
+    .meta-counters { display: flex; gap: 18px; font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-3); }
+    .meta-counters span b { color: var(--accent); font-weight: 700; }
+
+    section.block { margin-bottom: var(--sp-6); }
+    .section-head {
+      display: flex; align-items: center; gap: var(--sp-3);
+      margin-bottom: var(--sp-4);
+    }
+    .section-head .dot { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; }
+    .section-head .rule { flex: 1; height: 1px; background: var(--border); }
+    .section-head .stat { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-3); }
+
+    /* ─────────── call card ─────────── */
+    .call {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-bottom: var(--sp-4);
+    }
+    .call-head {
+      display: grid; grid-template-columns: auto 1fr auto; align-items: center;
+      gap: var(--sp-3);
+      padding: var(--sp-4) var(--sp-5);
+      border-bottom: 1px solid var(--border);
+      background:
+        linear-gradient(90deg, rgba(111,225,194,.06), transparent 30%),
+        var(--surface);
+    }
+    .call-head .ident {
+      width: 6px; height: 28px; background: var(--accent); border-radius: 2px;
+    }
+    .call-title { font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; color: var(--text); letter-spacing: -0.01em; }
+    .call-title .key { font-family: var(--font-mono); color: var(--text-3); font-weight: 500; margin-right: 8px; }
+    .call-meta {
+      font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-3);
+      display: flex; gap: 16px;
+    }
+    .call-meta b { color: var(--text); font-weight: 500; }
+
+    .call-controls {
+      display: flex; align-items: center; gap: var(--sp-4);
+      padding: var(--sp-3) var(--sp-5);
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-2);
+      flex-wrap: wrap;
+    }
+    .pill-select {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-family: var(--font-mono); font-size: 0.78rem;
+    }
+    .pill-select label { color: var(--text-3); }
+    .pill-select select {
+      appearance: none; -webkit-appearance: none;
+      background: var(--surface); border: 1px solid var(--border); color: var(--text);
+      padding: 4px 22px 4px 8px; font: inherit; font-family: var(--font-mono); font-weight: 500;
+      border-radius: var(--radius);
+      background-image:
+        linear-gradient(45deg, transparent 50%, var(--text-3) 50%),
+        linear-gradient(135deg, var(--text-3) 50%, transparent 50%);
+      background-position: calc(100% - 12px) 55%, calc(100% - 8px) 55%;
+      background-size: 4px 4px, 4px 4px; background-repeat: no-repeat;
+    }
+    .view-toggle {
+      margin-left: auto; display: inline-flex; gap: 0;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      font-family: var(--font-mono); font-size: 0.72rem;
+    }
+    .view-toggle button {
+      appearance: none; border: 0; background: transparent;
+      padding: 5px 12px; cursor: pointer; font: inherit; color: var(--text-3);
+      border-right: 1px solid var(--border);
+    }
+    .view-toggle button:last-child { border-right: 0; }
+    .view-toggle button.active { background: var(--surface-3); color: var(--text); }
+
+    /* ─────────── task table-style ─────────── */
+    .task-list { list-style: none; margin: 0; padding: 0; }
+    .task {
+      display: grid;
+      grid-template-columns: auto 1fr auto auto auto;
+      align-items: center;
+      gap: var(--sp-3);
+      padding: var(--task-pad);
+      min-height: var(--row-h);
+      border-bottom: 1px solid var(--border);
+      transition: background .12s;
+    }
+    .task:last-child { border-bottom: 0; }
+    .task:hover { background: var(--surface-2); }
+    .task.checked { background: linear-gradient(90deg, rgba(111,225,194,.07), transparent 40%); }
+    .check {
+      appearance: none; -webkit-appearance: none;
+      width: var(--check-size); height: var(--check-size);
+      border: 1px solid var(--border-strong); background: var(--surface);
+      border-radius: 3px; cursor: pointer; position: relative;
+    }
+    .check:checked { background: var(--accent); border-color: var(--accent); }
+    .check:checked::after {
+      content: ""; position: absolute;
+      left: 25%; top: 8%; width: 35%; height: 70%;
+      border-right: 2px solid var(--bg); border-bottom: 2px solid var(--bg);
+      transform: rotate(45deg);
+    }
+    .task .name { font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .task .name .id { font-family: var(--font-mono); color: var(--text-3); font-weight: 500; font-size: 0.82em; }
+    .task .when {
+      font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+      color: var(--text-2); font-size: 0.82em; white-space: nowrap;
+    }
+    .task .where { font-family: var(--font-mono); color: var(--text-3); font-size: 0.82em; }
+    .task .status-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 2px 8px 2px 7px;
+      border-radius: 999px;
+      background: var(--surface-2);
+      font-family: var(--font-mono); font-size: 0.7rem;
+      color: var(--text-2);
+      border: 1px solid var(--border);
+    }
+    .status-pill .led { width: 6px; height: 6px; border-radius: 50%; background: var(--text-3); }
+    .status-pill.ok       .led { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+    .status-pill.conflict .led { background: var(--warn); box-shadow: 0 0 6px var(--warn); }
+    .expand {
+      appearance: none; border: 0; background: transparent; cursor: pointer;
+      width: 28px; height: 28px; color: var(--text-3);
+      display: grid; place-items: center; border-radius: var(--radius);
+    }
+    .expand:hover { background: var(--surface-3); }
+    .chev { transition: transform .2s; }
+    .task.expanded .chev { transform: rotate(180deg); }
+    .task-detail {
+      grid-column: 1 / -1;
+      margin-top: var(--sp-3);
+      padding: var(--sp-3);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      display: grid; grid-template-columns: max-content 1fr; gap: 4px var(--sp-4);
+      font-family: var(--font-mono); font-size: 0.82em;
+    }
+    .task-detail dt { color: var(--text-3); }
+    .task-detail dd { margin: 0; color: var(--text-2); }
+    .task:not(.expanded) .task-detail { display: none; }
+
+    /* compact = tight rows; large = column gets a card halo */
+    [data-density="large"] .task {
+      grid-template-columns: auto 1fr auto auto auto;
+      margin: 8px; padding: 16px; min-height: 56px;
+      background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius);
+    }
+    [data-density="compact"] .task { padding: 4px 12px; min-height: 32px; }
+    [data-density="compact"] .task .name { font-weight: 500; }
+
+    /* ─────── submit footer (terminal-y) ─────── */
+    .submit-row {
+      display: flex; align-items: center; gap: var(--sp-3);
+      padding: var(--sp-3) var(--sp-5);
+      background: var(--surface-2);
+      border-top: 1px solid var(--border);
+    }
+    .submit-row .status {
+      font-family: var(--font-mono); font-size: 0.76rem; color: var(--text-3);
+    }
+    .submit-row .status b { color: var(--accent); font-weight: 500; }
+    .submit-row .spacer { flex: 1; }
+    .btn {
+      appearance: none; border: 1px solid transparent; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 8px;
+      height: var(--btn-h); padding: 0 var(--btn-pad-x);
+      border-radius: var(--radius);
+      font: inherit; font-weight: 600; font-size: var(--btn-fz);
+      background: var(--accent); color: var(--bg);
+      font-family: var(--font-mono);
+      transition: filter .15s, background .15s;
+    }
+    .btn:hover { filter: brightness(1.1); }
+    .btn .kbd { font-size: 0.78em; opacity: 0.5; border: 1px solid currentColor; padding: 0 4px; border-radius: 3px; margin-left: 4px; }
+    .btn.ghost { background: transparent; color: var(--text-2); border-color: var(--border); }
+    .btn.ghost:hover { background: var(--surface-3); color: var(--text); }
+
+    /* ─────── assignments grid ─────── */
+    .assignment-table {
+      display: grid;
+      grid-template-columns: 9ch 1fr auto auto;
+      gap: 0;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .assignment-table .row {
+      display: contents;
+    }
+    .assignment-table .cell {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      display: flex; align-items: center; gap: 10px;
+      min-width: 0;
+    }
+    .assignment-table .row:last-child .cell { border-bottom: 0; }
+    .assignment-table .row:hover .cell { background: var(--surface-2); }
+    .at-when {
+      font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+      color: var(--text-2); font-size: 0.85em; display: block;
+    }
+    .at-when .d { color: var(--accent); font-weight: 700; }
+    .at-task { color: var(--text); font-weight: 600; }
+    .at-task .where { font-family: var(--font-mono); color: var(--text-3); font-weight: 500; font-size: 0.85em; margin-left: 6px; }
+    .at-actions { display: flex; gap: 4px; }
+    .icon-btn {
+      appearance: none; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2);
+      width: 28px; height: 28px; border-radius: var(--radius); cursor: pointer;
+      display: grid; place-items: center; transition: background .12s, color .12s, border-color .12s;
+    }
+    .icon-btn:hover { background: var(--surface-3); color: var(--text); border-color: var(--border-strong); }
+    .icon-btn.danger:hover { color: var(--bad); border-color: var(--bad); }
+
+    /* compact assignment = thinner rows */
+    [data-density="compact"] .assignment-table .cell { padding: 6px 10px; }
+    [data-density="compact"] .at-actions .icon-btn { width: 22px; height: 22px; }
+    [data-density="large"] .assignment-table .cell { padding: 18px 18px; }
+  </style>
+</head>
+<body>
+  <div class="chrome">
+    <div class="brand">volunteer-call <b>/</b> volunteering <em>· mockup C · architectural</em></div>
+    <div class="spacer"></div>
+    <div class="seg" role="radiogroup" aria-label="Density">
+      <button data-d="compact"  aria-pressed="false">compact</button>
+      <button data-d="standard" aria-pressed="true">standard</button>
+      <button data-d="large"    aria-pressed="false">large</button>
+    </div>
+    <a href="./index.html" style="color:#7a8195;text-decoration:none;font-size:.8rem;font-family:JetBrains Mono,monospace;">← index</a>
+  </div>
+
+  <div class="frames">
+    <!-- ──────────── DESKTOP ──────────── -->
+    <div class="frame desktop">
+      <div class="frame-label">DESKTOP / TABLET · 980</div>
+      <div class="frame-body">
+
+        <header class="page-title">
+          <div>
+            <div class="crumb"><b>~</b> / volunteering</div>
+            <h1>Volunteering</h1>
+          </div>
+          <div class="meta-counters">
+            <span>calls <b>2</b></span>
+            <span>selected <b>3</b></span>
+            <span>assignments <b>3</b></span>
+          </div>
+        </header>
+
+        <section class="block">
+          <div class="section-head">
+            <span class="dot"></span><h2>Calls · waiting for volunteers</h2>
+            <div class="rule"></div>
+            <div class="stat">VC-014 · 5 tasks</div>
+          </div>
+
+          <article class="call">
+            <header class="call-head">
+              <span class="ident"></span>
+              <div>
+                <div class="call-title"><span class="key">VC-014</span>June 21 — Coastal cleanup, Pacifica</div>
+              </div>
+              <div class="call-meta">
+                <span>posted <b>6d</b></span>
+                <span>tasks <b>5</b></span>
+                <span>picked <b>3</b></span>
+              </div>
+            </header>
+
+            <div class="call-controls">
+              <span class="pill-select">
+                <label>max/wk</label>
+                <select><option>2</option><option selected>3</option><option>4</option></select>
+              </span>
+              <span class="pill-select">
+                <label>wk2</label>
+                <select><option>2</option><option selected>3</option></select>
+              </span>
+              <div class="view-toggle">
+                <button class="active">rows</button>
+                <button>table</button>
+              </div>
+            </div>
+
+            <ul class="task-list">
+              <li class="task checked">
+                <input type="checkbox" class="check" checked>
+                <div class="name"><span class="id">T-01</span>Saturday morning beach sweep</div>
+                <span class="when">Sat 21 Jun</span>
+                <span class="where">Pacifica</span>
+                <span class="status-pill ok"><span class="led"></span>ready</span>
+              </li>
+              <li class="task expanded checked">
+                <input type="checkbox" class="check" checked>
+                <div class="name"><span class="id">T-02</span>Driftwood collection &amp; sort</div>
+                <span class="when">Sat 21 · 10:00–13:00</span>
+                <span class="where">Pacifica</span>
+                <span class="status-pill conflict"><span class="led"></span>cal conflict</span>
+                <dl class="task-detail">
+                  <dt>volunteers</dt><dd>4 needed (1 skilled)</dd>
+                  <dt>conflict</dt><dd>iCal: "Lunch — A. Brown" 11:30–12:30</dd>
+                  <dt>notes</dt><dd>Bring gloves, closed-toe shoes. Tide is out at 11:30.</dd>
+                </dl>
+              </li>
+              <li class="task">
+                <input type="checkbox" class="check">
+                <div class="name"><span class="id">T-03</span>Mobile dunny resupply</div>
+                <span class="when">Sun 22 Jun</span>
+                <span class="where">Pacifica</span>
+                <span class="status-pill ok"><span class="led"></span>ready</span>
+              </li>
+              <li class="task">
+                <input type="checkbox" class="check">
+                <div class="name"><span class="id">T-04</span>Recycling sorter — afternoon shift</div>
+                <span class="when">Sun 22 Jun</span>
+                <span class="where">Pacifica</span>
+                <span class="status-pill ok"><span class="led"></span>ready</span>
+              </li>
+              <li class="task checked">
+                <input type="checkbox" class="check" checked>
+                <div class="name"><span class="id">T-05</span>Hot drinks &amp; check-in table</div>
+                <span class="when">Sat 21 · 08:30–12:00</span>
+                <span class="where">Pacifica</span>
+                <span class="status-pill ok"><span class="led"></span>ready</span>
+              </li>
+            </ul>
+
+            <div class="submit-row">
+              <div class="status">selected: <b>3 / 5</b> · within weekly cap: <b>2 / 3</b></div>
+              <div class="spacer"></div>
+              <button class="btn ghost">save draft</button>
+              <button class="btn">submit <span class="kbd">⏎</span></button>
+            </div>
+          </article>
+        </section>
+
+        <section class="block">
+          <div class="section-head">
+            <span class="dot"></span><h2>My Assignments</h2>
+            <div class="rule"></div>
+            <div class="stat">3 upcoming</div>
+          </div>
+
+          <div class="assignment-table">
+            <div class="row">
+              <div class="cell"><span class="at-when"><span class="d">21 JUN</span><br>10:00–13:00</span></div>
+              <div class="cell"><span class="at-task">Driftwood collection &amp; sort<span class="where">pacifica.north</span></span></div>
+              <div class="cell"><span class="status-pill ok"><span class="led"></span>confirmed</span></div>
+              <div class="cell at-actions">
+                <button class="icon-btn" title="Add to calendar">📅</button>
+                <button class="icon-btn" title="Checklist">☑</button>
+                <button class="icon-btn danger" title="Withdraw">×</button>
+              </div>
+            </div>
+            <div class="row">
+              <div class="cell"><span class="at-when"><span class="d">21 JUN</span><br>08:30–12:00</span></div>
+              <div class="cell"><span class="at-task">Hot drinks &amp; check-in table<span class="where">pacifica.tent</span></span></div>
+              <div class="cell"><span class="status-pill conflict"><span class="led"></span>waitlist</span></div>
+              <div class="cell at-actions">
+                <button class="icon-btn" title="Add to calendar">📅</button>
+                <button class="icon-btn danger" title="Withdraw">×</button>
+              </div>
+            </div>
+            <div class="row">
+              <div class="cell"><span class="at-when"><span class="d">22 JUN</span><br>14:00–17:00</span></div>
+              <div class="cell"><span class="at-task">Mobile dunny resupply<span class="where">pacifica.south</span></span></div>
+              <div class="cell"><span class="status-pill ok"><span class="led"></span>confirmed</span></div>
+              <div class="cell at-actions">
+                <button class="icon-btn" title="Add to calendar">📅</button>
+                <button class="icon-btn danger" title="Withdraw">×</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </div>
+
+    <!-- ──────────── MOBILE ──────────── -->
+    <div class="frame mobile">
+      <div class="frame-label">MOBILE · 375</div>
+      <div class="frame-body">
+        <header class="page-title">
+          <div>
+            <div class="crumb"><b>~</b>/volunteering</div>
+            <h1 style="font-size:1.5rem;">Volunteering</h1>
+          </div>
+          <div class="meta-counters" style="flex-direction:column;gap:2px;text-align:right;">
+            <span>3 / 5</span>
+            <span>3 asn</span>
+          </div>
+        </header>
+        <section class="block">
+          <div class="section-head"><span class="dot"></span><h2>Calls</h2><div class="rule"></div><div class="stat">VC-014</div></div>
+          <article class="call">
+            <header class="call-head">
+              <span class="ident"></span>
+              <div>
+                <div class="call-title" style="font-size:0.95rem;"><span class="key">VC-014</span>Coastal cleanup</div>
+              </div>
+            </header>
+            <div class="call-controls">
+              <span class="pill-select"><label>max/wk</label><select><option>2</option><option selected>3</option></select></span>
+            </div>
+            <ul class="task-list">
+              <li class="task checked" style="grid-template-columns:auto 1fr auto;">
+                <input type="checkbox" class="check" checked>
+                <div>
+                  <div class="name"><span class="id">T-01</span>Sat morning sweep</div>
+                  <div class="when" style="margin-top:2px;">Sat 21 Jun · Pacifica</div>
+                </div>
+                <span class="status-pill ok"><span class="led"></span>ok</span>
+              </li>
+              <li class="task expanded checked" style="grid-template-columns:auto 1fr auto;">
+                <input type="checkbox" class="check" checked>
+                <div>
+                  <div class="name"><span class="id">T-02</span>Driftwood collection</div>
+                  <div class="when" style="margin-top:2px;">Sat 21 · 10:00–13:00</div>
+                </div>
+                <span class="status-pill conflict"><span class="led"></span>conflict</span>
+                <dl class="task-detail">
+                  <dt>crew</dt><dd>4 needed</dd>
+                  <dt>notes</dt><dd>Closed-toe shoes</dd>
+                </dl>
+              </li>
+              <li class="task" style="grid-template-columns:auto 1fr auto;">
+                <input type="checkbox" class="check">
+                <div>
+                  <div class="name"><span class="id">T-03</span>Dunny resupply</div>
+                  <div class="when" style="margin-top:2px;">Sun 22 Jun</div>
+                </div>
+                <span class="status-pill ok"><span class="led"></span>ok</span>
+              </li>
+            </ul>
+            <div class="submit-row">
+              <div class="status">3 / 5</div>
+              <div class="spacer"></div>
+              <button class="btn">submit ⏎</button>
+            </div>
+          </article>
+        </section>
+        <section class="block">
+          <div class="section-head"><span class="dot"></span><h2>Assignments</h2><div class="rule"></div></div>
+          <div class="assignment-table" style="grid-template-columns:8ch 1fr auto;">
+            <div class="row">
+              <div class="cell"><span class="at-when"><span class="d">21 JUN</span><br>10–13</span></div>
+              <div class="cell"><span class="at-task" style="font-size:0.9rem;">Driftwood<br><span class="where">north lot</span></span></div>
+              <div class="cell at-actions"><button class="icon-btn">📅</button></div>
+            </div>
+            <div class="row">
+              <div class="cell"><span class="at-when"><span class="d">21 JUN</span><br>8–12</span></div>
+              <div class="cell"><span class="at-task" style="font-size:0.9rem;">Check-in<br><span class="where">tent</span></span></div>
+              <div class="cell at-actions"><button class="icon-btn">📅</button></div>
+            </div>
+            <div class="row">
+              <div class="cell"><span class="at-when"><span class="d">22 JUN</span><br>14–17</span></div>
+              <div class="cell"><span class="at-task" style="font-size:0.9rem;">Dunny resupply<br><span class="where">south lot</span></span></div>
+              <div class="cell at-actions"><button class="icon-btn">📅</button></div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const root = document.documentElement;
+    document.querySelectorAll('.seg button').forEach(b => {
+      b.addEventListener('click', () => {
+        root.setAttribute('data-density', b.dataset.d);
+        document.querySelectorAll('.seg button').forEach(x =>
+          x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+      });
+    });
+  </script>
+</body>
+</html>

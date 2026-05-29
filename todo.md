@@ -151,7 +151,7 @@ verification), `deploy.yml` (Docker build to GHCR + GCP Artifact
 Registry, Cloud Run deploy on `v*` tags), Dependabot config for npm
 + uv lockfiles.
 
-### [/] feat/15-multiple-calendars
+### ✅ feat/15-multiple-calendars
 
 **Decision recorded**: store a list of `(provider, url, label)` per
 person in a child table; conflict detection merges events from every
@@ -173,7 +173,7 @@ connected calendar (so personal + work meetings both block a task).
   adding/removing a calendar invalidates correctly. Continue to use
   the existing per-URL fetcher under the hood.
 
-### [/] feat/16-people-pagination
+### ✅ feat/16-people-pagination
 
 `routes/people.py::list_people` silently truncates results at
 `.limit(25)`. With 57 volunteers in the seed and 25 visible, an
@@ -205,7 +205,7 @@ otherwise the pluralized role name ("staff", "team leaders",
 - Backend test: `total` reflects the filter (`role`, `program`,
   `search`, `active`) and is independent of `start` / `count`.
 
-### [/] feat/17-convert-remaining-native-selects
+### ✅ feat/17-convert-remaining-native-selects
 
 The Select.svelte component (feat/09) only got adopted in a few
 spots; eight native `<select>`s remain that still pop the OS-native
@@ -235,6 +235,9 @@ Notes:
 - Update the demo helpers (`pickComboboxByAriaLabel` already exists)
   for any new aria-label introduced by the conversion.
 
+## Task
+Review the state of the UI.  Consider that many users will be older, not particularly "tech-centric".  Comment on areas where the interface may be too complex of clever, suggest any improvements to make the overall interface simpler and understandable.  Maybe following Apple's practices of just providing "one true way" rather than lots of options.
+
 ## Deferred — questions for the user
 
 These need a decision before they can be executed unattended.
@@ -255,3 +258,10 @@ These need a decision before they can be executed unattended.
   current note; revisit when traffic warrants.
 - **Resend for a particular task.** (Already deferred — spec needed.)
 - **Gamification.** (Already deferred — design discussion.)
+- **Withdraw from an assignment.** Surfaced in the UI mockup
+  exploration on 2026-05-29 — once a volunteer is *assigned* (not just
+  available), give them a way to back out. Open design questions: hard
+  deadline (e.g. ≥48h before task) vs. always allowed with a notice
+  back to the team lead; what happens to the assignment row (delete vs.
+  mark `withdrawn`); does a withdrawal automatically re-open the slot
+  in the call; how/whether the team lead is notified.

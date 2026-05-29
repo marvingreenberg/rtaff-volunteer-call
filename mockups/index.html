@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>volunteer-call · UI mockups</title>
+  <style>
+    :root { color-scheme: light; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Helvetica Neue", sans-serif;
+      background: #faf9f6;
+      color: #1e2f3d;
+      padding: 4rem 2rem;
+      max-width: 720px;
+      margin-inline: auto;
+    }
+    h1 {
+      font-family: ui-serif, "Iowan Old Style", "Apple Garamond", Baskerville, "Times New Roman", serif;
+      font-weight: 400;
+      letter-spacing: -0.5px;
+      font-size: 2.25rem;
+      margin: 0 0 0.25rem 0;
+    }
+    p.lede { color: #555; margin: 0 0 2.5rem 0; }
+    ul { list-style: none; padding: 0; display: grid; gap: 1rem; }
+    li a {
+      display: block;
+      padding: 1.25rem 1.5rem;
+      background: white;
+      border: 1px solid #e4dfda;
+      border-radius: 8px;
+      text-decoration: none;
+      color: inherit;
+      transition: box-shadow .15s, border-color .15s;
+    }
+    li a:hover {
+      box-shadow: 0 2px 12px rgba(0,0,0,.06);
+      border-color: #cdc7c0;
+    }
+    .label { font-weight: 600; font-size: 1.1rem; }
+    .tag {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      vertical-align: middle;
+      margin-left: 0.5rem;
+    }
+    .tag-rec { background: #d4edda; color: #276749; }
+    .desc { color: #555; margin-top: 0.25rem; font-size: 0.92rem; line-height: 1.5; }
+    code { background: #f4f1ec; padding: 1px 5px; border-radius: 3px; font-size: 0.85em; }
+  </style>
+</head>
+<body>
+  <h1>volunteer-call mockups</h1>
+  <p class="lede">
+    Three aesthetic directions applied to the volunteer-response and assignment+task views.
+    Each file has a working density toggle (top right) so the
+    <code>compact / standard / large</code> deltas are visible, not just described.
+    Mobile preview is rendered alongside desktop in each file.
+  </p>
+  <ul>
+    <li>
+      <a href="./a-editorial.html">
+        <div class="label">A · Editorial-refined</div>
+        <div class="desc">
+          Print-weekly feel. Hairline dividers replace card borders. Display font swapped
+          to Fraunces; body to Söhne-alike. Numerics get tabular tracking. Structure comes
+          from spacing.
+        </div>
+      </a>
+    </li>
+    <li>
+      <a href="./b-soft-modular.html">
+        <div class="label">B · Soft-modular <span class="tag tag-rec">recommended</span></div>
+        <div class="desc">
+          Linear/Notion-leaning. Larger radii (12px), layered surfaces with subtle gradient
+          page background, tinted card heads using brand colors at low opacity. Density tiers
+          actually restructure card grouping (large = each task its own card, compact = single table).
+        </div>
+      </a>
+    </li>
+    <li>
+      <a href="./c-architectural.html">
+        <div class="label">C · Architectural</div>
+        <div class="desc">
+          Vercel/Railway-leaning. Sharp 4px radii, JetBrains Mono for numerics and timestamps,
+          confident grid with thin guide lines, status pills with leading colored dot. Numbers
+          feel important.
+        </div>
+      </a>
+    </li>
+  </ul>
+</body>
+</html>
