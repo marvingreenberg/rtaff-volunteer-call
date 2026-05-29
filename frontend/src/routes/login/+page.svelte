@@ -35,7 +35,7 @@
 </svelte:head>
 
 <div class="login-container">
-  <div class="login-card">
+  <div class="card login-card">
     <div class="logo-wrap">
       <img src="/images/rt-aff-logo.png" alt="RT-AFF Logo" class="logo" />
     </div>
@@ -50,8 +50,8 @@
       <p class="hint">Check your email (or the backend console in dev mode) for the link.</p>
     {:else}
       <form onsubmit={handleSubmit}>
-        <div class="form-group">
-          <label for="email">Email Address</label>
+        <label class="form-field" for="email">
+          Email Address
           <input
             type="email"
             id="email"
@@ -60,7 +60,7 @@
             required
             disabled={status === 'loading'}
           />
-        </div>
+        </label>
 
         {#if status === 'error'}
           <div class="alert alert-error">
@@ -82,21 +82,18 @@
     justify-content: center;
     align-items: center;
     min-height: 80vh;
-    padding: var(--spacing-md);
+    padding: var(--sp-4);
   }
 
   .login-card {
-    background: var(--rt-white);
-    padding: var(--spacing-xl);
-    border-radius: var(--card-radius);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     width: 100%;
     max-width: 400px;
     text-align: center;
+    padding: var(--sp-6);
   }
 
   .logo-wrap {
-    margin-bottom: var(--spacing-lg);
+    margin-bottom: var(--sp-5);
   }
 
   .logo {
@@ -105,52 +102,29 @@
   }
 
   h1 {
-    margin: 0 0 var(--spacing-sm) 0;
+    margin: 0 0 var(--sp-3) 0;
     font-size: 1.75rem;
     color: var(--rt-dark);
   }
 
   .subtitle {
-    color: var(--rt-text-light);
-    margin-bottom: var(--spacing-xl);
+    color: var(--rt-text-muted);
+    margin-bottom: var(--sp-5);
   }
 
-  .form-group {
+  .form-field {
     text-align: left;
-    margin-bottom: var(--spacing-lg);
-  }
-
-  label {
-    display: block;
-    margin-bottom: var(--spacing-sm);
-    font-weight: 500;
-    font-size: var(--font-size-sm);
-  }
-
-  input {
-    width: 100%;
-    padding: var(--spacing-md);
-    border: 1px solid var(--rt-gray-200);
-    border-radius: var(--card-radius);
-    font-size: var(--btn-font-size);
-    transition: border-color 0.2s;
-  }
-
-  input:focus {
-    outline: none;
-    border-color: var(--color-primary);
+    margin-bottom: var(--sp-5);
   }
 
   .btn-block {
     width: 100%;
-    padding: var(--spacing-md);
-    font-size: var(--btn-font-size);
   }
 
   .alert {
-    padding: var(--spacing-md);
-    border-radius: var(--card-radius);
-    margin-bottom: var(--spacing-lg);
+    padding: var(--sp-3) var(--sp-4);
+    border-radius: var(--radius-sm);
+    margin-bottom: var(--sp-4);
     font-size: var(--font-size-sm);
     text-align: left;
   }
@@ -168,7 +142,7 @@
   }
 
   .hint {
-    margin-top: var(--spacing-lg);
+    margin-top: var(--sp-4);
     font-size: var(--font-size-sm);
     color: var(--rt-text-muted);
   }
