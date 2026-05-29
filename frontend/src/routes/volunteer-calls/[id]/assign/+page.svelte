@@ -12,6 +12,7 @@
     type TaskAssignment,
   } from "$lib/api/client";
   import Breadcrumb from "$lib/components/Breadcrumb.svelte";
+  import PageHeader from "$lib/components/PageHeader.svelte";
   import Select from "$lib/components/Select.svelte";
   import AssignmentSpreadsheet from "$lib/components/AssignmentSpreadsheet.svelte";
   import { skillBadgeClass } from "$lib/utils/badges";
@@ -319,7 +320,7 @@
         { label: "Assign" },
       ]}
     />
-    <h1>Assign — {overview.call_title}</h1>
+    <PageHeader title="Assign — {overview.call_title}" />
 
     <div class="top-bar">
       <div class="counts-col">
@@ -590,12 +591,12 @@
 
 <style>
   /* The page itself is full-viewport so the spreadsheet view can use all
-     horizontal real estate, but the page header (title, top-bar, view
-     tabs) and the task-card stack don't benefit from being wider than the
-     cards themselves — keep them aligned to the same left-aligned 1400px
-     frame so the chrome doesn't sprawl on ultrawide monitors. */
-  .assign-page > h1,
+     horizontal real estate, but the page chrome (header, top-bar, tabs)
+     and the task-card stack don't benefit from being wider than the cards
+     themselves — keep everything aligned to the same left 1400px frame so
+     the chrome doesn't sprawl on ultrawide monitors. */
   .assign-page > :global(.breadcrumb),
+  .assign-page > :global(.page-header),
   .top-bar,
   .view-tabs,
   .task-cards {
@@ -604,8 +605,8 @@
   }
 
   /* Sticky two-row top bar that pins to the top of the viewport while the
-     task cards below scroll. Visually a "separate scroll area" without
-     fighting the existing page-md / layout-main flow. */
+     task cards below scroll. Uses the soft-modular surface + hairline
+     tokens so it reads as a peer to the .card surfaces below. */
   .top-bar {
     position: sticky;
     top: 0;
@@ -613,13 +614,13 @@
     display: grid;
     grid-template-columns: max-content 1fr max-content;
     grid-template-rows: auto auto;
-    gap: var(--spacing-xs) var(--spacing-lg);
+    gap: var(--sp-2) var(--sp-5);
     align-items: center;
-    padding: var(--spacing-sm) var(--spacing-md);
-    margin-bottom: var(--spacing-md);
-    background: var(--rt-bg-subtle, #f9f7f2);
-    border: 1px solid var(--rt-gray-200, #e4dfda);
-    border-radius: var(--card-radius, 8px);
+    padding: var(--sp-3) var(--sp-4);
+    margin-bottom: var(--sp-4);
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius);
   }
 
   .counts-col {
@@ -630,7 +631,7 @@
     justify-content: center;
     font-size: calc(var(--font-size-sm) * 1.5);
     font-weight: 700;
-    color: var(--rt-text-light, #555);
+    color: var(--rt-text-light);
     font-variant-numeric: tabular-nums;
   }
 
@@ -644,22 +645,22 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
-    gap: var(--spacing-xs);
+    gap: var(--sp-2);
     min-width: 0;
   }
 
   .message-area {
     font-size: calc(var(--font-size-sm) * 1.6);
-    color: var(--rt-text-light, #d81010);
+    color: var(--rt-text-light);
     line-height: 1.3;
   }
 
   .message-area[data-area="gate"] {
-    color: var(--rt-warning-text, #e1b402);
+    color: var(--rt-warning-text);
     font-weight: 700;
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
+    gap: var(--sp-3);
   }
 
   .gate-icon {
@@ -678,13 +679,13 @@
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    gap: var(--spacing-xs);
+    gap: var(--sp-2);
   }
 
   .policy-label {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
+    gap: var(--sp-3);
     font-size: calc(var(--font-size-sm) * 1.5);
     font-weight: 700;
   }
@@ -693,7 +694,6 @@
     color: var(--color-text);
   }
 
-
   .save-btn {
     min-width: 6em;
   }
@@ -701,7 +701,7 @@
   .action-buttons {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
+    gap: var(--sp-3);
   }
 
   .auto-leads-btn {
@@ -725,16 +725,16 @@
   .view-tabs {
     display: flex;
     gap: 2px;
-    margin-bottom: var(--spacing-md);
-    border-bottom: 1px solid var(--rt-gray-200, #e4dfda);
+    margin-bottom: var(--sp-4);
+    border-bottom: 1px solid var(--hairline);
   }
 
   .view-tab {
-    padding: var(--spacing-xs) var(--spacing-md);
+    padding: var(--sp-2) var(--sp-4);
     background: transparent;
     border: 0;
     border-bottom: 2px solid transparent;
-    color: var(--rt-text-muted, #777);
+    color: var(--rt-text-muted);
     cursor: pointer;
     font: inherit;
     font-weight: 500;
@@ -742,8 +742,8 @@
   }
 
   .view-tab.active {
-    color: var(--color-primary, #3a6db5);
-    border-bottom-color: var(--color-primary, #3a6db5);
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
   }
 
   .view-tab:hover:not(:disabled):not(.active) {
@@ -758,35 +758,28 @@
   .task-cards {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-md);
-    /* The page itself is full-viewport (so the spreadsheet view can use
-       all the horizontal real estate), but the task cards don't benefit
-       from being arbitrarily wide — cap so each card has comfortable
-       room for two volunteer columns at any density without growing to
-       fill an ultrawide monitor. */
-    max-width: 1400px;
-    width: 100%;
+    gap: var(--sp-4);
   }
 
   .task-meta {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-xs);
-    padding: var(--spacing-sm) 0;
-    border-bottom: 1px solid var(--rt-gray-200, #e4dfda);
-    margin-bottom: var(--spacing-sm);
+    gap: var(--sp-2);
+    padding: var(--sp-3) 0;
+    border-bottom: 1px solid var(--hairline);
+    margin-bottom: var(--sp-3);
   }
 
   .meta-row {
     display: grid;
     grid-template-columns: 7em minmax(0, 1fr);
-    gap: var(--spacing-sm);
+    gap: var(--sp-3);
     align-items: center;
     font-size: var(--font-size-sm);
   }
 
   .meta-label {
-    color: var(--rt-text-muted, #777);
+    color: var(--rt-text-muted);
     font-weight: 500;
   }
 
@@ -796,33 +789,41 @@
 
   .meta-value.notes {
     white-space: pre-wrap;
-    color: var(--rt-text-light, #555);
+    color: var(--rt-text-light);
   }
 
+  /* Task surface uses the same soft-modular tokens as .card (surface-1
+     background, hairline border, rounded), but with `overflow: hidden`
+     and no internal padding — the .card-header and .lists sections
+     supply their own padding so the green "full" treatment can paint to
+     the card edge. */
   .task-card {
-    border: 1px solid var(--rt-gray-200, #e4dfda);
-    border-radius: var(--card-radius);
-    background: var(--rt-white, #ffffff);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius);
+    background: var(--surface-1);
     overflow: hidden;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.6) inset,
+      0 8px 24px -16px rgba(30, 47, 61, 0.12);
   }
 
   .task-card.full {
-    border-color: var(--rt-success-text, #2f7a45);
-    background: var(--rt-success-bg, #e6f4ea);
+    border-color: var(--rt-success-text);
+    background: var(--rt-success-bg);
   }
 
   .card-header {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-sm) var(--spacing-md);
-    border-bottom: 1px solid var(--rt-gray-200, #e4dfda);
-    background: var(--rt-gray-50, #fafaf7);
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4);
+    border-bottom: 1px solid var(--hairline);
+    background: var(--surface-2);
   }
 
   .task-card.full .card-header {
     background: transparent;
-    border-bottom-color: var(--rt-success-text, #2f7a45);
+    border-bottom-color: var(--rt-success-text);
   }
 
   .date {
@@ -832,14 +833,14 @@
   }
 
   .counts {
-    color: var(--rt-text-muted, #777);
+    color: var(--rt-text-muted);
     font-variant-numeric: tabular-nums;
     flex-shrink: 0;
   }
 
   .city {
     flex-shrink: 0;
-    color: var(--rt-text-muted, #777);
+    color: var(--rt-text-muted);
   }
 
   .description {
@@ -854,32 +855,32 @@
     flex-shrink: 0;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
-    color: var(--rt-text-muted, #777);
+    color: var(--rt-text-muted);
     display: inline-flex;
     align-items: center;
-    gap: var(--spacing-xs);
+    gap: var(--sp-2);
   }
 
   .progress.full {
-    color: var(--rt-success-text, #2f7a45);
+    color: var(--rt-success-text);
     font-weight: 800;
   }
 
   .full-tag,
   .extra-tag {
     font-size: var(--font-size-xs);
-    color: var(--rt-white, #fff);
+    color: var(--rt-white);
     padding: 1px 6px;
     border-radius: 10px;
     font-weight: 500;
   }
 
   .full-tag {
-    background: var(--rt-success-text, #2f7a45);
+    background: var(--rt-success-text);
   }
 
   .extra-tag {
-    background: var(--rt-warning-text, #b35900);
+    background: var(--rt-warning-text);
   }
 
   .lists {
@@ -888,8 +889,8 @@
     /* Don't stretch the shorter column to match the taller one — keeps
        both lists visually anchored at the top once one column scrolls. */
     align-items: start;
-    gap: var(--spacing-md);
-    padding: var(--spacing-md);
+    gap: var(--sp-4);
+    padding: var(--sp-4);
   }
 
   .list-block {
@@ -899,19 +900,19 @@
   .lists .separator {
     align-self: stretch;
     width: 1px;
-    background: var(--rt-gray-200, #e4dfda);
+    background: var(--hairline);
   }
 
   .list-heading {
     font-size: var(--font-size-sm);
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: var(--rt-text-muted, #777);
-    margin: 0 0 var(--spacing-xs) 0;
+    color: var(--rt-text-muted);
+    margin: 0 0 var(--sp-2) 0;
   }
 
   .list-empty {
-    color: var(--rt-text-muted, #777);
+    color: var(--rt-text-muted);
     font-style: italic;
     margin: 0;
     font-size: var(--font-size-sm);
@@ -962,19 +963,19 @@
   .person-row {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
+    gap: var(--sp-3);
     width: 100%;
     margin: 0;
     /* Explicit min-height: 0 overrides anything inherited (the global
-       .btn rule sets min-height: 44px and some browsers' UA button
+       .btn rule sets min-height via --btn-h and some browsers' UA button
        stylesheet adds its own) so the button's height is just padding +
        content. */
     min-height: 0;
-    padding: 2px var(--spacing-sm);
+    padding: 2px var(--sp-3);
     line-height: 1.5;
     background: none;
     border: 1px solid transparent;
-    border-radius: var(--card-radius);
+    border-radius: var(--radius);
     cursor: pointer;
     font: inherit;
     color: inherit;
@@ -982,8 +983,8 @@
   }
 
   .person-row:hover:not(:disabled) {
-    background: var(--rt-gray-100, #f5f3ef);
-    border-color: var(--rt-gray-200, #e4dfda);
+    background: var(--rt-gray-100);
+    border-color: var(--hairline);
   }
 
   .person-row:disabled {
@@ -998,14 +999,14 @@
     position: relative;
     width: 14px;
     height: 14px;
-    border: 1.5px solid var(--rt-gray-400, #b3aea7);
+    border: 1.5px solid var(--rt-gray-400);
     border-radius: 3px;
-    background: #fff;
+    background: var(--surface-1);
   }
 
   .check.checked {
-    background: var(--rt-success-text, #2f7a45);
-    border-color: var(--rt-success-text, #2f7a45);
+    background: var(--rt-success-text);
+    border-color: var(--rt-success-text);
   }
 
   .check.checked::after {
@@ -1015,7 +1016,7 @@
     top: 0;
     width: 4px;
     height: 8px;
-    border: solid #fff;
+    border: solid var(--rt-white);
     border-width: 0 2px 2px 0;
     transform: rotate(45deg);
   }
@@ -1033,6 +1034,8 @@
     white-space: nowrap;
   }
 
+  /* Tighten the global .badge rule for the dense person-row context —
+     the default 2px/10px padding pushes rows too tall here. */
   .badge {
     flex-shrink: 0;
     font-size: var(--font-size-xs);
@@ -1043,7 +1046,7 @@
   .action {
     flex-shrink: 0;
     font-size: var(--font-size-xs);
-    color: var(--rt-text-muted, #777);
+    color: var(--rt-text-muted);
   }
 
   .fairness-badge {
@@ -1053,12 +1056,12 @@
   }
 
   .conflicts-toggle {
-    margin-top: var(--spacing-xs);
+    margin-top: var(--sp-2);
     padding: 4px 8px;
     background: transparent;
-    border: 1px dashed var(--rt-gray-200, #e4dfda);
-    border-radius: var(--card-radius);
-    color: var(--rt-text-muted, #777);
+    border: 1px dashed var(--hairline);
+    border-radius: var(--radius);
+    color: var(--rt-text-muted);
     font-size: var(--font-size-xs);
     cursor: pointer;
     width: 100%;
@@ -1066,7 +1069,7 @@
   }
 
   .conflicts-toggle:hover {
-    background: var(--rt-gray-50, #fafaf7);
+    background: var(--surface-2);
     color: var(--color-text);
   }
 
@@ -1076,12 +1079,12 @@
   }
 
   .person.conflict .person-row {
-    border-color: var(--rt-warning-text, #b35900);
-    background: var(--rt-warning-bg, #fff7e6);
+    border-color: var(--rt-warning-text);
+    background: var(--rt-warning-bg);
   }
 
   .person-row:hover:not(:disabled) .action {
-    color: var(--color-primary, #3a6db5);
+    color: var(--color-primary);
   }
 
   @media (max-width: 768px) {
