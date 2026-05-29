@@ -2,7 +2,6 @@
   import { truncateOnWord } from "$lib/utils/truncate";
 
   let {
-    name,
     description,
     city,
     date,
@@ -17,7 +16,6 @@
     onToggleChecked,
     onToggleExpanded,
   }: {
-    name: string;
     description: string;
     city?: string;
     date?: string;
@@ -34,6 +32,10 @@
   } = $props();
 
   const summary = $derived(truncateOnWord(description, 65));
+  // Show the full description in the expanded panel only when truncation
+  // actually removed content. When description fits in the summary line,
+  // re-rendering it below the headline is redundant.
+  const showFullDescription = $derived(description !== summary);
 
   function bodyKey(e: KeyboardEvent) {
     if (e.key === "Enter" || e.key === " ") {
@@ -49,7 +51,7 @@
     class="task-check"
     {checked}
     onchange={() => onToggleChecked?.()}
-    aria-label={`Toggle ${name}`}
+    aria-label={`Toggle ${summary}`}
   />
 
   <div
@@ -60,13 +62,14 @@
     onclick={() => onToggleExpanded?.()}
     onkeydown={bodyKey}
   >
-    <div class="task-name">
-      {name}
+    <div class="task-headline">
+      <div class="task-summary">{summary}</div>
       {#if conflict}
-        <span class="conflict-flag" title={conflictTitle}>⚠ calendar conflict</span>
+        <span class="conflict-flag" title={conflictTitle}
+          >⚠ calendar conflict</span
+        >
       {/if}
     </div>
-    <div class="task-summary">{summary}</div>
     <div class="task-meta">
       {#if city}{city}{/if}
       {#if city && date} · {/if}
@@ -84,7 +87,7 @@
   </button>
 
   <dl class="task-detail">
-    {#if description}
+    {#if showFullDescription}
       <dd class="task-description">{description}</dd>
     {/if}
     {#if time}<dt>Time</dt>
@@ -153,17 +156,17 @@
     min-width: 0;
     cursor: pointer;
   }
-  .task-name {
-    font-weight: 600;
-    color: var(--rt-dark);
+  .task-headline {
     display: flex;
     align-items: center;
     gap: 6px;
+    min-width: 0;
   }
   .task-summary {
-    font-size: 0.92em;
-    color: var(--rt-text);
-    margin-top: 2px;
+    flex: 1;
+    min-width: 0;
+    font-weight: 600;
+    color: var(--rt-dark);
     overflow: hidden;
     text-overflow: ellipsis;
     display: -webkit-box;
@@ -171,15 +174,13 @@
     line-clamp: 1;
     -webkit-box-orient: vertical;
   }
-  .task.expanded .task-summary {
-    display: none;
-  }
   .task-meta {
     font-size: 0.82em;
     color: var(--rt-text-muted);
     margin-top: 2px;
   }
   .conflict-flag {
+    flex-shrink: 0;
     font-size: 0.7rem;
     padding: 2px 7px;
     border-radius: var(--radius-pill);
@@ -257,9 +258,6 @@
     display: flex;
     align-items: baseline;
     gap: 10px;
-  }
-  :global([data-density="compact"]) .task-summary {
-    display: none;
   }
   :global([data-density="compact"]) .task-meta {
     margin: 0 0 0 auto;
