@@ -4,6 +4,7 @@
   import { volunteerCalls, people, type VolunteerCallListResponse, type VolunteerCallCreate, type Program, type TaskCreate } from '$lib/api/client';
   import { ALL_PROGRAMS, PROGRAM_LABELS, SINGLE_TASK_PROGRAMS, suggestCallTitle } from '$lib/api/types';
   import Breadcrumb from '$lib/components/Breadcrumb.svelte';
+  import Select from '$lib/components/Select.svelte';
   import TaskEntryForm from '$lib/components/TaskEntryForm.svelte';
   import { callStatusBadgeClass, programLabel } from '$lib/utils/badges';
   import { rowAction, type RowAction } from '$lib/utils/call-row-action';
@@ -52,7 +53,7 @@
           program,
         });
         if (teamLeadsForProgram !== program) return; // raced past us
-        teamLeads = list.map((p) => ({
+        teamLeads = list.items.map((p) => ({
           id: p.id,
           first_name: p.first_name,
           last_name: p.last_name,
@@ -310,10 +311,15 @@
   {/if}
 
   <div class="filters">
-    <select bind:value={statusFilter} onchange={handleFilterChange}>
-      <option value="active">Active (open · waiting · assigned)</option>
-      <option value="archived">Archived</option>
-    </select>
+    <Select
+      bind:value={statusFilter}
+      options={[
+        { value: 'active', label: 'Active (open · waiting · assigned)' },
+        { value: 'archived', label: 'Archived' },
+      ]}
+      ariaLabel="Call status filter"
+      onchange={handleFilterChange}
+    />
   </div>
 
   {#if rowMessage}
@@ -448,14 +454,6 @@
     margin-bottom: var(--spacing-md);
   }
 
-  .filters select {
-    padding: var(--spacing-sm) var(--spacing-md);
-    min-height: var(--btn-min-height);
-    border: 1px solid var(--rt-gray-200);
-    border-radius: var(--card-radius);
-    font-size: var(--btn-font-size);
-    font-family: inherit;
-  }
 
   .row-link {
     font-weight: 600;

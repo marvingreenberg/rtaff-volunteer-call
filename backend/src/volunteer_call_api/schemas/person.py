@@ -5,6 +5,7 @@ from datetime import date, datetime
 from pydantic import BaseModel
 
 from volunteer_call_api.models.person import (
+    CalendarKind,
     NotificationDetailLevel,
     NotificationPreference,
     Program,
@@ -52,6 +53,20 @@ class PersonUpdate(BaseModel):
     notes: str | None = None
     roles: list[RoleType] | None = None
     programs: list[Program] | None = None
+    calendar_kind: CalendarKind | None = None
+
+
+class PersonCalendarSummary(BaseModel):
+    """One connected calendar feed. ``calendar_url`` is the bearer
+    secret — it never appears in API responses; only the row id +
+    provider + label come back so the UI can render and remove."""
+
+    id: str
+    calendar_provider: str | None
+    label: str | None
+    added_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 class PersonResponse(BaseModel):
@@ -73,8 +88,11 @@ class PersonResponse(BaseModel):
     notes: str | None
     roles: list[RoleType]
     programs: list[ProgramMembership]
-    calendar_connected: bool
-    calendar_provider: str | None
+    # Replaces the single calendar_url/calendar_provider exposure. A
+    # user with no connected calendars has an empty list; UI derives
+    # `calendar_connected = len(calendars) > 0`.
+    calendars: list[PersonCalendarSummary]
+    calendar_kind: CalendarKind
     created_at: datetime
     updated_at: datetime
 
@@ -93,17 +111,29 @@ class PersonListResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class PersonPageResponse(BaseModel):
+    """Paginated People response.
+
+    ``total`` is the unfiltered-by-pagination row count for the same
+    WHERE the query used — i.e. the matching-records count, not
+    ``len(items)``. Frontend renders "showing N–M of TOTAL" and the
+    filter-aware header label from it.
+    """
+
+    items: list[PersonListResponse]
+    total: int
+    start: int
+    count: int
+
+    model_config = {"from_attributes": True}
+
+
 class CalendarConnect(BaseModel):
-    """User pastes their private iCal URL. Provider is informational."""
+    """User pastes their private iCal URL. Provider + label are optional."""
 
     calendar_url: str
     calendar_provider: str | None = None
-
-
-class CalendarStatus(BaseModel):
-    calendar_connected: bool
-    calendar_provider: str | None
-    calendar_url_added_at: datetime | None
+    label: str | None = None
 
 
 class CalendarConflict(BaseModel):

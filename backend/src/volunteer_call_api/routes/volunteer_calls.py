@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from volunteer_call_api.config import settings
 from volunteer_call_api.database import get_db
+from volunteer_call_api.dependencies import get_current_user
 from volunteer_call_api.models.person import (
     Person,
     PersonRole,
@@ -101,6 +102,7 @@ async def list_volunteer_calls(
     status: list[CallStatus] | None = Query(default=None),
     program: Program | None = None,
     db: AsyncSession = Depends(get_db),
+    current_user: Person = Depends(get_current_user),
 ) -> list[VolunteerCallListResponse]:
     query = select(VolunteerCall).options(
         selectinload(VolunteerCall.tasks).selectinload(Task.assignments),
@@ -111,6 +113,18 @@ async def list_volunteer_calls(
         query = query.where(VolunteerCall.status.in_(status))
     if program is not None:
         query = query.where(VolunteerCall.program == program)
+
+    # Volunteer-only users see only calls for programs they belong to.
+    # Staff and team leaders see everything — they need cross-program
+    # visibility to run assignment.
+    user_roles = {r.role for r in current_user.roles}
+    is_admin_like = user_roles & {RoleType.STAFF, RoleType.TEAM_LEADER}
+    if not is_admin_like:
+        member_programs = [m.program for m in current_user.program_memberships if m.active]
+        if not member_programs:
+            return []
+        query = query.where(VolunteerCall.program.in_(member_programs))
+
     query = query.order_by(VolunteerCall.created_at.desc())
     result = await db.execute(query)
     return [call_list_response(c) for c in result.scalars().all()]

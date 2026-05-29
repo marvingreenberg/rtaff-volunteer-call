@@ -1,0 +1,84 @@
+name: Deploy
+
+on:
+  push:
+    tags: ["v*"]
+
+env:
+  SERVICE_NAME: volunteer-call-api
+  GCP_REGION: us-central1
+  GCP_REPOSITORY: container-images
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  build-and-deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Derive version from git tag
+        id: version
+        run: |
+          VERSION=$(git describe --tags --always | sed 's/^v//')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION"
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for GCP Artifact Registry
+        run: gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_PAT }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push to both registries
+        uses: docker/build-push-action@v6
+        env:
+          GCP_PROJECT: ${{ secrets.GCP_PROJECT }}
+        with:
+          context: .
+          push: true
+          build-args: VERSION=${{ steps.version.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/${{ env.SERVICE_NAME }}:${{ steps.version.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/${{ env.SERVICE_NAME }}:latest
+            ${{ env.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/${{ env.GCP_REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ steps.version.outputs.version }}
+            ${{ env.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/${{ env.GCP_REPOSITORY }}/${{ env.SERVICE_NAME }}:latest
+
+      - name: Deploy to Cloud Run
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          GCP_PROJECT: ${{ secrets.GCP_PROJECT }}
+        run: |
+          GCP_IMAGE="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT}/${GCP_REPOSITORY}/${SERVICE_NAME}"
+          gcloud run deploy "${SERVICE_NAME}" \
+            --image="${GCP_IMAGE}:${VERSION}" \
+            --platform=managed \
+            --region="${GCP_REGION}" \
+            --allow-unauthenticated \
+            --port=8000 --memory=1Gi --cpu=1 \
+            --min-instances=0 --max-instances=3 \
+            --service-account=volunteer-call-runtime@${GCP_PROJECT}.iam.gserviceaccount.com \
+            --set-secrets=DATABASE_URL=volunteer-call-database-url:latest,JWT_SECRET=volunteer-call-jwt-secret:latest \
+            --set-env-vars="PYTHONUNBUFFERED=1"
+          echo "Deployed: $(gcloud run services describe ${SERVICE_NAME} --region=${GCP_REGION} --format='value(status.url)')"

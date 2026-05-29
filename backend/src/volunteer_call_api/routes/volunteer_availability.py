@@ -1,12 +1,14 @@
 """Volunteer availability routes."""
 
+import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from volunteer_call_api.database import get_db
-from volunteer_call_api.models.person import Person
+from volunteer_call_api.models.person import Person, SubscriptionStatus
 from volunteer_call_api.models.volunteer_availability import VolunteerAvailability
 from volunteer_call_api.models.volunteer_call import CallStatus, VolunteerCall
 from volunteer_call_api.routes.helpers import apply_partial_update, get_one_or_404
@@ -15,6 +17,21 @@ from volunteer_call_api.schemas.volunteer_availability import (
     AvailabilityResponse,
     AvailabilityUpdate,
 )
+
+
+def _is_paused(person: Person, today: datetime.date | None = None) -> bool:
+    """Mirror of services.notifications.is_subscribed's pause check.
+
+    Kept local to avoid pulling the whole notifications module — the
+    rule is small and rewriting it here keeps imports surgical.
+    """
+    if person.subscription_status != SubscriptionStatus.PAUSED:
+        return False
+    if not (person.pause_start and person.pause_end):
+        return False
+    today = today or datetime.date.today()
+    return person.pause_start <= today <= person.pause_end
+
 
 router = APIRouter()
 
@@ -54,8 +71,14 @@ async def submit_availability(
     if call.status not in (CallStatus.WAITING, CallStatus.ASSIGNED):
         raise HTTPException(status_code=400, detail="Call is not open for availability")
     person_result = await db.execute(select(Person).where(Person.id == body.person_id))
-    if person_result.scalar_one_or_none() is None:
+    person = person_result.scalar_one_or_none()
+    if person is None:
         raise HTTPException(status_code=400, detail="Person not found")
+    if _is_paused(person):
+        raise HTTPException(
+            status_code=400,
+            detail="You're paused for this period — resume in settings to submit availability.",
+        )
     avail = VolunteerAvailability(
         volunteer_call_id=call_id,
         person_id=body.person_id,

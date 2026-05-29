@@ -1,18 +1,18 @@
 <script lang="ts">
   import { people } from "$lib/api/client";
+  import type { PersonCalendarSummary } from "$lib/api/types";
 
   type Props = {
     personId: string;
-    calendarConnected: boolean;
-    calendarProvider: string | null;
+    calendars: PersonCalendarSummary[];
     onChanged: () => void | Promise<void>;
   };
 
-  let { personId, calendarConnected, calendarProvider, onChanged }: Props =
-    $props();
+  let { personId, calendars, onChanged }: Props = $props();
 
-  let expanded = $state(false);
+  let showAdd = $state(false);
   let urlInput = $state("");
+  let labelInput = $state("");
   let providerInput = $state("");
   let saving = $state(false);
   let errorMsg = $state("");
@@ -27,28 +27,27 @@
     { id: "outlook", label: "Outlook" },
   ];
 
-  function toggle() {
-    expanded = !expanded;
-    if (!expanded) {
-      // Reset transient state so the next open is clean.
-      errorMsg = "";
-    }
+  function toggleAdd() {
+    showAdd = !showAdd;
+    if (!showAdd) errorMsg = "";
   }
 
-  async function handleConnect(e: SubmitEvent) {
+  async function handleAdd(e: SubmitEvent) {
     e.preventDefault();
     const url = urlInput.trim();
     if (!url) return;
     saving = true;
     errorMsg = "";
     try {
-      await people.connectCalendar(personId, {
+      await people.addCalendar(personId, {
         calendar_url: url,
         calendar_provider: providerInput.trim() || null,
+        label: labelInput.trim() || null,
       });
       urlInput = "";
+      labelInput = "";
       providerInput = "";
-      expanded = false;
+      showAdd = false;
       await onChanged();
     } catch (err) {
       errorMsg =
@@ -60,14 +59,14 @@
     }
   }
 
-  async function handleDisconnect() {
-    if (!confirm("Disconnect calendar? Conflict warnings will stop appearing."))
+  async function handleRemove(cal: PersonCalendarSummary) {
+    const name = cal.label ?? cal.calendar_provider ?? "this calendar";
+    if (!confirm(`Disconnect ${name}? Conflict warnings from it will stop.`))
       return;
     saving = true;
     errorMsg = "";
     try {
-      await people.disconnectCalendar(personId);
-      expanded = false;
+      await people.removeCalendar(personId, cal.id);
       await onChanged();
     } catch (err) {
       errorMsg =
@@ -78,171 +77,174 @@
       saving = false;
     }
   }
-
-  let buttonLabel = $derived(
-    calendarConnected
-      ? `Calendar connected · ${calendarProvider || "iCal"}`
-      : "Connect Calendar",
-  );
 </script>
 
 <div class="calendar-connect">
+  {#if errorMsg}
+    <div class="error-banner" role="alert">{errorMsg}</div>
+  {/if}
+
+  {#if calendars.length > 0}
+    <ul class="cal-list" aria-label="Connected calendars">
+      {#each calendars as cal (cal.id)}
+        <li class="cal-row">
+          <span class="cal-label">{cal.label ?? "Calendar"}</span>
+          {#if cal.calendar_provider}
+            <span class="cal-provider">{cal.calendar_provider}</span>
+          {/if}
+          <button
+            type="button"
+            class="cal-remove"
+            aria-label={`Disconnect ${cal.label ?? "calendar"}`}
+            onclick={() => handleRemove(cal)}
+            disabled={saving}
+          >
+            ×
+          </button>
+        </li>
+      {/each}
+    </ul>
+  {:else}
+    <p class="empty-hint">
+      No calendars connected. Add one to see conflicts on assignment dates.
+    </p>
+  {/if}
+
   <button
     type="button"
-    class="connect-btn"
-    class:connected={calendarConnected}
-    title="Connect your calendar to make volunteering simpler"
-    aria-expanded={expanded}
-    onclick={toggle}
+    class="add-toggle"
+    aria-expanded={showAdd}
+    onclick={toggleAdd}
   >
-    {buttonLabel}
+    {showAdd ? "Cancel" : "Add a calendar"}
   </button>
 
-  {#if expanded}
-    <div class="panel" role="region" aria-label="Connect calendar">
-      {#if errorMsg}
-        <div class="error-banner" role="alert">{errorMsg}</div>
-      {/if}
+  {#if showAdd}
+    <form onsubmit={handleAdd} class="connect-form">
+      <label class="field">
+        <span class="field-label">Label (optional)</span>
+        <input
+          type="text"
+          bind:value={labelInput}
+          placeholder="Personal, Work…"
+          autocomplete="off"
+        />
+      </label>
+      <label class="field">
+        <span class="field-label">Shared calendar URL</span>
+        <input
+          type="url"
+          bind:value={urlInput}
+          placeholder="https://..."
+          required
+          autocomplete="off"
+          spellcheck="false"
+        />
+      </label>
+      <label class="field">
+        <span class="field-label">Provider (optional)</span>
+        <input
+          type="text"
+          bind:value={providerInput}
+          placeholder="Google, Apple, Outlook…"
+          autocomplete="off"
+        />
+      </label>
+      <button
+        type="submit"
+        class="btn btn-primary"
+        disabled={saving || !urlInput.trim()}
+      >
+        {saving ? "Connecting…" : "Connect"}
+      </button>
+    </form>
 
-      {#if calendarConnected}
-        <p class="connected-status">
-          Your calendar is connected{calendarProvider
-            ? ` (${calendarProvider})`
-            : ""}. We use it only to flag conflicts with your assignments.
-        </p>
-        <button
-          type="button"
-          class="btn btn-secondary"
-          onclick={handleDisconnect}
-          disabled={saving}
-        >
-          {saving ? "Working..." : "Disconnect calendar"}
-        </button>
-      {:else}
-        <form onsubmit={handleConnect} class="connect-form">
-          <label class="field">
-            <span class="field-label">Shared calendar URL</span>
-            <input
-              type="url"
-              bind:value={urlInput}
-              placeholder="https://..."
-              required
-              autocomplete="off"
-              spellcheck="false"
-            />
-          </label>
-          <label class="field provider-field">
-            <span class="field-label">Provider (optional)</span>
-            <input
-              type="text"
-              bind:value={providerInput}
-              placeholder="Google, Apple, Outlook..."
-              autocomplete="off"
-            />
-          </label>
-          <button
-            type="submit"
-            class="btn btn-primary"
-            disabled={saving || !urlInput.trim()}
-          >
-            {saving ? "Connecting..." : "Connect"}
-          </button>
-        </form>
-        <p class="hint">
-          Calendar URLs are kept secret and used only to flag conflicts with
-          your assignments. You can only connect one calendar.
-        </p>
-      {/if}
-
-      <details class="help">
-        <summary>Help &mdash; getting your calendar URL</summary>
-        <div class="help-body">
-          <div class="tabs" role="tablist">
-            {#each TABS as t (t.id)}
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === t.id}
-                class="tab"
-                class:active={activeTab === t.id}
-                onclick={() => (activeTab = t.id)}
-              >
-                {t.label}
-              </button>
-            {/each}
-          </div>
-
-          <div class="tab-panel" role="tabpanel">
-            {#if activeTab === "general"}
-              <p>
-                A "calendar URL" is a private subscription link that lets us
-                read the busy/free times on your calendar. You publish it once
-                from your calendar app, paste the URL here, and we'll flag any
-                volunteer task that overlaps an existing event.
-              </p>
-              <p>
-                Treat the URL as a secret &mdash; anyone with it could read
-                your calendar. We never display it back to you and never share
-                it.
-              </p>
-              <p>
-                If something looks wrong after connecting, double-check that
-                the URL ends in <code>.ics</code> or is a
-                <code>webcal://</code> link (we'll fetch it the same way).
-              </p>
-            {:else if activeTab === "apple"}
-              <ol>
-                <li>Open Apple Calendar and right-click the calendar you want to share.</li>
-                <li>Choose <em>Share Calendar</em> and turn on <em>Public Calendar</em>.</li>
-                <li>Copy the <code>webcal://</code> link and paste it above.</li>
-              </ol>
-              <img
-                src="/screenshots/apple-calendar.png"
-                alt="Apple Calendar share dialog with Public Calendar enabled and the link visible"
-              />
-            {:else if activeTab === "google"}
-              <ol>
-                <li>
-                  Open Google Calendar &raquo; <em>Settings</em> &raquo;
-                  <em>Settings for my calendars</em> and pick your calendar.
-                </li>
-                <li>
-                  Under <em>Access permissions for events</em> check
-                  <em>Make available to public</em> (free/busy is enough).
-                </li>
-                <li>
-                  Click <em>Get shareable link</em> and paste it above.
-                </li>
-              </ol>
-              <img
-                src="/screenshots/google-calendar.png"
-                alt="Google Calendar access permissions screen with public availability enabled"
-              />
-            {:else if activeTab === "outlook"}
-              <ol>
-                <li>
-                  Open Outlook on the web &raquo; <em>Settings</em> &raquo;
-                  <em>Calendar</em> &raquo; <em>Shared calendars</em>.
-                </li>
-                <li>
-                  Under <em>Publish a calendar</em>, choose your calendar and
-                  permission level, then click <em>Publish</em>.
-                </li>
-                <li>Copy the <em>ICS</em> link and paste it above.</li>
-              </ol>
-              <img
-                src="/screenshots/outlook-calendar-publish.png"
-                alt="Outlook Publish a calendar dialog with calendar and permission selectors"
-              />
-              <img
-                src="/screenshots/outlook-calendar-link.png"
-                alt="Outlook ICS link shown after publishing"
-              />
-            {/if}
-          </div>
+    <details class="help">
+      <summary>Help &mdash; getting your calendar URL</summary>
+      <div class="help-body">
+        <div class="tabs" role="tablist">
+          {#each TABS as t (t.id)}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === t.id}
+              class="tab"
+              class:active={activeTab === t.id}
+              onclick={() => (activeTab = t.id)}
+            >
+              {t.label}
+            </button>
+          {/each}
         </div>
-      </details>
-    </div>
+
+        <div class="tab-panel" role="tabpanel">
+          {#if activeTab === "general"}
+            <p>
+              A "calendar URL" is a private subscription link that lets us read
+              the busy/free times on your calendar. You publish it once from your
+              calendar app, paste the URL here, and we'll flag any volunteer
+              task that overlaps an existing event.
+            </p>
+            <p>
+              Treat the URL as a secret &mdash; anyone with it could read your
+              calendar. We never display it back to you and never share it.
+            </p>
+            <p>
+              You can connect multiple calendars (e.g. personal + work);
+              conflicts from all of them are merged on each task.
+            </p>
+          {:else if activeTab === "apple"}
+            <ol>
+              <li>Open Apple Calendar and right-click the calendar you want to share.</li>
+              <li>Choose <em>Share Calendar</em> and turn on <em>Public Calendar</em>.</li>
+              <li>Copy the <code>webcal://</code> link and paste it above.</li>
+            </ol>
+            <img
+              src="/screenshots/apple-calendar.png"
+              alt="Apple Calendar share dialog with Public Calendar enabled and the link visible"
+            />
+          {:else if activeTab === "google"}
+            <ol>
+              <li>
+                Open Google Calendar &raquo; <em>Settings</em> &raquo;
+                <em>Settings for my calendars</em> and pick your calendar.
+              </li>
+              <li>
+                Under <em>Access permissions for events</em> check
+                <em>Make available to public</em> (free/busy is enough).
+              </li>
+              <li>
+                Click <em>Get shareable link</em> and paste it above.
+              </li>
+            </ol>
+            <img
+              src="/screenshots/google-calendar.png"
+              alt="Google Calendar access permissions screen with public availability enabled"
+            />
+          {:else if activeTab === "outlook"}
+            <ol>
+              <li>
+                Open Outlook on the web &raquo; <em>Settings</em> &raquo;
+                <em>Calendar</em> &raquo; <em>Shared calendars</em>.
+              </li>
+              <li>
+                Under <em>Publish a calendar</em>, choose your calendar and
+                permission level, then click <em>Publish</em>.
+              </li>
+              <li>Copy the <em>ICS</em> link and paste it above.</li>
+            </ol>
+            <img
+              src="/screenshots/outlook-calendar-publish.png"
+              alt="Outlook Publish a calendar dialog with calendar and permission selectors"
+            />
+            <img
+              src="/screenshots/outlook-calendar-link.png"
+              alt="Outlook ICS link shown after publishing"
+            />
+          {/if}
+        </div>
+      </div>
+    </details>
   {/if}
 </div>
 
@@ -251,7 +253,63 @@
     margin: var(--spacing-sm) 0 var(--spacing-md);
   }
 
-  .connect-btn {
+  .cal-list {
+    list-style: none;
+    margin: 0 0 var(--spacing-sm) 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs, 0.25rem);
+  }
+
+  .cal-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--rt-gray-100, #f5f3ef);
+    border-radius: var(--card-radius, 8px);
+  }
+
+  .cal-label {
+    font-weight: 600;
+  }
+
+  .cal-provider {
+    font-size: var(--font-size-sm);
+    color: var(--rt-text-muted, #777);
+  }
+
+  .cal-remove {
+    margin-left: auto;
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    color: var(--rt-text-muted, #777);
+  }
+
+  .cal-remove:hover {
+    background: var(--rt-gray-200, #e4dfda);
+    color: var(--rt-danger-text, #b00020);
+  }
+
+  .cal-remove:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .empty-hint {
+    color: var(--rt-text-muted, #777);
+    font-size: var(--font-size-sm);
+    margin: 0 0 var(--spacing-sm) 0;
+  }
+
+  .add-toggle {
     background: var(--rt-white, #fff);
     color: var(--color-primary, #3a6db5);
     border: 1px solid var(--color-primary, #3a6db5);
@@ -260,36 +318,19 @@
     font: inherit;
     font-weight: 600;
     cursor: pointer;
-    min-height: var(--btn-min-height, 40px);
+    min-height: var(--btn-min-height, 36px);
   }
 
-  .connect-btn.connected {
-    background: var(--rt-success-bg, #e6f4ea);
-    border-color: var(--rt-success-text, #2f7a45);
-    color: var(--rt-success-text, #2f7a45);
-  }
-
-  .connect-btn:hover {
+  .add-toggle:hover {
     background: var(--rt-gray-100, #f5f3ef);
-  }
-
-  .panel {
-    margin-top: var(--spacing-sm);
-    padding: var(--spacing-md);
-    background: var(--rt-white, #fff);
-    border: 1px solid var(--rt-gray-200, #e4dfda);
-    border-radius: var(--card-radius, 8px);
-  }
-
-  .connected-status {
-    margin: 0 0 var(--spacing-md) 0;
   }
 
   .connect-form {
     display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr) auto;
     gap: var(--spacing-sm);
     align-items: end;
+    margin-top: var(--spacing-sm);
   }
 
   .field {
@@ -316,12 +357,6 @@
     .connect-form {
       grid-template-columns: 1fr;
     }
-  }
-
-  .hint {
-    margin: var(--spacing-sm) 0 0;
-    font-size: var(--font-size-xs);
-    color: var(--rt-text-muted, #777);
   }
 
   .error-banner {

@@ -20,6 +20,7 @@ function makeTask(overrides: Partial<TaskResponse> = {}): TaskResponse {
     status: "open",
     notes: null,
     assigned_count: 0,
+    assignees: [],
     created_at: "2026-05-05T00:00:00Z",
     updated_at: "2026-05-05T00:00:00Z",
     ...overrides,
@@ -138,6 +139,46 @@ describe("TaskRow", () => {
     expect(promptedText).toContain("Wednesday, July 1");
     expect(ondelete).toHaveBeenCalledWith("task-1");
     confirmSpy.mockRestore();
+  });
+
+  it("renders assignee chips with team-lead marker", () => {
+    // Bug it catches: the assignee chip block silently skips
+    // is_team_lead, so the admin can't see at a glance who's leading.
+    render(TaskRow, {
+      props: makeProps({
+        task: makeTask({
+          assignees: [
+            {
+              person_id: "p1",
+              first_name: "Ada",
+              last_name: "Lovelace",
+              initials: "AL",
+              is_team_lead: true,
+            },
+            {
+              person_id: "p2",
+              first_name: "Bob",
+              last_name: "Test",
+              initials: "BT",
+              is_team_lead: false,
+            },
+          ],
+        }),
+      }),
+    });
+    const lead = screen.getByText("AL");
+    const crew = screen.getByText("BT");
+    expect(lead).toHaveClass("assignee-lead");
+    expect(crew).not.toHaveClass("assignee-lead");
+  });
+
+  it("renders no chip block when assignees is empty", () => {
+    // Bug it catches: the {#if assignees && length} guard is dropped,
+    // so an empty list paints a stray container with no contents.
+    const { container } = render(TaskRow, {
+      props: makeProps({ task: makeTask({ assignees: [] }) }),
+    });
+    expect(container.querySelector(".assignees")).toBeNull();
   });
 
   it("does not call ondelete when the confirm dialog is dismissed", async () => {

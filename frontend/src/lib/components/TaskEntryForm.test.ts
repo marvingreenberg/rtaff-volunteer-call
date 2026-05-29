@@ -27,16 +27,40 @@ async function fillRequiredFields(container: HTMLElement) {
   const address = container.querySelector(
     'input[placeholder="Address"]',
   ) as HTMLInputElement;
-  const city = container.querySelector(
-    'select[aria-label="City"]',
-  ) as HTMLSelectElement;
   const description = container.querySelector(
     "textarea",
   ) as HTMLTextAreaElement;
   await fireEvent.input(date, { target: { value: "07/01" } });
   await fireEvent.input(address, { target: { value: "123 Oak St" } });
-  await fireEvent.change(city, { target: { value: "Arlington" } });
+  await pickCombobox(container, "City", "Arlington");
   await fireEvent.input(description, { target: { value: "Fix gutters" } });
+}
+
+/** Drive the Select.svelte component: click trigger by aria-label,
+ * then click the option whose visible label matches. */
+async function pickCombobox(
+  container: HTMLElement,
+  ariaLabel: string,
+  optionLabel: string,
+): Promise<void> {
+  const trigger = container.querySelector(
+    `button[role="combobox"][aria-label="${ariaLabel}"]`,
+  ) as HTMLButtonElement;
+  if (!trigger) throw new Error(`No combobox with aria-label "${ariaLabel}"`);
+  await fireEvent.click(trigger);
+  const options = container.querySelectorAll<HTMLElement>('[role="option"]');
+  const match = Array.from(options).find(
+    (o) => o.textContent?.trim() === optionLabel,
+  );
+  if (!match) {
+    throw new Error(
+      `No option "${optionLabel}" in combobox "${ariaLabel}"; ` +
+        `saw: ${Array.from(options)
+          .map((o) => o.textContent?.trim())
+          .join(", ")}`,
+    );
+  }
+  await fireEvent.click(match);
 }
 
 describe("TaskEntryForm", () => {
@@ -92,30 +116,28 @@ describe("TaskEntryForm", () => {
     expect(lastDirty(onchange)).toBe(true);
   });
 
-  it("renders city as a native <select> populated from CITIES", () => {
-    // The city control is a native pull-down (no typeahead component).
-    // Pinning that the city options come from the CITIES constant catches
-    // a regression that swaps it back to a custom autocomplete.
+  it("renders the city pulldown populated from CITIES with a placeholder", async () => {
+    // The city control is a combobox component (Select.svelte). Pinning
+    // that the options come from the CITIES constant catches a regression
+    // that swaps it back to a freeform input or autocomplete.
     const { container } = render(TaskEntryForm, {
       props: { onchange: vi.fn() },
     });
-    const citySelect = container.querySelector(
-      'select[aria-label="City"]',
-    ) as HTMLSelectElement;
-    expect(citySelect).toBeInTheDocument();
-    const optionLabels = Array.from(citySelect.options).map((o) => o.text);
+    const trigger = container.querySelector(
+      'button[role="combobox"][aria-label="City"]',
+    ) as HTMLButtonElement;
+    expect(trigger).toBeInTheDocument();
+    // Trigger shows the "City" placeholder when nothing is picked.
+    expect(trigger.textContent?.trim().startsWith("City")).toBe(true);
+    await fireEvent.click(trigger);
+    const optionLabels = Array.from(
+      container.querySelectorAll('[role="option"]'),
+    ).map((o) => o.textContent?.trim());
     expect(optionLabels).toContain("Arlington");
     expect(optionLabels).toContain("Falls Church");
-    // The first option is the empty placeholder so the select can read as
-    // "unset" until the user picks one.
-    expect(citySelect.options[0].value).toBe("");
   });
 
-  it("team lead is a native <select> populated from the teamLeads prop", () => {
-    // Same shape as city — native pull-down, no autocomplete. The list of
-    // candidates comes from the parent (one fetch per page rather than per
-    // row); pinning the prop wiring catches a regression that reverts to
-    // an internal fetch + autocomplete.
+  it("team lead pulldown is populated from the teamLeads prop with a placeholder", async () => {
     const { container } = render(TaskEntryForm, {
       props: {
         onchange: vi.fn(),
@@ -125,12 +147,18 @@ describe("TaskEntryForm", () => {
         ],
       },
     });
-    const leadSelect = container.querySelector(
-      'select[aria-label="Team lead"]',
-    ) as HTMLSelectElement;
-    expect(leadSelect).toBeInTheDocument();
-    const labels = Array.from(leadSelect.options).map((o) => o.text);
-    expect(labels).toEqual(["Team lead (optional)", "Pat Lee", "Sam Quinn"]);
+    const trigger = container.querySelector(
+      'button[role="combobox"][aria-label="Team lead"]',
+    ) as HTMLButtonElement;
+    expect(trigger).toBeInTheDocument();
+    expect(trigger.textContent?.trim().startsWith("Team lead (optional)")).toBe(
+      true,
+    );
+    await fireEvent.click(trigger);
+    const labels = Array.from(
+      container.querySelectorAll('[role="option"]'),
+    ).map((o) => o.textContent?.trim());
+    expect(labels).toEqual(["Pat Lee", "Sam Quinn"]);
   });
 
   it("picking a team lead emits team_lead_id in the payload", async () => {
@@ -142,10 +170,7 @@ describe("TaskEntryForm", () => {
       },
     });
     await fillRequiredFields(container);
-    const leadSelect = container.querySelector(
-      'select[aria-label="Team lead"]',
-    ) as HTMLSelectElement;
-    await fireEvent.change(leadSelect, { target: { value: "lead-1" } });
+    await pickCombobox(container, "Team lead", "Pat Lee");
     expect(lastValue(onchange)).toMatchObject({ team_lead_id: "lead-1" });
   });
 
@@ -209,16 +234,17 @@ describe("TaskEntryForm", () => {
       'input[placeholder="MM/DD"]',
     ) as HTMLInputElement;
     const time = screen.getByLabelText("Start time") as HTMLInputElement;
-    const citySelect = container.querySelector(
-      'select[aria-label="City"]',
-    ) as HTMLSelectElement;
+    const cityTrigger = container.querySelector(
+      'button[role="combobox"][aria-label="City"]',
+    ) as HTMLButtonElement;
     const numbers = container.querySelectorAll(
       'input[type="number"]',
     ) as NodeListOf<HTMLInputElement>;
     expect(description.value).toBe("Roof repair");
     expect(date.value).toBe("08/15");
     expect(time.value).toBe("10:30 AM");
-    expect(citySelect.value).toBe("Vienna");
+    // Trigger renders the selected city name (not the placeholder).
+    expect(cityTrigger.textContent?.trim().startsWith("Vienna")).toBe(true);
     expect(numbers[0].value).toBe("6");
     expect(numbers[1].value).toBe("2");
   });
@@ -273,15 +299,12 @@ describe("TaskEntryForm", () => {
     const address = container.querySelector(
       'input[placeholder="Address"]',
     ) as HTMLInputElement;
-    const citySelect = container.querySelector(
-      'select[aria-label="City"]',
-    ) as HTMLSelectElement;
     const description = container.querySelector(
       "textarea",
     ) as HTMLTextAreaElement;
     await fireEvent.input(date, { target: { value: "02/14" } });
     await fireEvent.input(address, { target: { value: "1 Main St" } });
-    await fireEvent.change(citySelect, { target: { value: "Arlington" } });
+    await pickCombobox(container, "City", "Arlington");
     await fireEvent.input(description, { target: { value: "Snow removal" } });
     expect(lastValue(onchange)).toMatchObject({
       date: `${PINNED_YEAR + 1}-02-14`,

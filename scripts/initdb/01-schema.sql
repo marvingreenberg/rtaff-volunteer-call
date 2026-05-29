@@ -17,6 +17,8 @@ CREATE TYPE taskstatus AS ENUM ('open', 'full', 'cancelled');
 CREATE TYPE assignmentrole AS ENUM ('team_leader', 'volunteer');
 CREATE TYPE notificationtype AS ENUM ('call_invite', 'assignment', 'call_thanks', 'assignment_update');
 CREATE TYPE sloteventtype AS ENUM ('postponed', 'cancelled', 'rescheduled');
+-- Calendar app the user prefers for "Add to calendar" deeplinks.
+CREATE TYPE calendarkind AS ENUM ('google', 'apple', 'outlook', 'other');
 
 -- People
 CREATE TABLE people (
@@ -34,14 +36,28 @@ CREATE TABLE people (
     subscription_status subscriptionstatus NOT NULL DEFAULT 'active',
     pause_start DATE,
     pause_end DATE,
-    -- Calendar integration: bearer-secret iCal URL pasted by the user.
-    -- Never returned in API responses; only the boolean "connected" derives.
-    calendar_url VARCHAR(2048),
-    calendar_provider VARCHAR(20),
-    calendar_url_added_at TIMESTAMPTZ,
+    -- Calendar feeds live in person_calendars (one row per connected
+    -- iCal URL). calendar_kind here is the user's preferred app for
+    -- "Add to calendar" deeplinks, independent of how many feeds (if
+    -- any) are connected.
+    calendar_kind calendarkind NOT NULL DEFAULT 'google',
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Connected iCal feeds. A volunteer can attach multiple (e.g. work +
+-- personal) and the conflict detector unions events from all of them.
+-- calendar_url is a bearer secret and is never returned in any API
+-- response; the API surfaces only the row id + provider + label.
+CREATE TABLE person_calendars (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    person_id UUID NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+    calendar_url VARCHAR(2048) NOT NULL,
+    calendar_provider VARCHAR(20),
+    label VARCHAR(80),
+    added_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_person_calendars_person ON person_calendars(person_id);
 
 -- Alternate login email addresses. Primary email on `people` remains the
 -- channel for all outbound notifications; aliases only widen the set of

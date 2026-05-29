@@ -1,6 +1,6 @@
 <script lang="ts">
   import "../app.css";
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import type { Snippet } from 'svelte';
@@ -9,6 +9,36 @@
   import AvatarMenu from '$lib/components/AvatarMenu.svelte';
 
   let { children }: { children: Snippet } = $props();
+
+  // Cloud Run warmth heartbeat. While the user is authenticated, ping
+  // /warm every 4 minutes — well under Cloud Run's ~15-minute idle
+  // eviction so the container they're already using doesn't cold-start
+  // mid-session. Off the auth pages because there's no value in keeping
+  // an idle browser tab warming the backend.
+  const HEARTBEAT_MS = 4 * 60 * 1000;
+  let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+
+  function startHeartbeat() {
+    if (heartbeatTimer !== null) return;
+    heartbeatTimer = setInterval(() => {
+      // Fire-and-forget; a failed warm ping isn't worth surfacing.
+      fetch('/warm', { credentials: 'include' }).catch(() => {});
+    }, HEARTBEAT_MS);
+  }
+
+  function stopHeartbeat() {
+    if (heartbeatTimer !== null) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
+  }
+
+  $effect(() => {
+    if (authState.user && !isAuthPage) startHeartbeat();
+    else stopHeartbeat();
+  });
+
+  onDestroy(() => stopHeartbeat());
 
   onMount(async () => {
     loadSettings();

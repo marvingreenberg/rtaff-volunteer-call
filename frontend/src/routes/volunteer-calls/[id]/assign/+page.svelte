@@ -12,6 +12,7 @@
     type TaskAssignment,
   } from "$lib/api/client";
   import Breadcrumb from "$lib/components/Breadcrumb.svelte";
+  import Select from "$lib/components/Select.svelte";
   import AssignmentSpreadsheet from "$lib/components/AssignmentSpreadsheet.svelte";
   import { skillBadgeClass } from "$lib/utils/badges";
   import { formatDate, volunteersLabel } from "$lib/utils/format";
@@ -131,7 +132,7 @@
       await load();
       try {
         const leads = await people.list({ role: "team_leader", active: true });
-        teamLeads = leads.map((p) => ({
+        teamLeads = leads.items.map((p) => ({
           id: p.id,
           first_name: p.first_name,
           last_name: p.last_name,
@@ -341,13 +342,15 @@
       <div class="actions-col">
         <label class="policy-label">
           <span class="policy-prefix">Desired</span>
-          <select bind:value={policy} aria-label="Desired">
-            <option value="exact">{ASSIGNMENT_POLICY_LABELS.exact}</option>
-            <option value="over">{ASSIGNMENT_POLICY_LABELS.over}</option>
-            <option value="over_under">
-              {ASSIGNMENT_POLICY_LABELS.over_under}
-            </option>
-          </select>
+          <Select
+            bind:value={policy}
+            options={[
+              { value: "exact", label: ASSIGNMENT_POLICY_LABELS.exact },
+              { value: "over", label: ASSIGNMENT_POLICY_LABELS.over },
+              { value: "over_under", label: ASSIGNMENT_POLICY_LABELS.over_under },
+            ]}
+            ariaLabel="Desired"
+          />
         </label>
         <div class="action-buttons">
           {#if needsLeadCount > 0}
@@ -440,22 +443,21 @@
               <div class="meta-row">
                 <span class="meta-label">Team lead</span>
                 <div class="meta-value">
-                  <select
-                    value={task.team_lead_id ?? ""}
-                    aria-label="Team lead"
+                  <Select
+                    value={task.team_lead_id}
+                    options={[
+                      { value: null, label: "— None —" },
+                      ...teamLeads.map((lead) => ({
+                        value: lead.id,
+                        label: `${lead.first_name} ${lead.last_name}`,
+                      })),
+                    ]}
+                    ariaLabel="Team lead"
                     disabled={busyTaskIds.has(task.task_id)}
-                    onchange={(e) => {
-                      const v = (e.currentTarget as HTMLSelectElement).value;
-                      setTeamLead(task.task_id, v || null);
-                    }}
-                  >
-                    <option value="">— None —</option>
-                    {#each teamLeads as lead (lead.id)}
-                      <option value={lead.id}>
-                        {lead.first_name} {lead.last_name}
-                      </option>
-                    {/each}
-                  </select>
+                    onchange={(v) =>
+                      setTeamLead(task.task_id, (v as string | null) ?? null)
+                    }
+                  />
                 </div>
               </div>
               {#if task.notes}
@@ -691,13 +693,6 @@
     color: var(--color-text);
   }
 
-  .policy-label select {
-    padding: var(--spacing-xs) var(--spacing-sm);
-    border: 1px solid var(--rt-gray-200, #e4dfda);
-    border-radius: var(--card-radius, 8px);
-    font: inherit;
-    background: var(--rt-white, #fff);
-  }
 
   .save-btn {
     min-width: 6em;

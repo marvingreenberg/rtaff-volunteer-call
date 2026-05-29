@@ -6,9 +6,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from volunteer_call_api.models.team_assignment import TeamAssignment
 from volunteer_call_api.models.volunteer_call import Task, VolunteerCall
 from volunteer_call_api.routes.helpers import get_one_or_404
 from volunteer_call_api.schemas.volunteer_call import (
+    TaskAssigneeSummary,
     TaskResponse,
     VolunteerCallListResponse,
     VolunteerCallResponse,
@@ -45,6 +47,25 @@ def task_response(task: Task) -> TaskResponse:
     team_lead_name = None
     if task.team_lead:
         team_lead_name = f"{task.team_lead.first_name} {task.team_lead.last_name}"
+
+    # Assignees sorted by first name for stable chip order in the UI.
+    # Team lead floated to the front so it reads "lead first, then crew".
+    assignees: list[TaskAssigneeSummary] = []
+    for a in task.assignments:
+        p = a.person
+        if p is None:
+            continue
+        assignees.append(
+            TaskAssigneeSummary(
+                person_id=p.id,
+                first_name=p.first_name,
+                last_name=p.last_name,
+                initials=_initials(p.first_name, p.last_name),
+                is_team_lead=(p.id == task.team_lead_id),
+            )
+        )
+    assignees.sort(key=lambda a: (not a.is_team_lead, a.first_name.lower()))
+
     return TaskResponse(
         id=task.id,
         volunteer_call_id=task.volunteer_call_id,
@@ -61,6 +82,7 @@ def task_response(task: Task) -> TaskResponse:
         status=task.status,
         notes=task.notes,
         assigned_count=len(task.assignments),
+        assignees=assignees,
         created_at=task.created_at,
         updated_at=task.updated_at,
     )
@@ -122,7 +144,11 @@ async def get_call_or_404(call_id: str, db: AsyncSession) -> VolunteerCall:
     query = (
         select(VolunteerCall)
         .options(
-            selectinload(VolunteerCall.tasks).selectinload(Task.assignments),
+            # Eager-load assignees so task_response can render the
+            # assignee chips without lazy-loading per task.
+            selectinload(VolunteerCall.tasks)
+            .selectinload(Task.assignments)
+            .selectinload(TeamAssignment.person),
             selectinload(VolunteerCall.tasks).selectinload(Task.team_lead),
         )
         .where(VolunteerCall.id == call_id)

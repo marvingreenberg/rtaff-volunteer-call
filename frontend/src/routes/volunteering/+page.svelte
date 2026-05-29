@@ -15,11 +15,17 @@
     type CallStatus,
   } from '$lib/api/client';
   import { formatDate } from '$lib/utils/format';
+  import {
+    chooseCalendarAction,
+    downloadIcs,
+    type CalendarAction,
+    type CalendarEvent,
+  } from '$lib/utils/add-to-calendar';
   import { tasksSpanMultipleWeeks } from '$lib/utils/task-weeks';
   import ItemCard from '$lib/components/ItemCard.svelte';
   import ListViewToggle from '$lib/components/ListViewToggle.svelte';
   import DataTable from '$lib/components/DataTable.svelte';
-  import CalendarConnectPanel from '$lib/components/CalendarConnectPanel.svelte';
+  import Select from '$lib/components/Select.svelte';
   import { settingsState, setListView } from '$lib/stores/settings.svelte';
   import { truncateText } from '$lib/components/data-table';
   import type { Column, SortDir } from '$lib/components/data-table';
@@ -370,36 +376,31 @@
     jobSortDir = dir;
   }
 
-  function generateIcs(a: MyAssignment): void {
-    if (!a.date) return;
-    const d = a.date.replace(/-/g, '');
-    const startTime = a.time_start ? a.time_start.replace(/:/g, '') : '090000';
-    const endTime = a.time_end ? a.time_end.replace(/:/g, '') : '123000';
-    // Pad to 6 digits for HHMMSS format
-    const startPadded = startTime.length === 4 ? startTime + '00' : startTime;
-    const endPadded = endTime.length === 4 ? endTime + '00' : endTime;
-    const ics = [
-      'BEGIN:VCALENDAR',
-      'VERSION:2.0',
-      'PRODID:-//RT-AFF//Volunteer//EN',
-      'BEGIN:VEVENT',
-      `DTSTART:${d}T${startPadded}`,
-      `DTEND:${d}T${endPadded}`,
-      `SUMMARY:RT-AFF Volunteer - ${a.task_description}`,
-      a.address ? `LOCATION:${a.address}` : '',
-      `DESCRIPTION:Volunteer call: ${a.call_title}`,
-      'END:VEVENT',
-      'END:VCALENDAR',
-    ]
-      .filter(Boolean)
-      .join('\r\n');
-    const blob = new Blob([ics], { type: 'text/calendar' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `rt-aff-${a.date}.ics`;
-    link.click();
-    URL.revokeObjectURL(url);
+  function calendarEventFor(a: MyAssignment): CalendarEvent | null {
+    if (!a.date) return null;
+    return {
+      date: a.date,
+      time_start: a.time_start,
+      time_end: a.time_end,
+      title: `RT-AFF Volunteer - ${a.task_description}`,
+      location: a.address ?? null,
+      description: `Volunteer call: ${a.call_title}`,
+    };
+  }
+
+  function calendarActionFor(a: MyAssignment): CalendarAction | null {
+    const e = calendarEventFor(a);
+    if (!e || !authState.user) return null;
+    return chooseCalendarAction(e, authState.user.calendar_kind);
+  }
+
+  let icsHint = $state<string | null>(null);
+
+  function downloadIcsFor(a: MyAssignment, hint: string | null): void {
+    const e = calendarEventFor(a);
+    if (!e) return;
+    downloadIcs(e);
+    icsHint = hint;
   }
 
   function hasExistingAvailability(callId: string): boolean {
@@ -408,14 +409,6 @@
     return callLevelAvail[callId] !== null && callLevelAvail[callId] !== undefined;
   }
 
-  async function refreshUserAndConflicts() {
-    const token = page.url.searchParams.get('token');
-    await initFromToken(token);
-    // Connecting/disconnecting the calendar changes which tasks should be
-    // flagged. Reload conflicts for every open call so the warnings update
-    // without making the user reload the page.
-    await Promise.all(openCalls.map((call) => loadCallData(call.id)));
-  }
 </script>
 
 <svelte:head>
@@ -432,13 +425,10 @@
   {:else}
     <section class="section">
       <h2>Volunteer Calls <em class="section-sub">waiting for volunteers</em></h2>
-      {#if authState.user}
-        <CalendarConnectPanel
-          personId={authState.user.id}
-          calendarConnected={authState.user.calendar_connected}
-          calendarProvider={authState.user.calendar_provider}
-          onChanged={refreshUserAndConflicts}
-        />
+      {#if authState.user && authState.user.calendars.length === 0}
+        <p class="settings-hint">
+          See <a href="/settings">Settings</a> to connect your calendar and detect conflicts.
+        </p>
       {/if}
       {#if openCalls.length === 0}
         <p class="empty-text">No volunteer calls are looking for volunteers right now.</p>
@@ -480,28 +470,22 @@
                   <span class="max-week-label">Maximum tasks:</span>
                   <label class="week-pick">
                     <span class="week-pick-label">{showWeek2 ? 'Week 1' : 'per week'}</span>
-                    <select
+                    <Select
                       value={mpw}
-                      onchange={(e) => setMaxPerWeek(call.id, parseInt((e.currentTarget as HTMLSelectElement).value, 10))}
-                      aria-label={showWeek2 ? 'Maximum tasks, week 1' : 'Maximum tasks per week'}
-                    >
-                      {#each MAX_WEEK_OPTIONS as n (n)}
-                        <option value={n}>{n}</option>
-                      {/each}
-                    </select>
+                      options={MAX_WEEK_OPTIONS.map((n) => ({ value: n, label: String(n) }))}
+                      ariaLabel={showWeek2 ? 'Maximum tasks, week 1' : 'Maximum tasks per week'}
+                      onchange={(v) => setMaxPerWeek(call.id, Number(v))}
+                    />
                   </label>
                   {#if showWeek2}
                     <label class="week-pick">
                       <span class="week-pick-label">Week 2</span>
-                      <select
+                      <Select
                         value={mpw2}
-                        onchange={(e) => setMaxPerWeek2(call.id, parseInt((e.currentTarget as HTMLSelectElement).value, 10))}
-                        aria-label="Maximum tasks, week 2"
-                      >
-                        {#each MAX_WEEK_OPTIONS as n (n)}
-                          <option value={n}>{n}</option>
-                        {/each}
-                      </select>
+                        options={MAX_WEEK_OPTIONS.map((n) => ({ value: n, label: String(n) }))}
+                        ariaLabel="Maximum tasks, week 2"
+                        onchange={(v) => setMaxPerWeek2(call.id, Number(v))}
+                      />
                     </label>
                   {/if}
                 </div>
@@ -640,6 +624,9 @@
 
     <section class="section">
       <h2>My Assignments</h2>
+      {#if icsHint}
+        <div class="ics-hint" role="status">{icsHint}</div>
+      {/if}
       {#if assignments.length === 0}
         <p class="empty-text">No assignments yet. Sign up for a volunteer call above!</p>
       {:else}
@@ -666,9 +653,16 @@
                   {a.confirmed ? 'Confirmed' : 'Pending'}
                 </span>
                 {#if a.date}
-                  <button class="btn btn-sm btn-outline" title="Add to calendar" onclick={() => generateIcs(a)}>
-                    Add to Calendar
-                  </button>
+                  {@const action = calendarActionFor(a)}
+                  {#if action?.kind === 'link'}
+                    <a class="btn btn-sm btn-outline" href={action.href} target="_blank" rel="noopener noreferrer">
+                      {action.label}
+                    </a>
+                  {:else if action?.kind === 'download'}
+                    <button class="btn btn-sm btn-outline" onclick={() => downloadIcsFor(a, action.hint)}>
+                      {action.label}
+                    </button>
+                  {/if}
                 {/if}
               </div>
             </ItemCard>
@@ -784,14 +778,6 @@
     color: var(--rt-text-muted, #777);
   }
 
-  .week-pick select {
-    padding: 2px var(--spacing-sm);
-    border: 1px solid var(--rt-gray-200, #e4dfda);
-    border-radius: var(--card-radius, 8px);
-    font: inherit;
-    background: var(--rt-white, #fff);
-    min-height: 28px;
-  }
 
   .list-header-row {
     display: flex;

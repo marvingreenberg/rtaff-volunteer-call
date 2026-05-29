@@ -14,6 +14,7 @@
   import { ALL_PROGRAMS, ALL_SKILLS, PROGRAM_LABELS } from '$lib/api/types';
   import { authState } from '$lib/stores/auth.svelte';
   import Breadcrumb from '$lib/components/Breadcrumb.svelte';
+  import Select from '$lib/components/Select.svelte';
   import { skillLabel } from '$lib/utils/badges';
 
   let person = $state<PersonResponse | null>(null);
@@ -233,25 +234,37 @@
 
       <div class="row">
         <span class="lbl">Notify via</span>
-        <select bind:value={notificationPreference}>
-          <option value="email">Email</option>
-          <option value="sms">SMS</option>
-          <option value="both">Both</option>
-        </select>
+        <Select
+          bind:value={notificationPreference}
+          options={[
+            { value: 'email', label: 'Email' },
+            { value: 'sms', label: 'SMS' },
+            { value: 'both', label: 'Both' },
+          ]}
+          ariaLabel="Notification channel"
+        />
         <span class="lbl secondary">Detail</span>
-        <select bind:value={notificationDetailLevel}>
-          <option value="summary">Summary</option>
-          <option value="full">Full</option>
-        </select>
+        <Select
+          bind:value={notificationDetailLevel}
+          options={[
+            { value: 'summary', label: 'Summary' },
+            { value: 'full', label: 'Full' },
+          ]}
+          ariaLabel="Notification detail level"
+        />
       </div>
 
       <div class="row">
         <span class="lbl">Subscription</span>
-        <select bind:value={subscriptionStatus}>
-          <option value="active">Active</option>
-          <option value="paused">Paused</option>
-          <option value="unsubscribed">Unsubscribed</option>
-        </select>
+        <Select
+          bind:value={subscriptionStatus}
+          options={[
+            { value: 'active', label: 'Active' },
+            { value: 'paused', label: 'Paused' },
+            { value: 'unsubscribed', label: 'Unsubscribed' },
+          ]}
+          ariaLabel="Subscription status"
+        />
         {#if subscriptionStatus === 'paused'}
           <span class="lbl secondary">Until</span>
           <input type="date" bind:value={pauseEnd} />
@@ -324,7 +337,6 @@
   .row input[type='text'],
   .row input[type='email'],
   .row input[type='date'],
-  .row select,
   .row textarea {
     padding: var(--spacing-xs) var(--spacing-sm);
     min-height: 32px;
@@ -355,7 +367,6 @@
   }
 
   .row input:focus,
-  .row select:focus,
   .row textarea:focus {
     outline: none;
     border-color: var(--color-primary);

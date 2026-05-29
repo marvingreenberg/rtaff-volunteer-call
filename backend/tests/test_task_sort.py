@@ -125,5 +125,5 @@ async def test_first_name_sort_in_people_endpoint(db: AsyncSession, client: Asyn
 
     resp = await client.get("/api/people")
     assert resp.status_code == 200
-    first_names = [p["first_name"] for p in resp.json()]
+    first_names = [p["first_name"] for p in resp.json()["items"]]
     assert first_names == ["Bryan", "Vick", "Zara"]

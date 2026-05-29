@@ -24,6 +24,7 @@ dependencies = [
     # Calendar conflict detection: fetch user iCal URLs + parse VEVENTs.
     "httpx>=0.26.0",
     "icalendar>=5.0.0",
+    "recurring-ical-events>=2.2.0",
     "PyJWT>=2.8.0",
 ]
 
@@ -79,7 +80,7 @@ strict = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["icalendar.*"]
+module = ["icalendar.*", "recurring_ical_events.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

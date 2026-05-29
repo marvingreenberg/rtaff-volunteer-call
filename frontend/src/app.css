@@ -574,6 +574,32 @@ main:has(.page-full) {
 }
 
 /* ──────────────────────────────
+   Global <select> normalization
+
+   The platform-native chevron renders differently on every OS/browser
+   and clashes with our rounded, lightweight form-field look. Strip the
+   appearance and paint our own chevron so plain <select> tags in ad-hoc
+   spots match the styled Select.svelte component without a refactor.
+   Opt out by adding the `native-select` class.
+   ────────────────────────────── */
+select:not(.native-select) {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--rt-white, #fff);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--rt-text-muted, #777) 50%),
+    linear-gradient(135deg, var(--rt-text-muted, #777) 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) 50%,
+    calc(100% - 9px) 50%;
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 26px;
+}
+
+/* ──────────────────────────────
    Utility
    ────────────────────────────── */
 .loading,

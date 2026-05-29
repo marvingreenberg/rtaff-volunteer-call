@@ -3,7 +3,7 @@
  */
 
 import type {
-  PersonListResponse,
+  PersonPageResponse,
   PersonResponse,
   PersonCreate,
   PersonUpdate,
@@ -27,7 +27,7 @@ import type {
   AutoAssignTeamLeadsResponse,
   AssignmentOverviewResponse,
   CalendarConnect,
-  CalendarStatus,
+  PersonCalendarSummary,
   TaskConflicts,
   LoginRequest,
   LoginResponse,
@@ -42,6 +42,19 @@ import type {
 
 const API_BASE = "/api";
 
+/**
+ * Read the double-submit CSRF cookie set by the backend. Returns null
+ * when we haven't talked to the API yet — the first GET response sets
+ * the cookie so subsequent writes can echo it back in the header.
+ */
+function readCsrfCookie(): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(/(?:^|;\s*)csrf=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -54,6 +67,13 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const method = (options.method ?? "GET").toUpperCase();
+  const extraHeaders: Record<string, string> = {};
+  if (UNSAFE_METHODS.has(method)) {
+    const csrf = readCsrfCookie();
+    if (csrf) extraHeaders["X-CSRF-Token"] = csrf;
+  }
+
   const response = await fetch(`${API_BASE}${path}`, {
     // The session cookie is HttpOnly; the fetch needs `credentials: 'include'`
     // so the browser actually sends it cross-origin (dev) and same-origin
@@ -61,6 +81,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
+      ...extraHeaders,
       ...options.headers,
     },
     ...options,
@@ -122,6 +143,8 @@ export const people = {
     program?: Program;
     active?: boolean;
     search?: string;
+    start?: number;
+    count?: number;
   }) => {
     const query = new URLSearchParams();
     if (params?.role) query.set("role", params.role);
@@ -130,8 +153,10 @@ export const people = {
     if (params?.active !== undefined)
       query.set("active", String(params.active));
     if (params?.search) query.set("search", params.search);
+    if (params?.start !== undefined) query.set("start", String(params.start));
+    if (params?.count !== undefined) query.set("count", String(params.count));
     const qs = query.toString();
-    return request<PersonListResponse[]>(`/people${qs ? "?" + qs : ""}`);
+    return request<PersonPageResponse>(`/people${qs ? "?" + qs : ""}`);
   },
 
   get: (id: string) => request<PersonResponse>(`/people/${id}`),
@@ -148,14 +173,17 @@ export const people = {
       body: JSON.stringify(data),
     }),
 
-  connectCalendar: (id: string, data: CalendarConnect) =>
-    request<CalendarStatus>(`/people/${id}/calendar`, {
-      method: "PUT",
+  listCalendars: (id: string) =>
+    request<PersonCalendarSummary[]>(`/people/${id}/calendars`),
+
+  addCalendar: (id: string, data: CalendarConnect) =>
+    request<PersonCalendarSummary>(`/people/${id}/calendars`, {
+      method: "POST",
       body: JSON.stringify(data),
     }),
 
-  disconnectCalendar: (id: string) =>
-    request<CalendarStatus>(`/people/${id}/calendar`, {
+  removeCalendar: (id: string, calendarId: string) =>
+    request<void>(`/people/${id}/calendars/${calendarId}`, {
       method: "DELETE",
     }),
 };

@@ -1,7 +1,9 @@
 """People routes."""
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, or_, select
+from sqlalchemy import Select, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -16,8 +18,10 @@ from volunteer_call_api.models.person import (
 )
 from volunteer_call_api.routes.helpers import apply_partial_update
 from volunteer_call_api.schemas.person import (
+    PersonCalendarSummary,
     PersonCreate,
     PersonListResponse,
+    PersonPageResponse,
     PersonResponse,
     PersonUpdate,
     ProgramMembership,
@@ -55,8 +59,10 @@ def _person_response(person: Person) -> PersonResponse:
         notes=person.notes,
         roles=_person_roles(person),
         programs=_person_programs(person),
-        calendar_connected=person.calendar_url is not None,
-        calendar_provider=person.calendar_provider,
+        calendars=[
+            PersonCalendarSummary.model_validate(c, from_attributes=True) for c in person.calendars
+        ],
+        calendar_kind=person.calendar_kind,
         created_at=person.created_at,
         updated_at=person.updated_at,
     )
@@ -69,54 +75,80 @@ def _person_response(person: Person) -> PersonResponse:
 PERSON_LOAD_OPTIONS = (
     selectinload(Person.roles),
     selectinload(Person.program_memberships),
+    selectinload(Person.calendars),
 )
 
 
-@router.get("", response_model=list[PersonListResponse])
+# Max rows the client can request in a single call. Prevents an
+# accidental count=10000 from materializing the whole table for an
+# admin search box.
+MAX_PEOPLE_PAGE_SIZE = 200
+
+
+@router.get("", response_model=PersonPageResponse)
 async def list_people(
     role: RoleType | None = None,
     skill: Skill | None = None,
     program: Program | None = None,
     active: bool | None = None,
     search: str | None = Query(None, min_length=1),
+    start: int = Query(0, ge=0),
+    count: int = Query(25, ge=1, le=MAX_PEOPLE_PAGE_SIZE),
     db: AsyncSession = Depends(get_db),
-) -> list[PersonListResponse]:
-    """List people with optional filters."""
-    query = select(Person).options(*PERSON_LOAD_OPTIONS)
+) -> PersonPageResponse:
+    """List people with optional filters, paginated by ``start`` / ``count``.
 
-    if active is not None:
-        query = query.where(Person.active == active)
+    Returns ``{ items, total, start, count }``. ``total`` is the
+    unfiltered-by-pagination matching count (separate
+    ``SELECT COUNT(DISTINCT person.id)`` against the same WHERE), so
+    the frontend can render "showing N–M of TOTAL" + a filter-aware
+    header label.
+    """
 
-    if skill is not None:
-        # Postgres ARRAY containment via the @> operator.
-        query = query.where(Person.skills.contains([skill]))
-
-    if program is not None:
-        query = query.join(Person.program_memberships).where(
-            VolunteerProgram.program == program,
-            VolunteerProgram.active.is_(True),
-        )
-
-    if search:
-        pattern = f"%{search}%"
-        full_name = func.concat(Person.first_name, " ", Person.last_name)
-        query = query.where(
-            or_(
-                Person.first_name.ilike(pattern),
-                Person.last_name.ilike(pattern),
-                full_name.ilike(pattern),
+    # Select is generic on the result-row type; the count query yields
+    # tuple[int] and the items query yields tuple[Person], so we keep
+    # Select as the structural type and let the row type stay loose.
+    def apply_filters(q: Select[Any]) -> Select[Any]:
+        if active is not None:
+            q = q.where(Person.active == active)
+        if skill is not None:
+            # Postgres ARRAY containment via the @> operator.
+            q = q.where(Person.skills.contains([skill]))
+        if program is not None:
+            q = q.join(Person.program_memberships).where(
+                VolunteerProgram.program == program,
+                VolunteerProgram.active.is_(True),
             )
-        )
+        if search:
+            pattern = f"%{search}%"
+            full_name = func.concat(Person.first_name, " ", Person.last_name)
+            q = q.where(
+                or_(
+                    Person.first_name.ilike(pattern),
+                    Person.last_name.ilike(pattern),
+                    full_name.ilike(pattern),
+                )
+            )
+        if role is not None:
+            q = q.join(Person.roles).where(PersonRole.role == role)
+        return q
 
-    if role is not None:
-        query = query.join(Person.roles).where(PersonRole.role == role)
+    # Total: separate COUNT(DISTINCT Person.id) so program/role joins
+    # don't double-count people who match the filter via multiple rows
+    # (e.g. a volunteer in two active programs when the program filter
+    # is unset).
+    count_query = apply_filters(select(func.count(func.distinct(Person.id))).select_from(Person))
+    total = (await db.execute(count_query)).scalar_one()
 
+    items_query = apply_filters(select(Person).options(*PERSON_LOAD_OPTIONS))
     # Admins know volunteers by first name — sort everywhere by first name.
-    query = query.order_by(Person.first_name, Person.last_name).limit(25)
-    result = await db.execute(query)
+    items_query = (
+        items_query.order_by(Person.first_name, Person.last_name).offset(start).limit(count)
+    )
+    result = await db.execute(items_query)
     people = result.scalars().unique().all()
 
-    return [
+    items = [
         PersonListResponse(
             id=p.id,
             first_name=p.first_name,
@@ -128,6 +160,7 @@ async def list_people(
         )
         for p in people
     ]
+    return PersonPageResponse(items=items, total=total, start=start, count=count)
 
 
 @router.post("", response_model=PersonResponse, status_code=201)
@@ -203,6 +236,7 @@ async def update_person(
             "pause_start",
             "pause_end",
             "notes",
+            "calendar_kind",
         ],
     )
 

@@ -716,27 +716,49 @@ export async function setMaxPerWeek(
   week1: number,
   week2: number | null,
 ): Promise<void> {
-  const sel1 = page.locator('select[aria-label="Maximum tasks, week 1"]');
-  const single = page.locator('select[aria-label="Maximum tasks per week"]');
-  const sel2 = page.locator('select[aria-label="Maximum tasks, week 2"]');
-  const target = (await sel1.count()) > 0 ? sel1 : single;
-  await target
-    .first()
-    .scrollIntoViewIfNeeded()
-    .catch(() => {});
-  await sleep(400);
-  await target
-    .first()
-    .selectOption(String(week1))
-    .catch(() => {});
+  // The Maximum-tasks pickers used to be native <select>s; feat/09
+  // swapped them for a Svelte combobox (Select.svelte). Drive it the
+  // same way a user would: click the trigger button, click the option
+  // by name.
+  await pickComboboxByAriaLabel(page, "Maximum tasks, week 1", week1, {
+    fallbackAriaLabel: "Maximum tasks per week",
+  });
   await sleep(500);
-  if (week2 != null && (await sel2.count()) > 0) {
-    await sel2
-      .first()
-      .selectOption(String(week2))
-      .catch(() => {});
+  if (week2 != null) {
+    await pickComboboxByAriaLabel(page, "Maximum tasks, week 2", week2);
     await sleep(500);
   }
+}
+
+async function pickComboboxByAriaLabel(
+  page: Page,
+  ariaLabel: string,
+  value: number | string,
+  options: { fallbackAriaLabel?: string } = {},
+): Promise<void> {
+  const primary = page.getByRole("combobox", { name: ariaLabel }).first();
+  let trigger = primary;
+  if ((await primary.count()) === 0 && options.fallbackAriaLabel) {
+    trigger = page
+      .getByRole("combobox", { name: options.fallbackAriaLabel })
+      .first();
+  }
+  if ((await trigger.count()) === 0) {
+    // Neither label resolved — silently no-op so a demo refactor
+    // doesn't get wedged on an absent control. Matches the previous
+    // helper's swallow-errors stance.
+    return;
+  }
+  await trigger.scrollIntoViewIfNeeded().catch(() => {});
+  await sleep(200);
+  await trigger.click().catch(() => {});
+  await page
+    .waitForSelector('[role="listbox"]', { timeout: 2000 })
+    .catch(() => {});
+  const option = page
+    .getByRole("option", { name: String(value), exact: true })
+    .first();
+  await option.click().catch(() => {});
 }
 
 // ---------------------------------------------------------------------------

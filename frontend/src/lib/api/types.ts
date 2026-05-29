@@ -149,7 +149,10 @@ export interface PersonUpdate {
   notes?: string;
   roles?: RoleType[];
   programs?: Program[];
+  calendar_kind?: CalendarKind;
 }
+
+export type CalendarKind = "google" | "apple" | "outlook" | "other";
 
 export interface PersonResponse {
   id: string;
@@ -168,11 +171,24 @@ export interface PersonResponse {
   notes: string | null;
   roles: RoleType[];
   programs: ProgramMembership[];
-  /** True iff calendar_url is set on the server. The URL itself never crosses the wire. */
-  calendar_connected: boolean;
-  calendar_provider: string | null;
+  /**
+   * Connected iCal feeds. Each row carries id + provider + label +
+   * added_at — never the URL itself (the URL is a bearer secret on
+   * the server). UI derives "calendar_connected" from
+   * `calendars.length > 0`.
+   */
+  calendars: PersonCalendarSummary[];
+  /** Preferred calendar app for "Add to calendar" deeplinks. */
+  calendar_kind: CalendarKind;
   created_at: string;
   updated_at: string;
+}
+
+export interface PersonCalendarSummary {
+  id: string;
+  calendar_provider: string | null;
+  label: string | null;
+  added_at: string;
 }
 
 export interface PersonListResponse {
@@ -185,17 +201,20 @@ export interface PersonListResponse {
   programs: Program[];
 }
 
+export interface PersonPageResponse {
+  items: PersonListResponse[];
+  /** Matching-records count for the same WHERE — not limited by start/count. */
+  total: number;
+  start: number;
+  count: number;
+}
+
 // --- Calendar ---
 
 export interface CalendarConnect {
   calendar_url: string;
   calendar_provider?: string | null;
-}
-
-export interface CalendarStatus {
-  calendar_connected: boolean;
-  calendar_provider: string | null;
-  calendar_url_added_at: string | null;
+  label?: string | null;
 }
 
 export interface CalendarConflict {
@@ -273,6 +292,14 @@ export interface TaskUpdate {
   notes?: string | null;
 }
 
+export interface TaskAssigneeSummary {
+  person_id: string;
+  first_name: string;
+  last_name: string;
+  initials: string;
+  is_team_lead: boolean;
+}
+
 export interface TaskResponse {
   id: string;
   volunteer_call_id: string;
@@ -289,6 +316,7 @@ export interface TaskResponse {
   status: TaskStatus;
   notes: string | null;
   assigned_count: number;
+  assignees: TaskAssigneeSummary[];
   created_at: string;
   updated_at: string;
 }

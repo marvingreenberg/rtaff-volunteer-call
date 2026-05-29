@@ -32,7 +32,14 @@ async def get_current_user(
         raise HTTPException(status_code=401, detail="Invalid or expired token") from None
 
     result = await db.execute(
-        select(Person).options(selectinload(Person.roles)).where(Person.id == claims.person_id)
+        select(Person)
+        .options(
+            selectinload(Person.roles),
+            # Needed by routes that scope output by program (e.g. the
+            # volunteer-facing call list).
+            selectinload(Person.program_memberships),
+        )
+        .where(Person.id == claims.person_id)
     )
     person = result.scalar_one_or_none()
 

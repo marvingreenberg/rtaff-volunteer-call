@@ -25,9 +25,20 @@ class Settings(BaseSettings):
     # Lifetime for magic-link and invite tokens.
     jwt_ttl_days: int = 14
 
+    # SMS provider. "stub" logs the outbound message; "disabled" silently
+    # drops it. Real provider integration (Twilio etc.) will land as a
+    # new value here.
+    sms_provider: str = "stub"
+
     # Demo mode: skip the magic-link email step and return the access token
     # directly in the /login response. For local demos only.
     demo_mode: bool = False
+
+    # Toggle for the double-submit-cookie CSRF middleware. On in prod and
+    # dev; the test suite turns it off via conftest so existing
+    # state-change tests don't have to thread a CSRF header through every
+    # POST. The middleware logic itself is exercised by tests/test_csrf.py.
+    csrf_enabled: bool = True
 
     model_config = {"env_file": ".env"}
 

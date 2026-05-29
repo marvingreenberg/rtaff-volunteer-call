@@ -29,8 +29,8 @@ export function searchPeople(filters?: {
 }): FetchOptionsFn {
   const { role, active = true, descriptionField = "skills" } = filters || {};
   return withErrorFallback(async (query: string) => {
-    const results = await people.list({ role, active, search: query });
-    return results.map((p) => ({
+    const resp = await people.list({ role, active, search: query });
+    return resp.items.map((p) => ({
       value: p.id,
       label: `${p.first_name} ${p.last_name}`,
       description:
