@@ -530,6 +530,10 @@
                       {@const expanded = expandedTasks.has(job.task_id)}
                       {@const checked = selected.has(job.task_id)}
                       {@const conflict = callConflicts[call.id]?.[job.task_id]}
+                      <!-- short_description is a misnomer — the column carries the full
+                           task description (<=500 chars). TaskRow derives the collapsed
+                           summary from `description` via truncateOnWord; `name` is the
+                           headline shown in both collapsed and expanded views. -->
                       <TaskRow
                         name={job.short_description}
                         description={job.short_description}
