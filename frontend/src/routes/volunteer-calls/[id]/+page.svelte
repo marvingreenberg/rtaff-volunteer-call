@@ -222,7 +222,7 @@
     background: var(--surface-3);
     color: var(--rt-text-muted);
     border: 1px solid var(--hairline);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     font-size: var(--font-size-sm);
     font-weight: 500;
     margin-right: var(--sp-2);
@@ -287,7 +287,7 @@
     align-self: center;
     margin-right: var(--sp-3);
     padding: var(--sp-2) var(--sp-4);
-    background: var(--color-primary);
+    background: var(--rt-blue);
     color: white;
     border: none;
     border-radius: var(--radius-sm);
@@ -356,7 +356,7 @@
   }
 
   .task-link:not(:disabled):hover {
-    color: var(--color-primary);
+    color: var(--rt-blue);
   }
 
   /* Status badges. callStatusBadgeClass maps call lifecycle states to
