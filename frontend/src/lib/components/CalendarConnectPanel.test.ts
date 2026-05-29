@@ -10,10 +10,16 @@ vi.mock("$lib/api/client", () => ({
   },
 }));
 
+vi.mock("$lib/stores/confirm.svelte", () => ({
+  confirmDialog: vi.fn(),
+}));
+
 import { people } from "$lib/api/client";
+import { confirmDialog } from "$lib/stores/confirm.svelte";
 
 const addCal = people.addCalendar as ReturnType<typeof vi.fn>;
 const removeCal = people.removeCalendar as ReturnType<typeof vi.fn>;
+const confirmMock = confirmDialog as ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   addCal.mockReset();
@@ -114,9 +120,7 @@ describe("CalendarConnectPanel", () => {
 
   it("× button calls removeCalendar(personId, calId) after confirm", async () => {
     removeCal.mockResolvedValue(undefined);
-    const confirmSpy = vi
-      .spyOn(window, "confirm")
-      .mockImplementation(() => true);
+    confirmMock.mockResolvedValue(true);
     const onChanged = vi.fn();
     render(CalendarConnectPanel, {
       props: {
@@ -128,10 +132,13 @@ describe("CalendarConnectPanel", () => {
     await fireEvent.click(
       screen.getByRole("button", { name: /disconnect personal/i }),
     );
-    expect(confirmSpy).toHaveBeenCalled();
+    // confirmDialog is awaited inside the handler; flush microtasks so
+    // the subsequent removeCalendar call resolves before assertions.
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(confirmMock).toHaveBeenCalled();
     expect(removeCal).toHaveBeenCalledWith("p1", "cal-x");
     expect(onChanged).toHaveBeenCalled();
-    confirmSpy.mockRestore();
   });
 
   it("Help section defaults to General info; clicking provider tabs swaps content", async () => {

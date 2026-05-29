@@ -16,6 +16,7 @@
   import Select from "$lib/components/Select.svelte";
   import AssignmentSpreadsheet from "$lib/components/AssignmentSpreadsheet.svelte";
   import { skillBadgeClass } from "$lib/utils/badges";
+  import { confirmDialog } from "$lib/stores/confirm.svelte";
   import { formatDate, volunteersLabel } from "$lib/utils/format";
   import {
     ASSIGNMENT_POLICY_LABELS,
@@ -179,9 +180,11 @@
   ) {
     if (busyTaskIds.has(taskId)) return;
     if (isConflictOverride) {
-      const ok = confirm(
-        `${candidate.person_name} is already assigned to another task on this date. Assign anyway?`,
-      );
+      const ok = await confirmDialog({
+        title: "Schedule conflict",
+        body: `${candidate.person_name} is already assigned to another task on this date. Assign anyway?`,
+        okLabel: "Assign anyway",
+      });
       if (!ok) return;
     }
     setBusy(taskId, true);

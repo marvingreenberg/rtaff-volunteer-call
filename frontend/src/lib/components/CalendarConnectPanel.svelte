@@ -1,5 +1,6 @@
 <script lang="ts">
   import { people } from "$lib/api/client";
+  import { confirmDialog } from "$lib/stores/confirm.svelte";
   import type { PersonCalendarSummary } from "$lib/api/types";
 
   type Props = {
@@ -61,8 +62,13 @@
 
   async function handleRemove(cal: PersonCalendarSummary) {
     const name = cal.label ?? cal.calendar_provider ?? "this calendar";
-    if (!confirm(`Disconnect ${name}? Conflict warnings from it will stop.`))
-      return;
+    const ok = await confirmDialog({
+      title: "Disconnect calendar?",
+      body: `Disconnect ${name}? Conflict warnings from it will stop.`,
+      okLabel: "Disconnect",
+      danger: true,
+    });
+    if (!ok) return;
     saving = true;
     errorMsg = "";
     try {
