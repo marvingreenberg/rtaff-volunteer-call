@@ -18,7 +18,7 @@
 
 <style>
   .breadcrumb {
-    margin-bottom: var(--spacing-md, 1rem);
+    margin-bottom: var(--sp-4, 1rem);
     font-size: 0.85rem;
     color: var(--rt-text-muted);
   }
