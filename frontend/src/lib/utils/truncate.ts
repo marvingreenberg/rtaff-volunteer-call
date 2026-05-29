@@ -4,6 +4,11 @@
  * Internal whitespace runs (including newlines) collapse to a single space
  * so the summary reads as a one-line preview. If no whitespace exists
  * before `maxChars`, falls back to a hard cut at `maxChars`.
+ *
+ * `maxChars` counts UTF-16 code units (the JS `String.length` unit), not
+ * graphemes. Astral characters (emoji, some CJK) and combining-mark
+ * sequences may count as 2+ units each; the cut still respects word
+ * boundaries but the resulting display width is approximate for those.
  */
 export function truncateOnWord(text: string, maxChars: number): string {
   const normalized = text.trim().replace(/\s+/g, " ");

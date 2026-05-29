@@ -80,6 +80,8 @@
   --sp-6: 28px;
   --radius: 12px;
   --radius-sm: 8px;
+  --radius-pill: 999px;
+  --ring-focus: 0 0 0 3px rgba(58, 109, 181, 0.18);
   --card-pad-y: 14px;
   --card-pad-x: 18px;
   --task-pad-y: 12px;
@@ -308,7 +310,7 @@ header nav a {
   font-weight: 600;
   font-size: 0.92rem;
   padding: 8px 14px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -443,7 +445,7 @@ main:has(.page-full) {
   min-height: var(--btn-h);
   padding: 0 var(--btn-pad-x);
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-family: var(--font-body);
   font-weight: 600;
   font-size: var(--btn-fz);
@@ -560,7 +562,7 @@ main:has(.page-full) {
   align-items: center;
   gap: 6px;
   padding: 2px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: var(--font-size-sm);
   font-weight: 600;
   text-transform: capitalize;
@@ -665,7 +667,7 @@ main:has(.page-full) {
 .form-field textarea:focus {
   outline: none;
   border-color: var(--rt-blue);
-  box-shadow: 0 0 0 3px rgba(58, 109, 181, 0.18);
+  box-shadow: var(--ring-focus);
 }
 
 /* ──────────────────────────────
