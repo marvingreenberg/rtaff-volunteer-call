@@ -136,7 +136,7 @@
         text-transform: capitalize;
         font-size: var(--font-size-xs);
         padding: 2px var(--sp-3);
-        border-radius: 999px;
+        border-radius: var(--radius-pill);
         background: var(--surface-3);
     }
     .notif-body {
