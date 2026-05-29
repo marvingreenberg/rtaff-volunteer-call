@@ -49,7 +49,8 @@
     background: linear-gradient(180deg, var(--tint-blue), transparent);
     border-bottom: 1px solid var(--hairline);
   }
-  .call-head:last-child {
+  .call-head:last-child,
+  .call-controls:last-child {
     border-bottom: 0;
   }
   .call-title {

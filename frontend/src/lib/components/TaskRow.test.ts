@@ -76,6 +76,42 @@ describe("TaskRow", () => {
     expect(onToggleExpanded).toHaveBeenCalledOnce();
   });
 
+  it("fires onToggleExpanded on Enter keydown in the body", async () => {
+    const onToggleExpanded = vi.fn();
+    const { container } = render(TaskRow, {
+      props: { ...baseProps, onToggleExpanded },
+    });
+    const body = container.querySelector(".task-body") as HTMLElement;
+    await fireEvent.keyDown(body, { key: "Enter" });
+    expect(onToggleExpanded).toHaveBeenCalledOnce();
+  });
+
+  it("fires onToggleExpanded on Space keydown in the body and prevents page scroll", async () => {
+    const onToggleExpanded = vi.fn();
+    const { container } = render(TaskRow, {
+      props: { ...baseProps, onToggleExpanded },
+    });
+    const body = container.querySelector(".task-body") as HTMLElement;
+    const event = new KeyboardEvent("keydown", {
+      key: " ",
+      cancelable: true,
+      bubbles: true,
+    });
+    body.dispatchEvent(event);
+    expect(onToggleExpanded).toHaveBeenCalledOnce();
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it("fires onToggleExpanded when the chevron button is clicked", async () => {
+    const onToggleExpanded = vi.fn();
+    const { container } = render(TaskRow, {
+      props: { ...baseProps, onToggleExpanded },
+    });
+    const expand = container.querySelector(".task-expand") as HTMLButtonElement;
+    await fireEvent.click(expand);
+    expect(onToggleExpanded).toHaveBeenCalledOnce();
+  });
+
   it("renders the conflict pill only when conflict=true", () => {
     const { container, rerender } = render(TaskRow, { props: baseProps });
     expect(container.querySelector(".conflict-flag")).toBeNull();

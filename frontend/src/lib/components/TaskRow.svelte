@@ -244,8 +244,8 @@
     background: transparent;
     border-radius: 0;
     border-top: 1px solid var(--hairline);
-    padding: 8px 14px;
-    grid-template-columns: auto 1fr auto auto;
+    padding: var(--task-pad-y) var(--task-pad-x);
+    grid-template-columns: auto 1fr auto;
     align-items: center;
   }
   :global([data-density="compact"]) .task.checked {

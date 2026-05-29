@@ -1,7 +1,7 @@
 <script lang="ts">
   import { notifications } from '$lib/api/client';
   import type { PersonResponse } from '$lib/api/types';
-  import { settingsState, applySettings } from '$lib/stores/settings.svelte';
+  import { settingsState, setDensity } from '$lib/stores/settings.svelte';
 
   type Density = 'compact' | 'standard' | 'large';
 
@@ -96,10 +96,7 @@
           class:active={settingsState.density === value}
           role="radio"
           aria-checked={settingsState.density === value}
-          onclick={() => {
-            settingsState.density = value;
-            applySettings();
-          }}
+          onclick={() => setDensity(value)}
         >{label}</button>
       {/snippet}
 

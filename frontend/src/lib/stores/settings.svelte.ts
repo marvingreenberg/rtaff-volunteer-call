@@ -39,6 +39,11 @@ export function setListView(v: ListView): void {
   applySettings();
 }
 
+export function setDensity(v: Density): void {
+  settingsState.density = v;
+  applySettings();
+}
+
 export function loadSettings(): void {
   if (typeof localStorage !== "undefined") {
     const d = localStorage.getItem(DENSITY_KEY);
