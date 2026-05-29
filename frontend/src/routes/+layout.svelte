@@ -138,7 +138,7 @@
 
   .login-link {
     font-weight: 500;
-    color: var(--color-primary);
+    color: var(--rt-blue);
     text-decoration: none;
     font-size: var(--font-size-sm);
   }
