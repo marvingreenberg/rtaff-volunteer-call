@@ -250,25 +250,25 @@
 
 <style>
   .calendar-connect {
-    margin: var(--spacing-sm) 0 var(--spacing-md);
+    margin: var(--sp-3) 0 var(--sp-4);
   }
 
   .cal-list {
     list-style: none;
-    margin: 0 0 var(--spacing-sm) 0;
+    margin: 0 0 var(--sp-3) 0;
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-xs, 0.25rem);
+    gap: var(--sp-2, 0.25rem);
   }
 
   .cal-row {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-sm) var(--spacing-md);
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4);
     background: var(--rt-gray-100, #f5f3ef);
-    border-radius: var(--card-radius, 8px);
+    border-radius: var(--radius, 8px);
   }
 
   .cal-label {
@@ -306,19 +306,19 @@
   .empty-hint {
     color: var(--rt-text-muted, #777);
     font-size: var(--font-size-sm);
-    margin: 0 0 var(--spacing-sm) 0;
+    margin: 0 0 var(--sp-3) 0;
   }
 
   .add-toggle {
     background: var(--rt-white, #fff);
-    color: var(--color-primary, #3a6db5);
-    border: 1px solid var(--color-primary, #3a6db5);
-    border-radius: var(--card-radius, 8px);
-    padding: var(--spacing-sm) var(--spacing-md);
+    color: var(--rt-blue, #3a6db5);
+    border: 1px solid var(--rt-blue, #3a6db5);
+    border-radius: var(--radius, 8px);
+    padding: var(--sp-3) var(--sp-4);
     font: inherit;
     font-weight: 600;
     cursor: pointer;
-    min-height: var(--btn-min-height, 36px);
+    min-height: var(--btn-h, 36px);
   }
 
   .add-toggle:hover {
@@ -328,9 +328,9 @@
   .connect-form {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr) auto;
-    gap: var(--spacing-sm);
+    gap: var(--sp-3);
     align-items: end;
-    margin-top: var(--spacing-sm);
+    margin-top: var(--sp-3);
   }
 
   .field {
@@ -346,7 +346,7 @@
   }
 
   .field input {
-    padding: var(--spacing-sm);
+    padding: var(--sp-3);
     border: 1px solid var(--rt-gray-200, #e4dfda);
     border-radius: 4px;
     font: inherit;
@@ -362,16 +362,16 @@
   .error-banner {
     background: var(--rt-danger-bg, #fdecea);
     color: var(--rt-danger-text, #b00020);
-    border-radius: var(--card-radius, 8px);
-    padding: var(--spacing-sm) var(--spacing-md);
-    margin-bottom: var(--spacing-sm);
+    border-radius: var(--radius, 8px);
+    padding: var(--sp-3) var(--sp-4);
+    margin-bottom: var(--sp-3);
     font-size: var(--font-size-sm);
   }
 
   .help {
-    margin-top: var(--spacing-md);
+    margin-top: var(--sp-4);
     border-top: 1px solid var(--rt-gray-200, #e4dfda);
-    padding-top: var(--spacing-sm);
+    padding-top: var(--sp-3);
   }
 
   .help summary {
@@ -382,21 +382,21 @@
   }
 
   .help-body {
-    margin-top: var(--spacing-sm);
+    margin-top: var(--sp-3);
   }
 
   .tabs {
     display: flex;
     gap: 2px;
     border-bottom: 1px solid var(--rt-gray-200, #e4dfda);
-    margin-bottom: var(--spacing-sm);
+    margin-bottom: var(--sp-3);
     overflow-x: auto;
   }
 
   .tab {
     background: none;
     border: none;
-    padding: var(--spacing-sm) var(--spacing-md);
+    padding: var(--sp-3) var(--sp-4);
     font: inherit;
     font-size: var(--font-size-sm);
     color: var(--rt-text-muted, #777);
@@ -406,8 +406,8 @@
   }
 
   .tab.active {
-    color: var(--color-primary, #3a6db5);
-    border-bottom-color: var(--color-primary, #3a6db5);
+    color: var(--rt-blue, #3a6db5);
+    border-bottom-color: var(--rt-blue, #3a6db5);
     font-weight: 600;
   }
 
@@ -429,7 +429,7 @@
     height: auto;
     border: 1px solid var(--rt-gray-200, #e4dfda);
     border-radius: 4px;
-    margin: var(--spacing-sm) 0;
+    margin: var(--sp-3) 0;
   }
 
   .tab-panel code {
