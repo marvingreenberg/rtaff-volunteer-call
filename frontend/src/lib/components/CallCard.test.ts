@@ -33,4 +33,20 @@ describe("CallCard", () => {
     expect(container.querySelector(".call-head")).toBeInTheDocument();
     expect(container.querySelector(".call-body")).toBeNull();
   });
+
+  it("renders the title as an <a> when titleHref is provided", () => {
+    const { getByRole } = render(CallCard, {
+      props: { title: "Cleanup", titleHref: "/volunteer-calls/abc" },
+    });
+    const link = getByRole("link", { name: "Cleanup" });
+    expect(link.getAttribute("href")).toBe("/volunteer-calls/abc");
+  });
+
+  it("renders the title as a <span> when titleHref is omitted", () => {
+    const { queryByRole, getByText } = render(CallCard, {
+      props: { title: "Cleanup" },
+    });
+    expect(queryByRole("link", { name: "Cleanup" })).toBeNull();
+    expect(getByText("Cleanup").tagName.toLowerCase()).toBe("span");
+  });
 });

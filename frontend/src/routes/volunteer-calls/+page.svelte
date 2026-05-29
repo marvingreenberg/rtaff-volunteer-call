@@ -340,41 +340,40 @@
         {@const busy = busyCallIds.has(call.id)}
         {@const notes = rowNotes(call)}
         <li data-testid="call-row" data-call-id={call.id}>
-          <a href="/volunteer-calls/{call.id}" class="call-link">
-            <CallCard
-              title={call.title}
-              meta={`${call.task_count} task${call.task_count === 1 ? '' : 's'}`}
-            >
-              {#snippet controls()}
-                <span class="badge {callStatusBadgeClass(call.status)}">{call.status}</span>
-                {#if notes}
-                  <span class="notes">{notes}</span>
-                {/if}
-                <span class="row-actions">
-                  {#each actions as action (action.action)}
-                    <button
-                      type="button"
-                      class="btn btn-primary btn-sm action-btn"
-                      data-testid="row-action-{action.action}"
-                      disabled={busy}
-                      onclick={(e) => { e.preventDefault(); e.stopPropagation(); handleRowAction(call, action.action); }}
-                    >
-                      {busy ? '...' : action.label}
-                    </button>
-                  {/each}
+          <CallCard
+            title={call.title}
+            titleHref={`/volunteer-calls/${call.id}`}
+            meta={`${call.task_count} task${call.task_count === 1 ? '' : 's'}`}
+          >
+            {#snippet controls()}
+              <span class="badge {callStatusBadgeClass(call.status)}">{call.status}</span>
+              {#if notes}
+                <span class="notes">{notes}</span>
+              {/if}
+              <span class="row-actions">
+                {#each actions as action (action.action)}
                   <button
                     type="button"
-                    class="trash-btn"
-                    onclick={(e) => { e.preventDefault(); e.stopPropagation(); handleDeleteCall(call); }}
-                    aria-label="Delete call {call.title}"
-                    title="Delete call"
+                    class="btn btn-primary btn-sm action-btn"
+                    data-testid="row-action-{action.action}"
+                    disabled={busy}
+                    onclick={() => handleRowAction(call, action.action)}
                   >
-                    🗑️
+                    {busy ? '...' : action.label}
                   </button>
-                </span>
-              {/snippet}
-            </CallCard>
-          </a>
+                {/each}
+                <button
+                  type="button"
+                  class="trash-btn"
+                  onclick={() => handleDeleteCall(call)}
+                  aria-label="Delete call {call.title}"
+                  title="Delete call"
+                >
+                  🗑️
+                </button>
+              </span>
+            {/snippet}
+          </CallCard>
         </li>
       {/each}
     </ul>
@@ -448,25 +447,13 @@
     margin-bottom: var(--sp-4);
   }
 
-  /* Calls list — each row is a CallCard wrapped in an <a> so the whole
-     card is the navigation target. The per-row admin buttons stop event
-     propagation so they don't trigger the link. */
+  /* Calls list — each row is a CallCard whose title is the navigation
+     link. Action buttons sit alongside as siblings rather than being
+     nested inside an <a>, which is invalid HTML5. */
   .calls-list {
     list-style: none;
     padding: 0;
     margin: 0;
-  }
-
-  .call-link {
-    display: block;
-    text-decoration: none;
-    color: inherit;
-    transition: transform 0.12s, box-shadow 0.12s;
-  }
-
-  .call-link:hover :global(.call) {
-    box-shadow: 0 8px 24px -16px rgba(30, 47, 61, 0.25);
-    transform: translateY(-1px);
   }
 
   .row-actions {
