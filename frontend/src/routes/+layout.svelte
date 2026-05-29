@@ -7,6 +7,7 @@
   import { loadSettings } from '$lib/stores/settings.svelte';
   import { authState, initFromToken, logout } from '$lib/stores/auth.svelte';
   import AvatarMenu from '$lib/components/AvatarMenu.svelte';
+  import ConfirmDialogHost from '$lib/components/ConfirmDialogHost.svelte';
 
   let { children }: { children: Snippet } = $props();
 
@@ -122,6 +123,8 @@
     {@render children?.()}
   </main>
 </div>
+
+<ConfirmDialogHost />
 
 <style>
   .user-auth {

@@ -9,6 +9,7 @@
   import Select from '$lib/components/Select.svelte';
   import TaskEntryForm from '$lib/components/TaskEntryForm.svelte';
   import { callStatusBadgeClass, programLabel } from '$lib/utils/badges';
+  import { confirmDialog } from '$lib/stores/confirm.svelte';
   import { rowAction, type RowAction } from '$lib/utils/call-row-action';
   import { rowNotes } from '$lib/utils/call-row-notes';
 
@@ -215,16 +216,22 @@
     // task count.
     const emptyAndUnsent = call.task_count === 0 && call.status === 'open';
     if (!emptyAndUnsent) {
-      const ok = window.confirm(
-        `Delete call "${call.title}" and all its tasks? This cannot be undone.`,
-      );
+      const ok = await confirmDialog({
+        title: 'Delete call?',
+        body: `Delete call "${call.title}" and all its tasks? This cannot be undone.`,
+        okLabel: 'Delete',
+        danger: true,
+      });
       if (!ok) return;
       // Second confirm if the call is past Open — the user already has
       // sent invites or assignments out to volunteers.
       if (call.status !== 'open') {
-        const ok2 = window.confirm(
-          'Volunteers have already been notified about this call. Are you sure you want to delete it?',
-        );
+        const ok2 = await confirmDialog({
+          title: 'Volunteers have been notified',
+          body: 'This call already has invites or assignment notices out to volunteers. Are you sure you want to delete it?',
+          okLabel: 'Delete anyway',
+          danger: true,
+        });
         if (!ok2) return;
       }
     }

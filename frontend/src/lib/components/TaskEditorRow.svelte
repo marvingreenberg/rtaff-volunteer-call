@@ -1,6 +1,7 @@
 <script lang="ts">
   import TaskEntryForm from "./TaskEntryForm.svelte";
   import { formatDate, volunteersLabel } from "$lib/utils/format";
+  import { confirmDialog } from "$lib/stores/confirm.svelte";
   import type { TaskCreate, TaskResponse } from "$lib/api/client";
 
   type TeamLead = { id: string; first_name: string; last_name: string };
@@ -56,14 +57,18 @@
     }
   }
 
-  function handleDeleteClick(e: MouseEvent) {
+  async function handleDeleteClick(e: MouseEvent) {
     e.stopPropagation();
     const dateText = task.date
       ? `on ${formatDate(task.date)}`
       : task.short_description;
-    if (window.confirm(`Delete task ${dateText}?`)) {
-      ondelete(task.id);
-    }
+    const ok = await confirmDialog({
+      title: "Delete task?",
+      body: `Delete task ${dateText}? This cannot be undone.`,
+      okLabel: "Delete",
+      danger: true,
+    });
+    if (ok) ondelete(task.id);
   }
 </script>
 

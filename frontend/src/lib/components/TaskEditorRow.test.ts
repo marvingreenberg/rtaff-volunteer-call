@@ -2,6 +2,15 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/svelte";
 import TaskEditorRow from "./TaskEditorRow.svelte";
 import type { TaskResponse } from "$lib/api/client";
+// vi.mock calls are hoisted above imports at runtime by Vitest, so the
+// confirmDialog import below resolves to the mocked module.
+import { confirmDialog } from "$lib/stores/confirm.svelte";
+
+vi.mock("$lib/stores/confirm.svelte", () => ({
+  confirmDialog: vi.fn(),
+}));
+
+const confirmMock = confirmDialog as ReturnType<typeof vi.fn>;
 
 function makeTask(overrides: Partial<TaskResponse> = {}): TaskResponse {
   return {
@@ -112,23 +121,16 @@ describe("TaskEditorRow", () => {
     // accidentally fold/unfold the row.
     const ontoggle = vi.fn();
     const ondelete = vi.fn();
-    const confirmSpy = vi
-      .spyOn(window, "confirm")
-      .mockImplementation(() => false);
+    confirmMock.mockResolvedValue(false);
     render(TaskEditorRow, { props: makeProps({ ontoggle, ondelete }) });
     await fireEvent.click(screen.getByRole("button", { name: /delete task/i }));
     expect(ontoggle).not.toHaveBeenCalled();
     expect(ondelete).not.toHaveBeenCalled();
-    confirmSpy.mockRestore();
   });
 
-  it("trash confirm uses the formatted task date in its prompt", async () => {
+  it("trash confirm uses the formatted task date in its body", async () => {
     const ondelete = vi.fn();
-    let promptedText = "";
-    const confirmSpy = vi.spyOn(window, "confirm").mockImplementation((msg) => {
-      promptedText = msg ?? "";
-      return true;
-    });
+    confirmMock.mockResolvedValue(true);
     render(TaskEditorRow, {
       props: makeProps({
         task: makeTask({ date: "2026-07-01" }),
@@ -136,9 +138,12 @@ describe("TaskEditorRow", () => {
       }),
     });
     await fireEvent.click(screen.getByRole("button", { name: /delete task/i }));
-    expect(promptedText).toContain("Wednesday, July 1");
+    // confirmDialog is awaited inside the handler; settle the microtask queue.
+    await Promise.resolve();
+    expect(confirmMock).toHaveBeenCalled();
+    const arg = confirmMock.mock.calls.at(-1)?.[0];
+    expect(arg?.body).toContain("Wednesday, July 1");
     expect(ondelete).toHaveBeenCalledWith("task-1");
-    confirmSpy.mockRestore();
   });
 
   it("renders assignee chips with team-lead marker", () => {
@@ -183,13 +188,11 @@ describe("TaskEditorRow", () => {
 
   it("does not call ondelete when the confirm dialog is dismissed", async () => {
     const ondelete = vi.fn();
-    const confirmSpy = vi
-      .spyOn(window, "confirm")
-      .mockImplementation(() => false);
+    confirmMock.mockResolvedValue(false);
     render(TaskEditorRow, { props: makeProps({ expanded: true, ondelete }) });
     await fireEvent.click(screen.getByRole("button", { name: /delete task/i }));
+    await Promise.resolve();
     expect(ondelete).not.toHaveBeenCalled();
-    confirmSpy.mockRestore();
   });
 
   it("collapsing the row clears in-flight edits (Update becomes disabled on reopen)", async () => {
