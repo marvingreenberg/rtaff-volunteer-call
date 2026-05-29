@@ -4,9 +4,11 @@
   let {
     title,
     meta,
+    actions,
   }: {
     title: string;
     meta?: Snippet;
+    actions?: Snippet;
   } = $props();
 </script>
 
@@ -14,6 +16,9 @@
   <div class="title-row">
     <span class="accent" aria-hidden="true"></span>
     <h1>{title}</h1>
+    {#if actions}
+      <div class="page-header-actions">{@render actions()}</div>
+    {/if}
   </div>
   {#if meta}
     <div class="page-header-meta">{@render meta()}</div>
@@ -31,7 +36,8 @@
   .title-row {
     display: flex;
     align-items: baseline;
-    gap: 12px;
+    gap: var(--sp-3);
+    flex: 1;
   }
   .accent {
     display: inline-block;
@@ -44,6 +50,12 @@
   h1 {
     margin: 0;
     font-size: var(--fz-h1);
+  }
+  .page-header-actions {
+    margin-left: auto;
+    display: flex;
+    gap: var(--sp-3);
+    align-items: center;
   }
   .page-header-meta {
     color: var(--rt-text-muted);

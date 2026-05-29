@@ -161,7 +161,9 @@
       {#if !loading}
         <span class="header-count">{total} {headerLabel}</span>
       {/if}
-      <button class="btn btn-primary btn-sm add-toggle" onclick={() => showAddForm = !showAddForm}>
+    {/snippet}
+    {#snippet actions()}
+      <button class="btn btn-primary btn-sm" onclick={() => showAddForm = !showAddForm}>
         {showAddForm ? 'Cancel' : '+ Add Person'}
       </button>
     {/snippet}
@@ -258,27 +260,29 @@
   {:else if personList.length === 0}
     <p class="empty">No people found.</p>
   {:else}
-    <div class="people-list">
+    <ul class="people-list">
       {#each personList as person (person.id)}
-        <a href="/people/{person.id}" class="person-row">
-          <span class="avatar" style="background-color: {getInitialColor(person.last_name)}">
-            {getInitials(person.first_name, person.last_name)}
-          </span>
-          <span class="person-name">{person.first_name} {person.last_name}</span>
-          <span class="person-skill">{person.skills.length ? person.skills.map(skillLabel).join(', ') : '—'}</span>
-          <span class="person-roles">
-            {#each person.roles as role (role)}
-              <span class="role-badge" style="background-color: {ROLE_COLORS[role] || 'var(--rt-gray-600)'}">{roleLabel(role)}</span>
-            {/each}
-          </span>
-          <span class="person-status">
-            <span class="badge" class:badge-active={person.active} class:badge-inactive={!person.active}>
-              {person.active ? 'Active' : 'Inactive'}
+        <li>
+          <a href="/people/{person.id}" class="person-row">
+            <span class="avatar" style="background-color: {getInitialColor(person.last_name)}">
+              {getInitials(person.first_name, person.last_name)}
             </span>
-          </span>
-        </a>
+            <span class="person-name">{person.first_name} {person.last_name}</span>
+            <span class="person-skill">{person.skills.length ? person.skills.map(skillLabel).join(', ') : '—'}</span>
+            <span class="person-roles">
+              {#each person.roles as role (role)}
+                <span class="role-badge" style="background-color: {ROLE_COLORS[role] || 'var(--rt-gray-600)'}">{roleLabel(role)}</span>
+              {/each}
+            </span>
+            <span class="person-status">
+              <span class="badge" class:badge-active={person.active} class:badge-inactive={!person.active}>
+                {person.active ? 'Active' : 'Inactive'}
+              </span>
+            </span>
+          </a>
+        </li>
       {/each}
-    </div>
+    </ul>
 
     {#if total > PAGE_SIZE}
       <div class="pagination">
@@ -310,14 +314,6 @@
 </div>
 
 <style>
-  .header-count {
-    margin-right: var(--sp-4);
-  }
-
-  .add-toggle {
-    margin-left: var(--sp-3);
-  }
-
   .pagination {
     display: flex;
     align-items: center;
@@ -414,6 +410,9 @@
      weight down at scale (25/page). The page itself sits on the body
      background; rows are separated only by hairlines. */
   .people-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
     background: var(--surface-1);
     border: 1px solid var(--hairline);
     border-radius: var(--radius);
@@ -432,7 +431,7 @@
     transition: background-color 0.1s;
   }
 
-  .person-row:first-child {
+  .people-list li:first-child .person-row {
     border-top: 0;
   }
 
