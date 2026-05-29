@@ -209,17 +209,24 @@
 
   async function handleDeleteCall(call: VolunteerCallListResponse) {
     if (busyCallIds.has(call.id)) return;
-    const ok = window.confirm(
-      `Delete call "${call.title}" and all its tasks? This cannot be undone.`,
-    );
-    if (!ok) return;
-    // Second confirm if the call is past Open — the user already has
-    // sent invites or assignments out to volunteers.
-    if (call.status !== 'open') {
-      const ok2 = window.confirm(
-        'Volunteers have already been notified about this call. Are you sure you want to delete it?',
+    // Empty calls have no tasks / availabilities / assignments to lose —
+    // skip the confirm and delete directly. Anything past Open (the user
+    // has notified volunteers) is never auto-confirmed regardless of
+    // task count.
+    const emptyAndUnsent = call.task_count === 0 && call.status === 'open';
+    if (!emptyAndUnsent) {
+      const ok = window.confirm(
+        `Delete call "${call.title}" and all its tasks? This cannot be undone.`,
       );
-      if (!ok2) return;
+      if (!ok) return;
+      // Second confirm if the call is past Open — the user already has
+      // sent invites or assignments out to volunteers.
+      if (call.status !== 'open') {
+        const ok2 = window.confirm(
+          'Volunteers have already been notified about this call. Are you sure you want to delete it?',
+        );
+        if (!ok2) return;
+      }
     }
     setBusy(call.id, true);
     error = null;
@@ -357,7 +364,10 @@
                     class="btn btn-primary btn-sm action-btn"
                     data-testid="row-action-{action.action}"
                     disabled={busy}
-                    onclick={() => handleRowAction(call, action.action)}
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      handleRowAction(call, action.action);
+                    }}
                   >
                     {busy ? '...' : action.label}
                   </button>
@@ -365,7 +375,10 @@
                 <button
                   type="button"
                   class="trash-btn"
-                  onclick={() => handleDeleteCall(call)}
+                  onclick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteCall(call);
+                  }}
                   aria-label="Delete call {call.title}"
                   title="Delete call"
                 >
