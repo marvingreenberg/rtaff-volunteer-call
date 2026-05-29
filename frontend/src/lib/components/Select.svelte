@@ -270,7 +270,7 @@
     padding: 6px 28px 6px 12px;
     background: var(--surface-2);
     border: 1px solid var(--hairline);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     font: inherit;
     font-weight: 600;
     color: var(--rt-dark);
@@ -297,12 +297,12 @@
   .app-select-trigger:focus-visible {
     outline: none;
     border-color: var(--rt-blue);
-    box-shadow: 0 0 0 3px rgba(58, 109, 181, 0.18);
+    box-shadow: var(--ring-focus);
   }
 
   .app-select.open .app-select-trigger {
     border-color: var(--rt-blue);
-    box-shadow: 0 0 0 3px rgba(58, 109, 181, 0.18);
+    box-shadow: var(--ring-focus);
   }
 
   .app-select-trigger:disabled {
