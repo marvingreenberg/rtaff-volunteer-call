@@ -103,23 +103,29 @@
 
       <section class="card">
         <h2>Contact</h2>
-        <div class="field">
-          <label for="profile-email">Email</label>
-          {#if editing}
-            <input id="profile-email" type="email" bind:value={editEmail} placeholder="email@example.com" />
-          {:else}
-            <span id="profile-email" class="field-value">{user.email || '—'}</span>
-          {/if}
-        </div>
+        {#if editing}
+          <div class="edit-fields">
+            <label class="form-field" for="profile-email">
+              Email
+              <input id="profile-email" type="email" bind:value={editEmail} placeholder="email@example.com" />
+            </label>
 
-        <div class="field">
-          <label for="profile-phone">Phone</label>
-          {#if editing}
-            <input id="profile-phone" type="tel" bind:value={editPhone} placeholder="703-555-1234" />
-          {:else}
-            <span id="profile-phone" class="field-value">{user.phone || '—'}</span>
-          {/if}
-        </div>
+            <label class="form-field" for="profile-phone">
+              Phone
+              <input id="profile-phone" type="tel" bind:value={editPhone} placeholder="703-555-1234" />
+            </label>
+          </div>
+        {:else}
+          <div class="field">
+            <span class="field-label">Email</span>
+            <span class="field-value">{user.email || '—'}</span>
+          </div>
+
+          <div class="field">
+            <span class="field-label">Phone</span>
+            <span class="field-value">{user.phone || '—'}</span>
+          </div>
+        {/if}
       </section>
 
       <section class="card">
@@ -225,7 +231,12 @@
     margin-bottom: 0;
   }
 
-  .field label,
+  .edit-fields {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+  }
+
   .field-label {
     font-size: var(--font-size-sm);
     font-weight: 600;

@@ -50,7 +50,7 @@
       <p class="hint">Check your email (or the backend console in dev mode) for the link.</p>
     {:else}
       <form onsubmit={handleSubmit}>
-        <label class="form-field" for="email">
+        <label class="form-field login-form-field" for="email">
           Email Address
           <input
             type="email"
@@ -112,7 +112,7 @@
     margin-bottom: var(--sp-5);
   }
 
-  .form-field {
+  .login-form-field {
     text-align: left;
     margin-bottom: var(--sp-5);
   }
