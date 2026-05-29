@@ -40,19 +40,62 @@ ADDRESS_POOL: list[tuple[str, str]] = [
     ("234 Magnolia Ave", "Centreville"),
 ]
 
+# Mix of long multi-task descriptions (paragraph-length, modeled on real
+# RT-AFF call emails — boilerplate like "We need N volunteers to help..."
+# stripped because volunteer count, city, address, and date all live in
+# their own columns) and short single-task descriptions. The short ones
+# exercise TaskRow's no-truncation branch; the long ones drive the
+# 65-char summary + full-text-on-expand split that's the point of the
+# component. Keep entries ≤500 chars to fit Task.short_description.
 TASK_DESCRIPTIONS: list[str] = [
-    "Kitchen cabinet replacement",
+    (
+        "Install three smoke/CO alarms, fire extinguisher, install five HVAC "
+        "supply registers, plane sticking bathroom door, install "
+        "weatherstripping and sweep on front door, repair kitchen cabinet "
+        "drawer slides, install 1x6 baseboard in hall bathroom, repair "
+        "corner trim on bath vanity, install lever handle on basement door, "
+        "and replace handheld showerhead."
+    ),
+    (
+        "Tune up deadbolt strikeplate, install one grab bar, install two "
+        "ceiling light fixtures, replace washer hoses, and provide fire "
+        "extinguisher."
+    ),
+    (
+        "Stabilize exterior handrails, repair exterior door, weather-proof "
+        "exterior outlet, clean dryer flapper, install two smoke alarms, "
+        "air-seal pull-down stairs, install toilet safety rails, replace "
+        "kitchen light, repair cabinet door, and install door sweep."
+    ),
+    (
+        "AC Rescue: install two window A/C units, secure with brackets, run "
+        "GFCI line check, dispose of old units, and walk homeowner through "
+        "filter cleaning. Volunteers must have completed AC Rescue training."
+    ),
+    (
+        "Replace flapper and fill valve on two toilets, install kitchen "
+        "faucet, caulk around tub and vanity, secure loose shutoff valve "
+        "under sink, and replace shower diverter."
+    ),
+    (
+        "Replace four interior door knobs with lever sets, hang two new "
+        "interior doors, install three smoke alarms, replace porch light, "
+        "and patch and paint drywall in stairwell."
+    ),
+    (
+        "Build and install wheelchair ramp from front walk to porch (about "
+        "20 linear feet, single switchback), install grab bar in adjacent "
+        "bathroom, and widen bathroom doorway hardware to lever handle."
+    ),
+    (
+        "Repair sticking storm door closer, replace weatherstripping on "
+        "front and back doors, install attic stairs insulation cover, and "
+        "caulk and paint exterior trim on front-facing windows."
+    ),
     "Bathroom grab-bar install",
-    "Deck repair and staining",
-    "Roof patch + gutter cleanup",
-    "Wheelchair ramp construction",
-    "Furnace filter + HVAC inspection",
-    "Exterior painting (single story)",
-    "Front door + storm door replacement",
-    "Floor refinishing — living room",
-    "Garage cleanout and reorganize",
-    "Window seal + weatherproofing",
-    "Plumbing fixture replacement",
+    "Furnace filter and quick HVAC check",
+    "Replace porch light fixture",
+    "Roof patch and gutter cleanout",
 ]
 
 

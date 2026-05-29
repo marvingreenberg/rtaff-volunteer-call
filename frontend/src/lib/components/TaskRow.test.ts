@@ -3,7 +3,6 @@ import { render, fireEvent } from "@testing-library/svelte";
 import TaskRow from "./TaskRow.svelte";
 
 const baseProps = {
-  name: "Driftwood collection",
   description:
     "Stage driftwood pulled from the upper beach into the sort pile by the lot.\n\nAnything over 6 ft. goes to the structural side.",
   city: "Pacifica",
@@ -38,7 +37,7 @@ describe("TaskRow", () => {
     expect(li.classList.contains("expanded")).toBe(false);
   });
 
-  it("expanded: .task wrapper carries .expanded and the description renders in .task-description", () => {
+  it("expanded: .task wrapper carries .expanded and the full description renders in .task-description", () => {
     const { container } = render(TaskRow, {
       props: { ...baseProps, expanded: true },
     });
@@ -46,6 +45,17 @@ describe("TaskRow", () => {
     expect(li.classList.contains("expanded")).toBe(true);
     const desc = container.querySelector(".task-description") as HTMLElement;
     expect(desc.textContent).toContain("structural side");
+  });
+
+  it("hides .task-description in expanded view when description fits in the summary (would duplicate the headline)", () => {
+    const { container } = render(TaskRow, {
+      props: { ...baseProps, expanded: true, description: "Roof patch" },
+    });
+    const li = container.querySelector("li.task") as HTMLElement;
+    expect(li.classList.contains("expanded")).toBe(true);
+    // The summary headline is "Roof patch"; rendering it again in
+    // .task-description would visually duplicate it. The guard must skip it.
+    expect(container.querySelector(".task-description")).toBeNull();
   });
 
   it("does NOT show time in the collapsed meta (lives in expanded detail only)", () => {

@@ -532,10 +532,10 @@
                       {@const conflict = callConflicts[call.id]?.[job.task_id]}
                       <!-- short_description is a misnomer — the column carries the full
                            task description (<=500 chars). TaskRow derives the collapsed
-                           summary from `description` via truncateOnWord; `name` is the
-                           headline shown in both collapsed and expanded views. -->
+                           headline from `description` via truncateOnWord and only re-
+                           renders the full text in the expanded panel when truncation
+                           actually removed something. -->
                       <TaskRow
-                        name={job.short_description}
                         description={job.short_description}
                         city={job.city ?? undefined}
                         date={job.date ? formatDate(job.date) : 'Unscheduled'}
