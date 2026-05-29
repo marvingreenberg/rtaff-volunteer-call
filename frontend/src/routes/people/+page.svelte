@@ -3,6 +3,7 @@
   import { people, type PersonListResponse, type Skill, type RoleType } from '$lib/api/client';
   import { ALL_SKILLS } from '$lib/api/types';
   import Breadcrumb from '$lib/components/Breadcrumb.svelte';
+  import PageHeader from '$lib/components/PageHeader.svelte';
   import Select from '$lib/components/Select.svelte';
   import { roleLabel, skillLabel } from '$lib/utils/badges';
 
@@ -155,17 +156,16 @@
 
 <div class="people-page page-md">
   <Breadcrumb crumbs={[{label: 'People'}]} />
-  <div class="page-header">
-    <div>
-      <h1>People</h1>
+  <PageHeader title="People">
+    {#snippet meta()}
       {#if !loading}
-        <p class="header-stats">{total} {headerLabel}</p>
+        <span class="header-count">{total} {headerLabel}</span>
       {/if}
-    </div>
-    <button class="btn btn-primary" onclick={() => showAddForm = !showAddForm}>
-      {showAddForm ? 'Cancel' : '+ Add Person'}
-    </button>
-  </div>
+      <button class="btn btn-primary btn-sm add-toggle" onclick={() => showAddForm = !showAddForm}>
+        {showAddForm ? 'Cancel' : '+ Add Person'}
+      </button>
+    {/snippet}
+  </PageHeader>
 
   {#if error}
     <div class="error-banner">{error}</div>
@@ -310,43 +310,35 @@
 </div>
 
 <style>
-  .header-stats {
-    margin: var(--spacing-xs) 0 0 0;
-    font-size: var(--font-size-sm);
-    color: var(--rt-text-muted);
+  .header-count {
+    margin-right: var(--sp-4);
+  }
+
+  .add-toggle {
+    margin-left: var(--sp-3);
   }
 
   .pagination {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-top: var(--spacing-md);
-    padding-top: var(--spacing-md);
-    border-top: 1px solid var(--rt-gray-200, #e4dfda);
+    margin-top: var(--sp-4);
+    padding-top: var(--sp-4);
+    border-top: 1px solid var(--hairline);
     font-size: var(--font-size-sm);
   }
 
   .page-range {
-    color: var(--rt-text-muted, #777);
+    color: var(--rt-text-muted);
   }
 
   .page-buttons {
     display: flex;
-    gap: var(--spacing-sm);
-  }
-
-  .pagination .btn-sm {
-    padding: var(--spacing-xs) var(--spacing-md);
-    font-size: var(--font-size-sm);
-  }
-
-  .pagination button:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
+    gap: var(--sp-3);
   }
 
   .add-form {
-    margin-bottom: var(--spacing-lg);
+    margin-bottom: var(--sp-5);
   }
 
   .add-form h2 {
@@ -356,41 +348,31 @@
   .form-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: var(--spacing-md);
-    margin-bottom: var(--spacing-md);
-  }
-
-  .form-field label {
-    display: block;
-    font-weight: 500;
-    margin-bottom: var(--spacing-xs);
-    font-size: var(--font-size-sm);
-    color: var(--rt-gray-600);
-  }
-
-  .form-field input {
-    width: 100%;
-    padding: var(--spacing-sm) var(--spacing-md);
-    min-height: var(--btn-min-height);
-    border: 1px solid var(--rt-gray-200);
-    border-radius: var(--card-radius);
-    font-size: var(--btn-font-size);
-    font-family: var(--font-body);
+    gap: var(--sp-4);
+    margin-bottom: var(--sp-4);
   }
 
   .role-checkboxes {
     display: flex;
-    gap: var(--spacing-md);
+    gap: var(--sp-4);
     flex-wrap: wrap;
+    margin-top: var(--sp-2);
+  }
+
+  .field-label {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--rt-text-muted);
   }
 
   .checkbox-label {
     display: flex;
     align-items: center;
-    gap: var(--spacing-xs);
+    gap: var(--sp-2);
     font-weight: normal;
     cursor: pointer;
-    min-height: var(--btn-min-height);
+    min-height: var(--btn-h);
+    color: var(--rt-text);
   }
 
   .checkbox-label input[type="checkbox"] {
@@ -399,50 +381,63 @@
   }
 
   .form-actions {
-    margin-top: var(--spacing-md);
+    margin-top: var(--sp-4);
     display: flex;
     justify-content: flex-end;
   }
 
   .filters {
     display: flex;
-    gap: var(--spacing-md);
-    margin-bottom: var(--spacing-md);
+    gap: var(--sp-4);
+    margin-bottom: var(--sp-4);
   }
 
   .search-input {
     flex: 1;
-    padding: var(--spacing-sm) var(--spacing-md);
-    min-height: var(--btn-min-height);
-    border: 1px solid var(--rt-gray-200);
-    border-radius: var(--card-radius);
-    font-size: var(--btn-font-size);
-    font-family: inherit;
+    padding: 0 var(--sp-4);
+    min-height: var(--btn-h);
+    border: 1px solid var(--rt-input-border);
+    border-radius: var(--radius-sm);
+    background: var(--rt-input-bg);
+    color: var(--color-text);
+    font-size: var(--fz-body);
+    font-family: var(--font-body);
   }
 
+  .search-input:focus {
+    outline: none;
+    border-color: var(--rt-blue);
+    box-shadow: 0 0 0 3px rgba(58, 109, 181, 0.18);
+  }
 
+  /* Hairline-divider list: chosen over per-row cards to keep visual
+     weight down at scale (25/page). The page itself sits on the body
+     background; rows are separated only by hairlines. */
   .people-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-xs);
+    background: var(--surface-1);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius);
+    overflow: hidden;
   }
 
   .person-row {
     display: flex;
     align-items: center;
-    gap: var(--spacing-md);
-    padding: var(--spacing-md) var(--spacing-md);
-    min-height: var(--btn-min-height);
-    background: var(--rt-white);
-    border: 1px solid var(--rt-gray-200);
-    border-radius: var(--card-radius);
+    gap: var(--sp-4);
+    padding: var(--sp-3) var(--card-pad-x);
+    min-height: var(--btn-h);
+    border-top: 1px solid var(--hairline);
     text-decoration: none;
     color: inherit;
     transition: background-color 0.1s;
   }
 
+  .person-row:first-child {
+    border-top: 0;
+  }
+
   .person-row:hover {
-    background: var(--rt-gray-100);
+    background: var(--surface-2);
     text-decoration: none;
   }
 
@@ -478,13 +473,13 @@
   .person-roles {
     flex: 1;
     display: flex;
-    gap: var(--spacing-xs);
+    gap: var(--sp-2);
     flex-wrap: wrap;
   }
 
   .role-badge {
     display: inline-block;
-    padding: 2px var(--spacing-sm);
+    padding: 2px var(--sp-3);
     color: white;
     border-radius: 10px;
     font-size: var(--font-size-xs);
