@@ -34,7 +34,7 @@
 ### Created
 - `frontend/src/lib/components/PageHeader.svelte` — title + optional accent bar + right-side meta slot.
 - `frontend/src/lib/components/CallCard.svelte` — the soft-modular tinted-head card shell (head + controls + body slot + optional footer).
-- `frontend/src/lib/components/TaskRow.svelte` — collapsed/expanded task row with checkbox, summary, full description, conflict pill. Replaces `ItemCard.svelte` for this use; ItemCard is deleted at end of phase 3.
+- `frontend/src/lib/components/TaskRow.svelte` — collapsed/expanded task row with checkbox, summary, full description, conflict pill. Replaces `ItemCard.svelte` for this use; ItemCard is deleted at end of phase 3. **Naming conflict:** there is already a `TaskRow.svelte` on `main` (an admin editor used by `/volunteer-calls/[id]`). Phase 2 task 2.3 first renames the existing component to `TaskEditorRow.svelte`, then creates the new shell.
 - `frontend/src/lib/components/PageHeader.test.ts`, `CallCard.test.ts`, `TaskRow.test.ts` — minimal Vitest coverage.
 - `docs/superpowers/specs/2026-05-29-ui-refresh-soft-modular.md` — symlink-style pointer doc to the mockup (visual specs don't read well as prose).
 
@@ -1763,17 +1763,17 @@ git commit -m "ui: calls list using CallCard (header-only shape supported)"
 
 **Files:** Modify `frontend/src/routes/volunteer-calls/[id]/+page.svelte`.
 
-- [ ] **Step 1: Wrap the detail body in `<CallCard title={call.title}>{...}</CallCard>`. The task list becomes `<TaskRow>` instances (same pattern as volunteering page, minus the checkbox semantics — staff are viewing, not selecting; pass `onToggleChecked={undefined}` and TaskRow's checkbox stays inert).**
+- [ ] **Step 1: Wrap the detail body in `<CallCard title={call.title}>{...}</CallCard>`. Leave `<TaskEditorRow>` instances in place** — they're admin-editor components (renamed from the original `TaskRow.svelte` during phase 2.3) and the call detail's actual functionality depends on their TaskEntryForm-embedded edit/delete API. The presentational `<TaskRow>` shell is not a substitute.
 
-If pass-through of `onToggleChecked={undefined}` doesn't disable the checkbox, add a `readonly` prop to `TaskRow.svelte` (small edit) and disable the checkbox when set.
+- [ ] **Step 2: Restyle `TaskEditorRow.svelte` to inherit the soft-modular look — same surface colors, hairlines, density vars — but keep its existing admin API unchanged.** This is a cosmetic pass on the editor row, not a swap.
 
-- [ ] **Step 2: Delete dead CSS.**
+- [ ] **Step 3: Delete dead CSS in the page-level `<style>` block.**
 
-- [ ] **Step 3: Commit + merge phase 6.**
+- [ ] **Step 4: Commit + merge phase 6.**
 
 ```bash
-git add frontend/src/routes/volunteer-calls/[id]/+page.svelte frontend/src/lib/components/TaskRow.svelte frontend/src/lib/components/TaskRow.test.ts
-git commit -m "ui: call detail on CallCard + read-only TaskRow"
+git add frontend/src/routes/volunteer-calls/[id]/+page.svelte frontend/src/lib/components/TaskEditorRow.svelte
+git commit -m "ui: call detail on CallCard; TaskEditorRow restyled"
 make lint-fe && make test-frontend && make test-e2e
 git checkout main
 git merge --no-ff feat/ui-06-calls
