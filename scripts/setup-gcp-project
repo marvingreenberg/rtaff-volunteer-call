@@ -1,35 +1,39 @@
 #!/usr/bin/env bash
 # One-time GCP project setup for volunteer-call deployment.
 #
-# Creates the GCP project, links billing, and enables required APIs.
-# Does NOT set up the database — see docs/NEON_SQL.howto or docs/CLOUD_SQL.howto.
+# Creates the GCP project, links billing, enables required APIs, and
+# creates the Artifact Registry repo. Idempotent — safe to re-run.
 #
-# Usage: ./scripts/setup-gcp-project --project-id=rtaff-volunteer-call
+# Does NOT set up the database — see scripts/setup-neon-project for the
+# Neon flow, or docs/CLOUD_SQL.howto for Cloud SQL.
 #
-# Pick any project-id you like, but note GCP project ids are globally
-# unique — the bare "volunteer-call" id is taken. Examples that work:
-# "rtaff-volunteer-call", "volunteer-call-mg", "volunteer-call-prod-2025".
-# The check_prerequisites.sh check accepts any id that contains
-# "volunteer-call".
+# By default operates on $GCP_PROJECT_NAME from scripts/_project-config.sh.
+# Override with --project-id=<id> for a one-off (e.g. scratch project).
 set -euo pipefail
 
-# ── Parse flags ─────────────────────────────────────────────────
-PROJECT_ID=""
-REGION="us-central1"
-REPO_NAME="container-images"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./_project-config.sh
+source "${SCRIPT_DIR}/_project-config.sh"
+
+PROJECT_ID="$GCP_PROJECT_NAME"
+REGION="$GCP_REGION"
+REPO_NAME="$AR_REPO"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --project-id=*) PROJECT_ID="${1#*=}"; shift ;;
         --region=*)     REGION="${1#*=}"; shift ;;
+        -h|--help)
+            echo "Usage: $0 [--project-id=<id>] [--region=<region>]"
+            echo ""
+            echo "Defaults from scripts/_project-config.sh:"
+            echo "  --project-id=${GCP_PROJECT_NAME}"
+            echo "  --region=${GCP_REGION}"
+            exit 0
+            ;;
         *)              echo "Unknown flag: $1"; exit 1 ;;
     esac
 done
-
-if [[ -z "$PROJECT_ID" ]]; then
-    echo "Usage: $0 --project-id=<project-id> [--region=us-central1]"
-    exit 1
-fi
 
 echo "=== Setting up GCP project: ${PROJECT_ID} ==="
 
@@ -43,46 +47,57 @@ fi
 
 gcloud config set project "$PROJECT_ID"
 
-# ── Link billing account ───────────────────────────────────────
-BILLING_ACCOUNT=$(gcloud billing accounts list --filter="open=true" --format="value(ACCOUNT_ID)" --limit=1)
-if [[ -n "$BILLING_ACCOUNT" ]]; then
-    echo "Linking billing account ${BILLING_ACCOUNT}..."
-    gcloud billing projects link "$PROJECT_ID" --billing-account="$BILLING_ACCOUNT"
+# ── Link billing account (skip if already linked) ──────────────
+CURRENT_BILLING=$(gcloud billing projects describe "$PROJECT_ID" --format="value(billingEnabled)" 2>/dev/null || echo "")
+if [[ "$CURRENT_BILLING" == "True" ]]; then
+    echo "Billing already enabled for ${PROJECT_ID}, skipping."
 else
-    echo "WARNING: No billing account found. Link one manually:"
-    echo "  gcloud billing projects link ${PROJECT_ID} --billing-account=<ACCOUNT_ID>"
+    BILLING_ACCOUNT=$(gcloud billing accounts list --filter="open=true" --format="value(ACCOUNT_ID)" --limit=1)
+    if [[ -n "$BILLING_ACCOUNT" ]]; then
+        echo "Linking billing account ${BILLING_ACCOUNT}..."
+        gcloud billing projects link "$PROJECT_ID" --billing-account="$BILLING_ACCOUNT"
+    else
+        echo "WARNING: No billing account found. Link one manually:"
+        echo "  gcloud billing projects link ${PROJECT_ID} --billing-account=<ACCOUNT_ID>"
+    fi
 fi
 
 # ── Enable required APIs ───────────────────────────────────────
-echo "Enabling APIs..."
-gcloud services enable \
-    run.googleapis.com \
-    artifactregistry.googleapis.com \
+REQUIRED_APIS=(
+    run.googleapis.com
+    artifactregistry.googleapis.com
     secretmanager.googleapis.com
+)
+echo "Enabling APIs..."
+for api in "${REQUIRED_APIS[@]}"; do
+    echo "    $api"
+    gcloud services enable "$api" --project="$PROJECT_ID"
+done
+
+# IAM permissions need a few seconds to propagate after API enablement.
+API_PROPAGATION_DELAY=5
+echo "Waiting ${API_PROPAGATION_DELAY}s for API permissions to propagate..."
+sleep "$API_PROPAGATION_DELAY"
 
 # ── Create Artifact Registry repository ────────────────────────
-if gcloud artifacts repositories describe "$REPO_NAME" --location="$REGION" &>/dev/null; then
+if gcloud artifacts repositories describe "$REPO_NAME" --location="$REGION" --project="$PROJECT_ID" &>/dev/null; then
     echo "Artifact Registry repo ${REPO_NAME} already exists."
 else
     echo "Creating Artifact Registry repo ${REPO_NAME}..."
     gcloud artifacts repositories create "$REPO_NAME" \
         --repository-format=docker \
         --location="$REGION" \
-        --description="Container images for volunteer-call"
+        --project="$PROJECT_ID" \
+        --description="Container images for ${SERVICE_NAME}"
 fi
 
-# ── Done ───────────────────────────────────────────────────────
 echo ""
 echo "=== GCP project setup complete ==="
 echo ""
-echo "Next steps:"
-echo "  1. Set up the database:"
-echo "     - Neon (free): see docs/NEON_SQL.howto"
-echo "     - Cloud SQL:   see docs/CLOUD_SQL.howto"
+echo "  Project:   $PROJECT_ID"
+echo "  Region:    $REGION"
+echo "  AR repo:   $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME"
 echo ""
-echo "  2. Store the DATABASE_URL in Secret Manager:"
-echo "     echo -n 'postgresql+asyncpg://...' | \\"
-echo "       gcloud secrets create volunteer-call-database-url --data-file=-"
-echo ""
-echo "  3. Set up GitHub Actions credentials:"
-echo "     ./scripts/set-gcloud-creds-for-deploy"
+echo "Next: make bootstrap-creds  (service accounts + GitHub secrets)"
+echo "      make bootstrap-neon   (Neon project / role / database)"
+echo "      make bootstrap-secrets (DATABASE_URL + JWT_SECRET in Secret Manager)"

@@ -1,0 +1,179 @@
+#!/usr/bin/env bash
+# Idempotent Neon project / role / database bootstrap for volunteer-call.
+#
+# Uses neonctl. On success, emits the asyncpg-flavored pooled connection
+# string on stdout (all log output goes to stderr) so the caller can pipe
+# directly into GCP Secret Manager:
+#
+#   ./scripts/setup-neon-project | gcloud secrets versions add ... --data-file=-
+#
+# scripts/setup-secrets uses this for the volunteer-call-database-url secret.
+#
+# Prerequisites:
+#   - neonctl installed and authenticated (`neonctl auth`)
+#
+# Usage:
+#   ./scripts/setup-neon-project          # create / reuse (idempotent)
+#   ./scripts/setup-neon-project --new    # delete and recreate the project
+#   ./scripts/setup-neon-project --clear  # delete only (does not emit a URL)
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./_project-config.sh
+source "${SCRIPT_DIR}/_project-config.sh"
+
+# Log helpers — stderr only, so stdout stays clean for the connection string.
+log()  { echo "$@" >&2; }
+die()  { echo "ERROR: $*" >&2; exit 1; }
+
+command -v neonctl >/dev/null || die "neonctl not installed (npm install -g neonctl)"
+neonctl auth status >/dev/null 2>&1 || die "neonctl not authenticated — run: neonctl auth"
+
+usage() {
+    cat <<EOF >&2
+Usage: $(basename "$0") [--new | --clear]
+
+  (no args)  Create / reuse project, role, db (idempotent); print asyncpg URL on stdout.
+  --new      Delete the project (if any) then create fresh.
+  --clear    Delete the project; no output.
+EOF
+    exit 1
+}
+
+# Find the Neon project id by name. Fails if multiple projects share the name.
+find_project_id() {
+    local matches
+    matches=$(neonctl projects list --output json 2>/dev/null \
+        | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+# neonctl list returns {'projects': [...], 'shared_projects': [...]} or a list
+projects = data.get('projects', data) if isinstance(data, dict) else data
+ids = [p['id'] for p in projects if p.get('name') == '${NEON_PROJECT_NAME}']
+print(' '.join(ids))
+")
+    local count
+    count=$(echo "$matches" | wc -w | tr -d ' ')
+    if [[ "$count" == "0" ]]; then
+        return 1
+    elif [[ "$count" == "1" ]]; then
+        echo "$matches"
+        return 0
+    else
+        die "Multiple Neon projects named '${NEON_PROJECT_NAME}': ${matches}. Resolve manually."
+    fi
+}
+
+delete_project() {
+    local pid
+    if pid=$(find_project_id); then
+        log "Deleting Neon project '${NEON_PROJECT_NAME}' (${pid})..."
+        neonctl projects delete "$pid" >/dev/null
+    else
+        log "No existing Neon project named '${NEON_PROJECT_NAME}' to delete."
+    fi
+}
+
+create_project() {
+    log "Creating Neon project '${NEON_PROJECT_NAME}' in ${NEON_REGION}..."
+    neonctl projects create \
+        --name "$NEON_PROJECT_NAME" \
+        --region-id "$NEON_REGION" \
+        --database "$NEON_DB_NAME" \
+        --output json >/dev/null
+}
+
+ensure_role() {
+    local pid=$1
+    if neonctl roles list --project-id "$pid" --output json 2>/dev/null \
+        | python3 -c "
+import json, sys
+roles = json.load(sys.stdin)
+sys.exit(0 if any(r.get('name') == '${NEON_ROLE_NAME}' for r in roles) else 1)
+"; then
+        log "  Role ${NEON_ROLE_NAME} — already exists"
+    else
+        log "  Creating role ${NEON_ROLE_NAME}..."
+        neonctl roles create --project-id "$pid" --name "$NEON_ROLE_NAME" --output json >/dev/null
+    fi
+}
+
+ensure_database() {
+    local pid=$1
+    if neonctl databases list --project-id "$pid" --output json 2>/dev/null \
+        | python3 -c "
+import json, sys
+dbs = json.load(sys.stdin)
+sys.exit(0 if any(d.get('name') == '${NEON_DB_NAME}' for d in dbs) else 1)
+"; then
+        log "  Database ${NEON_DB_NAME} — already exists"
+    else
+        log "  Creating database ${NEON_DB_NAME} (owner ${NEON_ROLE_NAME})..."
+        neonctl databases create \
+            --project-id "$pid" \
+            --name "$NEON_DB_NAME" \
+            --owner-name "$NEON_ROLE_NAME" \
+            --output json >/dev/null
+    fi
+}
+
+# Transform a Neon-emitted libpq URL into the asyncpg flavor:
+#   postgresql:// → postgresql+asyncpg://
+#   sslmode=require → ssl=require
+#   strip channel_binding=require (asyncpg 0.30+ supports it but version
+#   drift would silently change behavior; the underlying SCRAM-SHA-256-PLUS
+#   negotiation still happens — see docs/NEON_SQL.howto for why).
+to_asyncpg_url() {
+    local url=$1
+    url="${url//postgresql:\/\//postgresql+asyncpg:\/\/}"
+    url="${url//sslmode=require/ssl=require}"
+    url="${url//&channel_binding=require/}"
+    url="${url//channel_binding=require&/}"
+    url="${url//?channel_binding=require/}"
+    echo "$url"
+}
+
+emit_url() {
+    local pid=$1
+    log "Fetching pooled connection string..."
+    local raw
+    raw=$(neonctl connection-string \
+        --project-id "$pid" \
+        --role-name "$NEON_ROLE_NAME" \
+        --database-name "$NEON_DB_NAME" \
+        --pooled 2>/dev/null \
+        | tr -d '\n')
+    [[ -n "$raw" ]] || die "neonctl returned empty connection string"
+    to_asyncpg_url "$raw"
+}
+
+MODE="${1:-}"
+
+case "$MODE" in
+    --clear)
+        delete_project
+        log "Done. Neon project cleared."
+        ;;
+    --new)
+        delete_project
+        create_project
+        pid=$(find_project_id) || die "Project disappeared after create"
+        ensure_role "$pid"
+        ensure_database "$pid"
+        emit_url "$pid"
+        ;;
+    "")
+        if pid=$(find_project_id); then
+            log "Neon project '${NEON_PROJECT_NAME}' already exists (${pid})."
+        else
+            create_project
+            pid=$(find_project_id) || die "Project disappeared after create"
+        fi
+        ensure_role "$pid"
+        ensure_database "$pid"
+        emit_url "$pid"
+        ;;
+    *)
+        usage
+        ;;
+esac

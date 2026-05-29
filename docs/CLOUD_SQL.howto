@@ -1,3 +1,7 @@
+[Reference walkthrough — there is no bootstrap script for Cloud SQL yet;
+the standard deploy uses Neon (see DEPLOY.md). Follow this doc only when
+migrating off Neon.]
+
 Upgrading to Cloud SQL for PostgreSQL
 ======================================
 

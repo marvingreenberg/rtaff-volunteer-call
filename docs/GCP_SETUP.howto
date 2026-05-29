@@ -1,3 +1,6 @@
+[Deprecated walkthrough — see DEPLOY.md and `make bootstrap-gcp` for the
+canonical path. This doc explains what the scripts do under the hood.]
+
 GCP project setup for deployment
 ================================
 

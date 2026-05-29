@@ -1,3 +1,8 @@
+[Deprecated walkthrough — see DEPLOY.md and `make bootstrap-neon` /
+`make bootstrap-secrets` for the canonical (idempotent) path. This doc
+explains what the scripts do under the hood, including why the asyncpg
+URL strips channel_binding=require.]
+
 Setting up Neon as the volunteer-call database
 ==============================================
 

@@ -1,30 +1,19 @@
 #!/usr/bin/env bash
 # Checks that required development tools are installed and meet minimum
-# version requirements, plus a couple of project-specific warnings (active
-# GCP project, fswatch for schema-watching).
+# version requirements, plus project-specific checks (active GCP project
+# matches the expected one, deploy.yml is in sync with _project-config.sh,
+# fswatch for schema-watching, neonctl for Neon bootstrap).
 set -euo pipefail
 
-RED='\033[0;31m'
-YELLOW='\033[1;33m'
-GREEN='\033[0;32m'
-NC='\033[0m'
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./_project-config.sh
+source "${SCRIPT_DIR}/_project-config.sh"
+# shellcheck source=./_lib.sh
+source "${SCRIPT_DIR}/_lib.sh"
 
 REQUIRED_PYTHON_MAJOR=3
 REQUIRED_PYTHON_MINOR=11
 REQUIRED_NODE_MAJOR=18
-
-# Substring the active GCP project id must contain. The deploy
-# SERVICE_NAME is "volunteer-call"; valid project ids include
-# "volunteer-call-prod", "rtaff-volunteer-call", "volunteer-call-dev",
-# etc. (the bare "volunteer-call" id is globally taken in GCP).
-EXPECTED_GCP_PROJECT_SUBSTRING="volunteer-call"
-
-errors=0
-warnings=0
-
-pass() { echo -e "${GREEN}  ✓${NC} $1"; }
-warn() { echo -e "${YELLOW}  ⚠${NC} $1"; warnings=$((warnings + 1)); }
-fail() { echo -e "${RED}  ✗${NC} $1"; errors=$((errors + 1)); }
 
 echo "Checking prerequisites..."
 echo ""
@@ -84,22 +73,61 @@ else
     warn "fswatch not found — schema-file watching disabled in 'make dev'. Install: brew install fswatch (macOS) or apt install fswatch"
 fi
 
-# gcloud CLI (optional — needed for deploy)
+# gcloud CLI (required for deploy / bootstrap)
 if command -v gcloud &>/dev/null; then
     pass "gcloud $(gcloud --version 2>/dev/null | head -1 | awk '{print $4}')"
 
     gcp_project=$(gcloud config get-value project 2>/dev/null || true)
     if [[ -z "$gcp_project" ]]; then
-        warn "No active GCP project — run: gcloud config set project rtaff-${EXPECTED_GCP_PROJECT_SUBSTRING}"
-    elif [[ "$gcp_project" != *"$EXPECTED_GCP_PROJECT_SUBSTRING"* ]]; then
-        fail "Active GCP project '${gcp_project}' does not contain '${EXPECTED_GCP_PROJECT_SUBSTRING}'"
-        fail "  This is almost certainly a sibling project (e.g. rtaff). Run: gcloud config set project <something-volunteer-call-something>"
+        warn "No active GCP project — run: gcloud config set project ${GCP_PROJECT_NAME}"
+    elif [[ "$gcp_project" != "$GCP_PROJECT_NAME" ]]; then
+        fail "Active GCP project '${gcp_project}' does not match expected '${GCP_PROJECT_NAME}'"
+        fail "  Run: gcloud config set project ${GCP_PROJECT_NAME}"
+        fail "  (Override the expected name by exporting GCP_PROJECT_NAME before running.)"
     else
         pass "Active GCP project: ${gcp_project}"
     fi
 else
-    warn "gcloud CLI not found — needed for 'make deploy' and the docs/*.howto walkthroughs"
+    warn "gcloud CLI not found — needed for 'make bootstrap' / 'make deploy' and the docs/*.howto walkthroughs"
     warn "  Install from https://cloud.google.com/sdk/docs/install"
+fi
+
+# gh CLI (required for set-gcloud-creds-for-deploy)
+if command -v gh &>/dev/null; then
+    pass "gh $(gh --version 2>/dev/null | head -1 | awk '{print $3}')"
+else
+    warn "gh CLI not found — needed for 'make bootstrap-creds' (pushes GCP_SA_KEY/GCP_PROJECT to GitHub secrets)"
+    warn "  Install from https://cli.github.com/"
+fi
+
+# neonctl (required for setup-neon-project)
+if command -v neonctl &>/dev/null; then
+    neonctl_version=$(neonctl --version 2>/dev/null | head -1 | awk '{print $NF}')
+    pass "neonctl ${neonctl_version}"
+    if neonctl auth status &>/dev/null; then
+        pass "neonctl authenticated"
+    else
+        warn "neonctl not authenticated — run: neonctl auth"
+    fi
+else
+    warn "neonctl not found — needed for 'make bootstrap-neon' (idempotent Neon project setup)"
+    warn "  Install with: npm install -g neonctl"
+fi
+
+# Sanity check: deploy.yml env values must match _project-config.sh.
+DEPLOY_YML="${SCRIPT_DIR}/../.github/workflows/deploy.yml"
+if [[ -f "$DEPLOY_YML" ]]; then
+    deploy_service_name=$(grep -E '^[[:space:]]+SERVICE_NAME:' "$DEPLOY_YML" | head -1 | awk '{print $2}')
+    deploy_region=$(grep -E '^[[:space:]]+GCP_REGION:' "$DEPLOY_YML" | head -1 | awk '{print $2}')
+    deploy_repo=$(grep -E '^[[:space:]]+GCP_REPOSITORY:' "$DEPLOY_YML" | head -1 | awk '{print $2}')
+    if [[ "$deploy_service_name" == "$SERVICE_NAME" && "$deploy_region" == "$GCP_REGION" && "$deploy_repo" == "$AR_REPO" ]]; then
+        pass "deploy.yml matches scripts/_project-config.sh"
+    else
+        fail "deploy.yml env block out of sync with scripts/_project-config.sh:"
+        fail "  SERVICE_NAME:    deploy.yml='${deploy_service_name}' config='${SERVICE_NAME}'"
+        fail "  GCP_REGION:      deploy.yml='${deploy_region}' config='${GCP_REGION}'"
+        fail "  GCP_REPOSITORY:  deploy.yml='${deploy_repo}' config='${AR_REPO}'"
+    fi
 fi
 
 echo ""

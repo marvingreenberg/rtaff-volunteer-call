@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 # Creates GCP service accounts for GitHub Actions deployment:
-#   1. github-deploy   — used by CI to push images and deploy
-#   2. volunteer-call-runtime — used by Cloud Run at runtime (secret access only)
+#   1. ${DEPLOY_SA_NAME}   — used by CI to push images and deploy
+#   2. ${RUNTIME_SA_NAME}  — used by Cloud Run at runtime
 #
 # Also sets the required GitHub repository secrets (GCP_SA_KEY, GCP_PROJECT).
 #
+# Idempotent on default invocation: re-checks every role binding on
+# existing SAs and re-grants any that are missing. Runtime SA secretAccessor
+# bindings are handled separately by scripts/setup-secrets (which knows
+# which secrets exist).
+#
 # Prerequisites:
-#   - gcloud CLI authenticated with project owner permissions
+#   - gcloud CLI authenticated, active project = $GCP_PROJECT_NAME
 #   - gh CLI authenticated with repo access
 #   - GCP project already created (run setup-gcp-project first)
 #
@@ -16,26 +21,21 @@
 #   ./scripts/set-gcloud-creds-for-deploy --clear  # delete only
 set -euo pipefail
 
-PROJECT=$(gcloud config get-value project 2>/dev/null)
-if [[ -z "$PROJECT" ]]; then
-    echo "ERROR: No GCP project set. Run: gcloud config set project <project-id>"
-    exit 1
-fi
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./_project-config.sh
+source "${SCRIPT_DIR}/_project-config.sh"
+# shellcheck source=./_lib.sh
+source "${SCRIPT_DIR}/_lib.sh"
 
-DEPLOY_SA_NAME="github-deploy"
+require_active_gcp_project
+
 DEPLOY_SA_EMAIL="${DEPLOY_SA_NAME}@${PROJECT}.iam.gserviceaccount.com"
-RUNTIME_SA_NAME="volunteer-call-runtime"
 RUNTIME_SA_EMAIL="${RUNTIME_SA_NAME}@${PROJECT}.iam.gserviceaccount.com"
 KEY_FILE=$(mktemp)
 
-DEPLOY_ROLES=(
+DEPLOY_PROJECT_ROLES=(
     "roles/run.admin"
-    "roles/artifactregistry.writer"
     "roles/iam.serviceAccountUser"
-)
-
-RUNTIME_SECRET_BINDINGS=(
-    "volunteer-call-database-url"
 )
 
 usage() {
@@ -50,14 +50,15 @@ usage() {
 cleanup() { rm -f "$KEY_FILE"; }
 trap cleanup EXIT
 
-# ── Helpers ──────────────────────────────────────────────────────
-
-sa_exists() {
-    gcloud iam service-accounts describe "$1" --project="$PROJECT" &>/dev/null
-}
-
 secrets_exist() {
     gh secret list 2>/dev/null | grep -q "GCP_SA_KEY"
+}
+
+ensure_deploy_sa_bindings() {
+    for role in "${DEPLOY_PROJECT_ROLES[@]}"; do
+        grant_project_role "$DEPLOY_SA_EMAIL" "$role"
+    done
+    grant_repo_role "$DEPLOY_SA_EMAIL" "$AR_REPO" "roles/artifactregistry.writer"
 }
 
 create_deploy_sa() {
@@ -65,29 +66,16 @@ create_deploy_sa() {
     gcloud iam service-accounts create "$DEPLOY_SA_NAME" \
         --project="$PROJECT" \
         --display-name="GitHub Actions Deploy"
-
-    for role in "${DEPLOY_ROLES[@]}"; do
-        echo "  Granting ${role}..."
-        gcloud projects add-iam-policy-binding "$PROJECT" \
-            --member="serviceAccount:${DEPLOY_SA_EMAIL}" \
-            --role="$role" \
-            --quiet &>/dev/null
-    done
+    ensure_deploy_sa_bindings
 }
 
 create_runtime_sa() {
     echo "Creating runtime service account ${RUNTIME_SA_NAME}..."
     gcloud iam service-accounts create "$RUNTIME_SA_NAME" \
         --project="$PROJECT" \
-        --display-name="Volunteer Call Cloud Run Runtime"
-
-    for secret in "${RUNTIME_SECRET_BINDINGS[@]}"; do
-        echo "  Granting secretAccessor on ${secret}..."
-        gcloud secrets add-iam-policy-binding "$secret" \
-            --member="serviceAccount:${RUNTIME_SA_EMAIL}" \
-            --role="roles/secretmanager.secretAccessor" \
-            --quiet &>/dev/null
-    done
+        --display-name="${SERVICE_NAME} Cloud Run Runtime"
+    # secretAccessor bindings on the runtime SA are handled in setup-secrets
+    # (after the secrets themselves exist).
 }
 
 delete_sa() {
@@ -115,8 +103,6 @@ clear_secrets() {
     gh secret delete GCP_PROJECT 2>/dev/null && echo "  Deleted GCP_PROJECT" || echo "  GCP_PROJECT not found"
 }
 
-# ── Main ─────────────────────────────────────────────────────────
-
 MODE="${1:-}"
 
 case "$MODE" in
@@ -136,25 +122,23 @@ case "$MODE" in
         echo "Done. Fresh credentials created."
         ;;
     "")
-        all_exist=true
         if ! sa_exists "$DEPLOY_SA_EMAIL"; then
             create_deploy_sa
-            all_exist=false
         else
-            echo "Deploy SA ${DEPLOY_SA_NAME} already exists, reusing."
+            echo "Deploy SA ${DEPLOY_SA_NAME} already exists — ensuring bindings..."
+            ensure_deploy_sa_bindings
         fi
         if ! sa_exists "$RUNTIME_SA_EMAIL"; then
             create_runtime_sa
-            all_exist=false
         else
-            echo "Runtime SA ${RUNTIME_SA_NAME} already exists, reusing."
+            echo "Runtime SA ${RUNTIME_SA_NAME} already exists."
         fi
-        if $all_exist && secrets_exist; then
-            echo "All service accounts and GitHub secrets already set."
-            echo "Use --new to recreate, or --clear to remove."
-            exit 0
+        if secrets_exist; then
+            echo "GitHub secrets already set. Skipping key generation."
+            echo "Use --new to recreate everything from scratch."
+        else
+            set_secrets
         fi
-        set_secrets
         echo "Done."
         ;;
     *)
