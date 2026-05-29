@@ -1,6 +1,10 @@
 # Stage 1: Build frontend static files
 FROM node:20-alpine AS frontend-builder
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# corepack picks up frontend/package.json's `packageManager` field, so
+# the pnpm version in the image always matches CI and local dev. Don't
+# float to @latest — pnpm 11.4 added a node:sqlite dep that requires
+# Node 22, and silently broke the deploy on the prior `pnpm@latest` line.
+RUN corepack enable
 
 WORKDIR /frontend
 COPY frontend/package.json frontend/pnpm-lock.yaml ./
