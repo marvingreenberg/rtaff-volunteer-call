@@ -11,7 +11,7 @@
     title: string;
     meta?: string;
     controls?: Snippet;
-    body: Snippet;
+    body?: Snippet;
     footer?: Snippet;
   } = $props();
 </script>
@@ -24,7 +24,9 @@
   {#if controls}
     <div class="call-controls">{@render controls()}</div>
   {/if}
-  <div class="call-body">{@render body()}</div>
+  {#if body}
+    <div class="call-body">{@render body()}</div>
+  {/if}
   {#if footer}
     <div class="call-footer">{@render footer()}</div>
   {/if}
@@ -46,6 +48,9 @@
     padding: var(--card-pad-y) var(--card-pad-x);
     background: linear-gradient(180deg, var(--tint-blue), transparent);
     border-bottom: 1px solid var(--hairline);
+  }
+  .call-head:last-child {
+    border-bottom: 0;
   }
   .call-title {
     font-family: var(--font-display);

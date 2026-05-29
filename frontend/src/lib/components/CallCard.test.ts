@@ -27,4 +27,10 @@ describe("CallCard", () => {
       "hello",
     );
   });
+
+  it("renders without body snippet (header-only shape)", () => {
+    const { container } = render(CallCard, { props: { title: "X" } });
+    expect(container.querySelector(".call-head")).toBeInTheDocument();
+    expect(container.querySelector(".call-body")).toBeNull();
+  });
 });
