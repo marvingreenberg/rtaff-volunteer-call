@@ -1,10 +1,17 @@
+<script lang="ts">
+  import PageHeader from '$lib/components/PageHeader.svelte';
+</script>
+
 <svelte:head>
   <title>Reports - RT-AFF</title>
 </svelte:head>
 
-<div class="reports-page page-sm">
-  <h1>Reports</h1>
-  <p class="subtitle">Program dashboards, impact summaries, and funder reports.</p>
+<div class="page-sm">
+  <PageHeader title="Reports">
+    {#snippet meta()}
+      Program dashboards, impact summaries, and funder reports.
+    {/snippet}
+  </PageHeader>
 
   <div class="report-links">
     <a href="/reports/dashboard" class="section-card report-card">
@@ -34,27 +41,16 @@
 </div>
 
 <style>
-  .reports-page h1 {
-    font-size: 2rem;
-    margin-bottom: var(--spacing-xs);
-  }
-
-  .subtitle {
-    color: var(--rt-text-light);
-    margin-bottom: var(--spacing-lg);
-  }
-
   .report-links {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-md);
+    gap: var(--sp-3);
   }
 
   .report-card {
     display: flex;
     align-items: center;
-    gap: var(--spacing-md);
-    min-height: var(--btn-min-height);
+    gap: var(--sp-4);
   }
 
   .report-icon {
@@ -64,8 +60,8 @@
 
   .report-card h3 {
     margin: 0;
-    font-size: var(--btn-font-size);
-    color: var(--color-primary);
+    font-size: var(--fz-body);
+    color: var(--rt-blue);
     font-family: var(--font-body);
     font-weight: 600;
   }

@@ -7,29 +7,17 @@
     type SubscriptionStatus,
   } from "$lib/api/client";
   import CalendarConnectPanel from "$lib/components/CalendarConnectPanel.svelte";
+  import PageHeader from "$lib/components/PageHeader.svelte";
   import Select from "$lib/components/Select.svelte";
-  import {
-    settingsState,
-    applySettings,
-    type Density,
-  } from "$lib/stores/settings.svelte";
-
-  function setDensity(d: Density) {
-    settingsState.density = d;
-    applySettings();
-  }
-
-  const densityOptions: { value: Density; label: string }[] = [
-    { value: "large", label: "Large" },
-    { value: "standard", label: "Standard" },
-    { value: "compact", label: "Compact" },
-  ];
 
   // Lives at /settings — the Avatar menu links here. Houses the
   // per-volunteer self-service knobs that previously only the staff
   // /people/[id] editor touched: notification kind/detail, pause, and
   // calendar connection. Staff editor is unchanged so admins can still
   // edit other volunteers from /people/[id].
+  //
+  // Density is no longer configured here — the AvatarMenu (top-right)
+  // owns it as the single source of truth.
 
   let loading = $state(true);
   let saving = $state(false);
@@ -86,7 +74,7 @@
 </svelte:head>
 
 <div class="page-md">
-  <h1>Settings</h1>
+  <PageHeader title="Settings" />
 
   {#if loading}
     <p class="loading-text">Loading…</p>
@@ -177,31 +165,6 @@
       />
     </section>
 
-    <section class="card">
-      <h2>Display</h2>
-      <p class="hint">
-        Density controls overall padding and row heights in lists. Saved on
-        this device.
-      </p>
-      <div class="density-options" role="radiogroup" aria-label="Display density">
-        {#each densityOptions as opt (opt.value)}
-          <label
-            class="density-option"
-            class:selected={settingsState.density === opt.value}
-          >
-            <input
-              type="radio"
-              name="density"
-              value={opt.value}
-              checked={settingsState.density === opt.value}
-              onchange={() => setDensity(opt.value)}
-            />
-            {opt.label}
-          </label>
-        {/each}
-      </div>
-    </section>
-
     <div class="actions">
       <button class="btn btn-primary" onclick={save} disabled={saving}>
         {saving ? "Saving…" : "Save changes"}
@@ -211,32 +174,23 @@
 </div>
 
 <style>
-  .card {
-    background: var(--rt-white, #fff);
-    border: 1px solid var(--rt-gray-200, #e4dfda);
-    border-radius: var(--card-radius);
-    padding: var(--spacing-md);
-    margin-bottom: var(--spacing-md);
-  }
-
-  .card h2 {
-    font-size: 1rem;
-    margin: 0 0 var(--spacing-sm) 0;
-    color: var(--color-primary, #3a6db5);
+  section.card + section.card,
+  section.card {
+    margin-bottom: var(--sp-4);
   }
 
   .row {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--spacing-sm);
+    gap: var(--sp-3);
   }
 
   .lbl {
     width: 7em;
     font-weight: 500;
     font-size: var(--font-size-sm);
-    color: var(--rt-gray-600, #555);
+    color: var(--rt-text-muted);
   }
 
   .lbl.secondary {
@@ -244,67 +198,24 @@
   }
 
   .hint {
-    color: var(--rt-text-muted, #777);
+    color: var(--rt-text-muted);
     font-size: var(--font-size-sm);
-    margin: 0 0 var(--spacing-sm) 0;
+    margin: 0 0 var(--sp-3) 0;
   }
 
   .actions {
-    margin-top: var(--spacing-md);
+    margin-top: var(--sp-4);
   }
 
   .saved-flash {
     color: var(--rt-success-text);
     font-weight: 500;
-    margin-bottom: var(--spacing-sm);
+    margin-bottom: var(--sp-3);
   }
 
   .loading-text,
   .empty-text {
-    color: var(--rt-text-muted, #777);
+    color: var(--rt-text-muted);
     font-style: italic;
-  }
-
-  .density-options {
-    display: inline-flex;
-    border: 1px solid var(--rt-gray-200, #e4dfda);
-    border-radius: var(--card-radius, 8px);
-    overflow: hidden;
-  }
-
-  .density-option {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--spacing-sm) var(--spacing-md);
-    font-size: var(--font-size-sm);
-    font-weight: 500;
-    cursor: pointer;
-    border-right: 1px solid var(--rt-gray-200, #e4dfda);
-    background: transparent;
-    color: var(--rt-text, #222);
-    min-height: var(--btn-min-height, 36px);
-    user-select: none;
-  }
-
-  .density-option:last-child {
-    border-right: none;
-  }
-
-  .density-option.selected {
-    background: var(--color-primary, #3a6db5);
-    color: #fff;
-  }
-
-  .density-option input {
-    /* Visually hidden — the label is the affordance. */
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    border: 0;
   }
 </style>
