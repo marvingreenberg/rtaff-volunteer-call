@@ -260,7 +260,7 @@
   {:else if personList.length === 0}
     <p class="empty">No people found.</p>
   {:else}
-    <ul class="people-list">
+    <ul class="hairline-list people-list">
       {#each personList as person (person.id)}
         <li>
           <a href="/people/{person.id}" class="person-row">
@@ -406,33 +406,17 @@
     box-shadow: var(--ring-focus);
   }
 
-  /* Hairline-divider list: chosen over per-row cards to keep visual
-     weight down at scale (25/page). The page itself sits on the body
-     background; rows are separated only by hairlines. */
-  .people-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    background: var(--surface-1);
-    border: 1px solid var(--hairline);
-    border-radius: var(--radius);
-    overflow: hidden;
-  }
-
+  /* Row layout for the people list. Hairline-divider container and row
+     separators come from the global .hairline-list utility. */
   .person-row {
     display: flex;
     align-items: center;
     gap: var(--sp-4);
     padding: var(--sp-3) var(--card-pad-x);
     min-height: var(--btn-h);
-    border-top: 1px solid var(--hairline);
     text-decoration: none;
     color: inherit;
     transition: background-color 0.1s;
-  }
-
-  .people-list li:first-child .person-row {
-    border-top: 0;
   }
 
   .person-row:hover {

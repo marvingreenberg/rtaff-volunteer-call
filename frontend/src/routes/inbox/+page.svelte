@@ -61,7 +61,7 @@
     {:else if items.length === 0}
         <p class="text-muted">No notifications</p>
     {:else}
-        <ul class="inbox-list">
+        <ul class="hairline-list inbox-list">
             {#each items as item (item.id)}
                 <li>
                     <button
@@ -89,30 +89,17 @@
 </div>
 
 <style>
-    .inbox-list {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-        background: var(--surface-1);
-        border: 1px solid var(--hairline);
-        border-radius: var(--radius);
-        overflow: hidden;
-    }
     .notification-row {
         display: block;
         width: 100%;
         text-align: left;
         background: transparent;
         border: 0;
-        border-top: 1px solid var(--hairline);
         padding: var(--sp-3) var(--card-pad-x);
         cursor: pointer;
         transition: background 0.15s;
         color: inherit;
         font-family: inherit;
-    }
-    .inbox-list li:first-child .notification-row {
-        border-top: 0;
     }
     .notification-row:hover {
         background: var(--surface-2);

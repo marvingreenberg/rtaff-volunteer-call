@@ -481,6 +481,22 @@ main:has(.page-full) {
   color: var(--rt-text-muted);
 }
 
+/* Hairline-divider list — surface-1 container with hairline-separated rows.
+   Used by /people and /inbox. Each row sits inside a <li>; the row
+   element (typically an <a> or <button>) carries hover treatment. */
+.hairline-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.hairline-list > li + li {
+  border-top: 1px solid var(--hairline);
+}
+
 /* ──────────────────────────────
    Status badges
    ────────────────────────────── */
