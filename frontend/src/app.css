@@ -76,7 +76,6 @@
   --card-pad-x: 18px;
   --task-pad-y: 12px;
   --task-pad-x: 16px;
-  --task-gap: 8px;
   --check-size: 22px;
   --btn-h: 40px;
   --btn-pad-x: 16px;
@@ -105,7 +104,6 @@
   --card-pad-x: 14px;
   --task-pad-y: 7px;
   --task-pad-x: 12px;
-  --task-gap: 2px;
   --check-size: 18px;
   --btn-h: 34px;
   --btn-pad-x: 12px;
@@ -133,7 +131,6 @@
   --card-pad-x: 24px;
   --task-pad-y: 18px;
   --task-pad-x: 22px;
-  --task-gap: 12px;
   --check-size: 26px;
   --btn-h: 48px;
   --btn-pad-x: 22px;
