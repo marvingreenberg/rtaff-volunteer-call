@@ -61,7 +61,7 @@
   }
   .call-title {
     font-family: var(--font-display);
-    font-size: 1.18rem;
+    font-size: var(--fz-h2);
     color: var(--rt-dark);
     font-weight: var(--heading-weight);
   }
@@ -76,11 +76,11 @@
   }
   .call-meta {
     margin-left: auto;
-    font-size: 0.78rem;
+    font-size: var(--font-size-xs);
     color: var(--rt-text-muted);
     background: var(--surface-3);
     padding: 4px 10px;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     font-weight: 600;
   }
   .call-controls {
