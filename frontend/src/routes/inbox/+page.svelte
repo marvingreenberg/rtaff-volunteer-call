@@ -3,6 +3,7 @@
     import type { NotificationResponse } from '$lib/api/types';
     import { goto } from '$app/navigation';
     import Breadcrumb from '$lib/components/Breadcrumb.svelte';
+    import PageHeader from '$lib/components/PageHeader.svelte';
 
     let items: NotificationResponse[] = $state([]);
     let loading = $state(true);
@@ -51,7 +52,7 @@
 <div class="page-md">
     <Breadcrumb crumbs={[{ label: 'Inbox' }]} />
 
-    <h1>Inbox</h1>
+    <PageHeader title="Inbox" />
 
     {#if loading}
         <p>Loading...</p>
@@ -60,81 +61,90 @@
     {:else if items.length === 0}
         <p class="text-muted">No notifications</p>
     {:else}
-        <div class="notification-list">
+        <ul class="inbox-list">
             {#each items as item (item.id)}
-                <button
-                    class="notification-row"
-                    class:unread={!item.read}
-                    onclick={() => openNotification(item)}
-                >
-                    <div class="notif-subject">
-                        {item.subject}
-                    </div>
-                    <div class="notif-meta">
-                        <span class="notif-type">{item.type.replace('_', ' ')}</span>
-                        <span class="notif-time">{timeAgo(item.created_at)}</span>
-                    </div>
-                </button>
-                {#if expandedId === item.id && !item.link}
-                    <div class="notif-body">
-                        {item.body}
-                    </div>
-                {/if}
+                <li>
+                    <button
+                        class="notification-row"
+                        class:unread={!item.read}
+                        onclick={() => openNotification(item)}
+                    >
+                        <div class="notif-subject">
+                            {item.subject}
+                        </div>
+                        <div class="notif-meta">
+                            <span class="notif-type">{item.type.replace('_', ' ')}</span>
+                            <span class="notif-time">{timeAgo(item.created_at)}</span>
+                        </div>
+                    </button>
+                    {#if expandedId === item.id && !item.link}
+                        <div class="notif-body">
+                            {item.body}
+                        </div>
+                    {/if}
+                </li>
             {/each}
-        </div>
+        </ul>
     {/if}
 </div>
 
 <style>
-    .notification-list {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
+    .inbox-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        background: var(--surface-1);
+        border: 1px solid var(--hairline);
+        border-radius: var(--radius);
+        overflow: hidden;
     }
     .notification-row {
         display: block;
         width: 100%;
         text-align: left;
-        background: var(--rt-white);
-        border: 1px solid var(--rt-gray-200);
-        border-radius: var(--card-radius);
-        padding: var(--spacing-sm) var(--spacing-md);
+        background: transparent;
+        border: 0;
+        border-top: 1px solid var(--hairline);
+        padding: var(--sp-3) var(--card-pad-x);
         cursor: pointer;
         transition: background 0.15s;
+        color: inherit;
+        font-family: inherit;
+    }
+    .inbox-list li:first-child .notification-row {
+        border-top: 0;
     }
     .notification-row:hover {
-        background: var(--rt-bg-subtle);
+        background: var(--surface-2);
     }
     .notification-row.unread {
         border-left: 3px solid var(--rt-blue);
         font-weight: 600;
     }
     .notif-subject {
-        font-size: var(--btn-font-size);
+        font-size: var(--fz-body);
     }
     .notif-meta {
         display: flex;
-        gap: var(--spacing-sm);
+        gap: var(--sp-3);
         align-items: center;
-        margin-top: var(--spacing-xs);
+        margin-top: var(--sp-2);
         font-size: var(--font-size-sm);
         color: var(--rt-text-muted);
     }
     .notif-type {
         text-transform: capitalize;
         font-size: var(--font-size-xs);
-        padding: var(--spacing-xs) var(--spacing-sm);
-        border-radius: var(--card-radius);
-        background: var(--rt-gray-100);
+        padding: 2px var(--sp-3);
+        border-radius: 999px;
+        background: var(--surface-3);
     }
     .notif-body {
-        padding: var(--spacing-sm) var(--spacing-md);
-        background: var(--rt-bg-subtle);
-        border: 1px solid var(--rt-gray-200);
-        border-top: none;
-        border-radius: 0 0 var(--card-radius) var(--card-radius);
+        padding: var(--sp-3) var(--card-pad-x);
+        background: var(--surface-2);
+        border-top: 1px solid var(--hairline);
         white-space: pre-line;
         font-size: var(--font-size-sm);
-        color: var(--rt-text-light);
+        color: var(--rt-text-muted);
     }
 </style>
