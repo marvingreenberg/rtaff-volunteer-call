@@ -14,6 +14,7 @@
   import { ALL_PROGRAMS, ALL_SKILLS, PROGRAM_LABELS } from '$lib/api/types';
   import { authState } from '$lib/stores/auth.svelte';
   import Breadcrumb from '$lib/components/Breadcrumb.svelte';
+  import PageHeader from '$lib/components/PageHeader.svelte';
   import Select from '$lib/components/Select.svelte';
   import { skillLabel } from '$lib/utils/badges';
 
@@ -152,129 +153,136 @@
   {#if loading}
     <p class="loading">Loading...</p>
   {:else if person}
-    <div class="page-header">
-      <h1>{person.first_name} {person.last_name}</h1>
-      {#if savedAt}
-        <span class="saved-flash" aria-live="polite">Saved</span>
-      {/if}
-    </div>
+    <PageHeader title={`${person.first_name} ${person.last_name}`}>
+      {#snippet meta()}
+        {#if savedAt}
+          <span class="saved-flash" aria-live="polite">Saved</span>
+        {/if}
+      {/snippet}
+    </PageHeader>
 
     <form
-      class="card editor"
+      class="editor"
       onsubmit={(e) => {
         e.preventDefault();
         handleSave();
       }}
     >
-      <div class="row">
-        <span class="lbl">Name</span>
-        <input type="text" bind:value={firstName} placeholder="First" required />
-        <input type="text" bind:value={lastName} placeholder="Last" required />
-      </div>
-
-      <div class="row">
-        <span class="lbl">Email</span>
-        <input type="email" bind:value={email} class="grow" />
-        <span class="lbl secondary">Phone</span>
-        <input type="text" bind:value={phone} class="grow" />
-        {#if person.phone_verified}
-          <span class="verified-tag" title="Phone verified">verified</span>
-        {/if}
-      </div>
-
-      <div class="row">
-        <span class="lbl">Skills</span>
-        {#each ALL_SKILLS as skill (skill)}
-          <label class="checkbox-inline">
-            <input
-              type="checkbox"
-              checked={skills.includes(skill)}
-              onchange={() => toggleSkill(skill)}
-            />
-            {skillLabel(skill)}
-          </label>
-        {/each}
-        <label class="checkbox-inline">
-          <input type="checkbox" bind:checked={active} />
-          Active
-        </label>
-      </div>
-
-      <div class="row">
-        <span class="lbl">Roles</span>
-        {#each ROLES as role (role.value)}
-          <label class="checkbox-inline">
-            <input
-              type="checkbox"
-              checked={roles.includes(role.value)}
-              onchange={() => toggleRole(role.value)}
-            />
-            {role.label}
-          </label>
-        {/each}
-      </div>
-
-      {#if isStaff}
+      <section class="card">
         <div class="row">
-          <span class="lbl">Programs</span>
-          {#each ALL_PROGRAMS as p (p)}
+          <span class="lbl">Name</span>
+          <input type="text" bind:value={firstName} placeholder="First" required />
+          <input type="text" bind:value={lastName} placeholder="Last" required />
+        </div>
+
+        <div class="row">
+          <span class="lbl">Email</span>
+          <input type="email" bind:value={email} class="grow" />
+          <span class="lbl secondary">Phone</span>
+          <input type="text" bind:value={phone} class="grow" />
+          {#if person.phone_verified}
+            <span class="verified-tag" title="Phone verified">verified</span>
+          {/if}
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="row">
+          <span class="lbl">Skills</span>
+          {#each ALL_SKILLS as skill (skill)}
             <label class="checkbox-inline">
               <input
                 type="checkbox"
-                checked={programs.includes(p)}
-                onchange={() => toggleProgram(p)}
+                checked={skills.includes(skill)}
+                onchange={() => toggleSkill(skill)}
               />
-              {PROGRAM_LABELS[p]}
+              {skillLabel(skill)}
+            </label>
+          {/each}
+          <label class="checkbox-inline">
+            <input type="checkbox" bind:checked={active} />
+            Active
+          </label>
+        </div>
+
+        <div class="row">
+          <span class="lbl">Roles</span>
+          {#each ROLES as role (role.value)}
+            <label class="checkbox-inline">
+              <input
+                type="checkbox"
+                checked={roles.includes(role.value)}
+                onchange={() => toggleRole(role.value)}
+              />
+              {role.label}
             </label>
           {/each}
         </div>
-      {/if}
 
-      <hr class="divider" />
-
-      <div class="row">
-        <span class="lbl">Notify via</span>
-        <Select
-          bind:value={notificationPreference}
-          options={[
-            { value: 'email', label: 'Email' },
-            { value: 'sms', label: 'SMS' },
-            { value: 'both', label: 'Both' },
-          ]}
-          ariaLabel="Notification channel"
-        />
-        <span class="lbl secondary">Detail</span>
-        <Select
-          bind:value={notificationDetailLevel}
-          options={[
-            { value: 'summary', label: 'Summary' },
-            { value: 'full', label: 'Full' },
-          ]}
-          ariaLabel="Notification detail level"
-        />
-      </div>
-
-      <div class="row">
-        <span class="lbl">Subscription</span>
-        <Select
-          bind:value={subscriptionStatus}
-          options={[
-            { value: 'active', label: 'Active' },
-            { value: 'paused', label: 'Paused' },
-            { value: 'unsubscribed', label: 'Unsubscribed' },
-          ]}
-          ariaLabel="Subscription status"
-        />
-        {#if subscriptionStatus === 'paused'}
-          <span class="lbl secondary">Until</span>
-          <input type="date" bind:value={pauseEnd} />
+        {#if isStaff}
+          <div class="row">
+            <span class="lbl">Programs</span>
+            {#each ALL_PROGRAMS as p (p)}
+              <label class="checkbox-inline">
+                <input
+                  type="checkbox"
+                  checked={programs.includes(p)}
+                  onchange={() => toggleProgram(p)}
+                />
+                {PROGRAM_LABELS[p]}
+              </label>
+            {/each}
+          </div>
         {/if}
-      </div>
+      </section>
 
-      <div class="row align-top">
-        <span class="lbl">Notes</span>
-        <textarea bind:value={notes} rows="3" class="grow"></textarea>
-      </div>
+      <section class="card">
+        <div class="row">
+          <span class="lbl">Notify via</span>
+          <Select
+            bind:value={notificationPreference}
+            options={[
+              { value: 'email', label: 'Email' },
+              { value: 'sms', label: 'SMS' },
+              { value: 'both', label: 'Both' },
+            ]}
+            ariaLabel="Notification channel"
+          />
+          <span class="lbl secondary">Detail</span>
+          <Select
+            bind:value={notificationDetailLevel}
+            options={[
+              { value: 'summary', label: 'Summary' },
+              { value: 'full', label: 'Full' },
+            ]}
+            ariaLabel="Notification detail level"
+          />
+        </div>
+
+        <div class="row">
+          <span class="lbl">Subscription</span>
+          <Select
+            bind:value={subscriptionStatus}
+            options={[
+              { value: 'active', label: 'Active' },
+              { value: 'paused', label: 'Paused' },
+              { value: 'unsubscribed', label: 'Unsubscribed' },
+            ]}
+            ariaLabel="Subscription status"
+          />
+          {#if subscriptionStatus === 'paused'}
+            <span class="lbl secondary">Until</span>
+            <input type="date" bind:value={pauseEnd} />
+          {/if}
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="row align-top">
+          <span class="lbl">Notes</span>
+          <textarea bind:value={notes} rows="3" class="grow"></textarea>
+        </div>
+      </section>
 
       <div class="form-actions">
         <a class="btn btn-secondary" href="/people">Back</a>
@@ -287,34 +295,27 @@
 </div>
 
 <style>
-  .page-header {
-    display: flex;
-    align-items: baseline;
-    gap: var(--spacing-md);
-    margin-bottom: var(--spacing-md);
-  }
-
-  .page-header h1 {
-    margin: 0;
-  }
-
   .saved-flash {
     color: var(--rt-success-text);
     font-size: var(--font-size-sm);
-    font-weight: 500;
+    font-weight: 600;
   }
 
   .editor {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-sm);
+    gap: var(--sp-4);
   }
 
   .row {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
+    gap: var(--sp-3);
     flex-wrap: wrap;
+  }
+
+  .row + .row {
+    margin-top: var(--sp-3);
   }
 
   .row.align-top {
@@ -324,28 +325,28 @@
   .lbl {
     width: 7em;
     flex-shrink: 0;
-    font-weight: 500;
+    font-weight: 600;
     font-size: var(--font-size-sm);
-    color: var(--rt-gray-600);
+    color: var(--rt-text-muted);
   }
 
   .lbl.secondary {
     width: auto;
-    margin-left: var(--spacing-sm);
+    margin-left: var(--sp-3);
   }
 
   .row input[type='text'],
   .row input[type='email'],
   .row input[type='date'],
   .row textarea {
-    padding: var(--spacing-xs) var(--spacing-sm);
-    min-height: 32px;
-    border: 1px solid var(--rt-gray-200);
-    border-radius: var(--card-radius);
-    font-size: inherit;
-    font-family: var(--font-body);
-    background: var(--rt-white);
+    padding: 0 var(--sp-4);
+    min-height: var(--btn-h);
+    border: 1px solid var(--rt-input-border);
+    border-radius: var(--radius-sm);
+    background: var(--rt-input-bg);
     color: var(--color-text);
+    font-size: var(--fz-body);
+    font-family: var(--font-body);
     box-sizing: border-box;
   }
 
@@ -363,23 +364,23 @@
   .row textarea {
     resize: vertical;
     min-height: 4.5em;
-    padding: var(--spacing-sm);
+    padding: var(--sp-3) var(--sp-4);
   }
 
   .row input:focus,
   .row textarea:focus {
     outline: none;
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 2px rgba(58, 109, 181, 0.2);
+    border-color: var(--rt-blue);
+    box-shadow: 0 0 0 3px rgba(58, 109, 181, 0.18);
   }
 
   .checkbox-inline {
     display: inline-flex;
     align-items: center;
-    gap: var(--spacing-xs);
+    gap: var(--sp-2);
     font-size: inherit;
     cursor: pointer;
-    margin-right: var(--spacing-md);
+    margin-right: var(--sp-4);
   }
 
   .checkbox-inline input[type='checkbox'] {
@@ -398,17 +399,11 @@
     font-weight: 500;
   }
 
-  .divider {
-    border: none;
-    border-top: 1px solid var(--rt-gray-200);
-    margin: var(--spacing-sm) 0;
-  }
-
   .form-actions {
     display: flex;
     justify-content: flex-end;
-    gap: var(--spacing-sm);
-    margin-top: var(--spacing-md);
+    gap: var(--sp-3);
+    margin-top: var(--sp-3);
   }
 
   @media (max-width: 600px) {
