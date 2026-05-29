@@ -730,7 +730,7 @@ export async function setMaxPerWeek(
   }
 }
 
-async function pickComboboxByAriaLabel(
+export async function pickComboboxByAriaLabel(
   page: Page,
   ariaLabel: string,
   value: number | string,

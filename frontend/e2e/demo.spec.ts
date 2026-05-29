@@ -41,6 +41,7 @@ import {
   logout,
   narrate,
   pauseForUser,
+  pickComboboxByAriaLabel,
   pickTasks,
   scrollMailpitToHref,
   setMaxPerWeek,
@@ -283,6 +284,7 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
   );
   await clickViewTab(page, "spreadsheet");
   await pause(3500);
+  await pauseForUser(page, "Spreadsheet view shown");
   await clickViewTab(page, "task");
   await pause(800);
 
@@ -300,9 +302,9 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
     "But the admin can override — for example, allow extras if more volunteers would help.",
     2400,
   );
-  await page
-    .selectOption('select[aria-label="Desired"]', "over")
-    .catch(() => {});
+  // Desired-policy picker is a Select.svelte combobox (feat/17); drive
+  // it through the trigger-then-option click flow.
+  await pickComboboxByAriaLabel(page, "Desired", "Allow extra").catch(() => {});
   await pause(1000);
   await say("Now Done Assigning is enabled — close the call.", 1600);
   await clickWithCursor(page.locator("button:has-text('Done Assigning')"), {

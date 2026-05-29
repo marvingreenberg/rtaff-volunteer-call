@@ -167,11 +167,11 @@ async def _respond_availability(call_id: str, count: int) -> int:
 
         n_tasks = len(tasks)
         for person in picks:
-            # Most volunteers pick 4–6 tasks; a long tail goes lower or
-            # higher. Triangular(1, n, mode≈5) gives the right shape — a
-            # clear peak around the mode with thin tails toward 1 and N.
-            mode = min(5, n_tasks)
-            pick_count = max(1, min(n_tasks, round(rng.triangular(1, n_tasks, mode))))
+            # Realistic respondent: each volunteer picks 1–3 tasks
+            # (slightly favoring 2). The demo's one "outlier" who
+            # signs up for everything is Vick, driven separately by
+            # the live UI flow — not via this bulk path.
+            pick_count = min(n_tasks, rng.choices([1, 2, 3], weights=[3, 4, 3])[0])
             subset = rng.sample(tasks, pick_count)
             for task in subset:
                 session.add(
@@ -213,8 +213,9 @@ def add_tasks_cmd(call_id: str, count: int, offset: int) -> None:
 @click.option("--count", type=int, default=23, show_default=True)
 def respond_availability_cmd(call_id: str, count: int) -> None:
     """Have COUNT random volunteer-only people (no staff / team-leads)
-    submit availability for the call. Each picks ~4–6 tasks via a
-    triangular distribution rather than uniformly across the schedule."""
+    submit availability for the call. Each picks 1–3 tasks (weights
+    3-4-3), matching realistic respondent behavior — the demo's one
+    "signs up for everything" volunteer is driven separately."""
     responded = asyncio.run(_respond_availability(call_id, count))
     click.echo(f"{responded} volunteer(s) responded to call {call_id}.")
 
