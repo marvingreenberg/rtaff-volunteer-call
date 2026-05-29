@@ -182,7 +182,7 @@
   .conflict-flag {
     font-size: 0.7rem;
     padding: 2px 7px;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: var(--tint-orange);
     color: #8c5a10;
     font-weight: 600;
