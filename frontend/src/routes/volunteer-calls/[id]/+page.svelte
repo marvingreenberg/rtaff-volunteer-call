@@ -9,6 +9,7 @@
     type TaskCreate,
   } from '$lib/api/client';
   import Breadcrumb from '$lib/components/Breadcrumb.svelte';
+  import PageHeader from '$lib/components/PageHeader.svelte';
   import TaskEntryForm from '$lib/components/TaskEntryForm.svelte';
   import TaskEditorRow from '$lib/components/TaskEditorRow.svelte';
   import { callStatusBadgeClass, programLabel } from '$lib/utils/badges';
@@ -132,22 +133,22 @@
     <p class="loading">Loading...</p>
   {:else if call}
     <Breadcrumb crumbs={[{label: 'Volunteering', href: '/volunteering'}, {label: 'Volunteer Calls', href: '/volunteer-calls'}, {label: call?.title || 'Call'}]} />
-    <div class="call-header">
-      <h1>{call.title}</h1>
-      <span class="program-tag">{programLabel(call.program)}</span>
-      <span class="badge {callStatusBadgeClass(call.status)}">{call.status}</span>
-    </div>
+    {@const headerCall = call}
+    <PageHeader title={headerCall.title}>
+      {#snippet meta()}
+        <span class="program-tag">{programLabel(headerCall.program)}</span>
+        <span class="badge {callStatusBadgeClass(headerCall.status)}">{headerCall.status}</span>
+      {/snippet}
+    </PageHeader>
 
     {#if call.notes}
-      <div class="call-info">
-        <dl>
-          <dt>Notes</dt>
-          <dd>{call.notes}</dd>
-        </dl>
-      </div>
+      <section class="card call-info">
+        <h2>Notes</h2>
+        <p class="notes-body">{call.notes}</p>
+      </section>
     {/if}
 
-    <div class="section">
+    <section class="card task-section">
       <div class="section-header">
         <h2>{isSingleTaskProgram ? `Task (${programLabel(call.program)})` : `Tasks (${call.task_count})`}</h2>
       </div>
@@ -210,47 +211,31 @@
       {:else if call.tasks.length === 0}
         <p class="empty">No tasks yet.</p>
       {/if}
-    </div>
+    </section>
   {/if}
 
 </div>
 
 <style>
-  .call-header {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-md);
-    margin-bottom: var(--spacing-sm);
-  }
-
-  .call-header h1 {
-    margin: 0;
-  }
-
   .program-tag {
-    padding: 2px var(--spacing-sm);
-    background: var(--rt-bg-subtle, #f9f7f2);
-    color: var(--rt-text-muted, #777);
-    border: 1px solid var(--rt-gray-200);
-    border-radius: 10px;
+    padding: 2px var(--sp-3);
+    background: var(--surface-3);
+    color: var(--rt-text-muted);
+    border: 1px solid var(--hairline);
+    border-radius: 999px;
     font-size: var(--font-size-sm);
     font-weight: 500;
+    margin-right: var(--sp-2);
   }
 
   .call-info {
-    margin-bottom: var(--spacing-md);
+    margin-bottom: var(--sp-4);
   }
 
-  .call-info dl {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: var(--spacing-xs) var(--spacing-md);
+  .notes-body {
     margin: 0;
-  }
-
-  .call-info dt {
-    font-weight: 600;
-    color: var(--rt-text-light, #555);
+    color: var(--rt-text);
+    white-space: pre-wrap;
   }
 
   .section-header {
@@ -258,8 +243,8 @@
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
-    gap: var(--spacing-sm);
-    margin-bottom: var(--spacing-md);
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-4);
   }
 
   .section-header h2 {
@@ -271,22 +256,22 @@
     flex-direction: column;
   }
 
-  /* New-task affordance: visual shell matches TaskEditorRow.expanded. The header
-     strip mirrors TaskEditorRow's summary-row layout so the Add + trash buttons
-     line up where the Update + trash live for existing rows. */
+  /* New-task affordance: visual shell matches TaskEditorRow.expanded. The
+     header strip mirrors TaskEditorRow's summary-row layout so the Add +
+     trash buttons line up where the Update + trash live for existing rows. */
   .task-row-add {
-    border: 1px solid var(--rt-success-text, #2f7a45);
-    border-radius: var(--card-radius);
-    background: var(--rt-success-bg, #e6f4ea);
-    margin-top: var(--spacing-md);
-    margin-bottom: var(--spacing-sm);
+    border: 1px solid var(--rt-success-text);
+    border-radius: var(--radius);
+    background: var(--rt-success-bg);
+    margin-top: var(--sp-4);
+    margin-bottom: var(--sp-3);
     overflow: hidden;
   }
 
   .summary-row {
     display: flex;
     align-items: stretch;
-    padding: var(--spacing-sm) var(--spacing-md);
+    padding: var(--sp-3) var(--sp-4);
   }
 
   .new-task-label {
@@ -294,18 +279,18 @@
     min-width: 0;
     align-self: center;
     font-weight: 600;
-    color: var(--rt-text-muted, #777);
+    color: var(--rt-text-muted);
     font-style: italic;
   }
 
   .action-btn {
     align-self: center;
-    margin-right: var(--spacing-sm);
-    padding: var(--spacing-xs) var(--spacing-md);
-    background: var(--color-primary, #3a6db5);
+    margin-right: var(--sp-3);
+    padding: var(--sp-2) var(--sp-4);
+    background: var(--color-primary);
     color: white;
     border: none;
-    border-radius: var(--card-radius);
+    border-radius: var(--radius-sm);
     font: inherit;
     font-weight: 600;
     cursor: pointer;
@@ -314,8 +299,8 @@
   }
 
   .action-btn:disabled {
-    background: var(--rt-gray-200, #e4dfda);
-    color: var(--rt-text-muted, #888);
+    background: var(--rt-gray-200);
+    color: var(--rt-text-muted);
     cursor: not-allowed;
   }
 
@@ -326,66 +311,65 @@
   .trash-btn {
     background: none;
     border: none;
-    padding: 0 var(--spacing-sm);
+    padding: 0 var(--sp-3);
     font-size: 1.2em;
     line-height: 1;
     cursor: pointer;
     flex-shrink: 0;
-    color: var(--rt-text-muted, #888);
+    color: var(--rt-text-muted);
     align-self: center;
+    border-radius: var(--radius-sm);
   }
 
   .trash-btn:hover {
-    background: var(--rt-danger-bg, #fdecea);
+    background: var(--rt-error-bg);
   }
 
   .form-wrapper {
-    padding: var(--spacing-md);
+    padding: var(--sp-4);
   }
 
   /* "- Add new task -" / "- No more Tasks/Updates -" link pair. */
   .task-links {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--spacing-lg);
-    margin-top: var(--spacing-md);
+    gap: var(--sp-5);
+    margin-top: var(--sp-4);
   }
 
   .task-link {
     background: none;
     border: none;
-    color: var(--rt-success-text, #2f7a45);
+    color: var(--rt-success-text);
     font: inherit;
     font-style: italic;
     font-weight: 600;
     text-decoration: underline;
     cursor: pointer;
-    padding: var(--spacing-sm) var(--spacing-md);
+    padding: var(--sp-3) var(--sp-4);
     text-align: left;
   }
 
   .task-link:disabled {
-    color: var(--rt-text-muted, #888);
+    color: var(--rt-text-muted);
     cursor: default;
   }
 
   .task-link:not(:disabled):hover {
-    color: var(--color-primary, #3a6db5);
+    color: var(--color-primary);
   }
 
+  /* Status badges. callStatusBadgeClass maps call lifecycle states to
+     these palette buckets: open→draft, waiting→open, assigned→full,
+     archived→cancelled. */
   .badge-draft {
-    background: var(--rt-gray-100, #f5f3ef);
-    color: var(--rt-text-muted, #777);
+    background: var(--rt-gray-100);
+    color: var(--rt-text-muted);
   }
 
   .badge-open {
     background: var(--rt-success-bg);
     color: var(--rt-success-text);
-  }
-
-  .badge-closed {
-    background: var(--rt-error-bg, #fce8e8);
-    color: var(--rt-error, #c53030);
   }
 
   .badge-full {
@@ -394,15 +378,11 @@
   }
 
   .badge-cancelled {
-    background: var(--rt-error-bg, #fce8e8);
-    color: var(--rt-error, #c53030);
+    background: var(--rt-error-bg);
+    color: var(--rt-error);
   }
 
   @media (max-width: 768px) {
-    .call-header {
-      flex-direction: column;
-      align-items: flex-start;
-    }
     .section-header {
       flex-direction: column;
       align-items: flex-start;

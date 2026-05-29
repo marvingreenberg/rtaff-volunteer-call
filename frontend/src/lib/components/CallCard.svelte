@@ -3,12 +3,14 @@
 
   let {
     title,
+    titleHref,
     meta,
     controls,
     body,
     footer,
   }: {
     title: string;
+    titleHref?: string;
     meta?: string;
     controls?: Snippet;
     body?: Snippet;
@@ -18,7 +20,11 @@
 
 <article class="call">
   <header class="call-head">
-    <span class="call-title">{title}</span>
+    {#if titleHref}
+      <a class="call-title call-title-link" href={titleHref}>{title}</a>
+    {:else}
+      <span class="call-title">{title}</span>
+    {/if}
     {#if meta}<span class="call-meta">{meta}</span>{/if}
   </header>
   {#if controls}
@@ -58,6 +64,15 @@
     font-size: 1.18rem;
     color: var(--rt-dark);
     font-weight: var(--heading-weight);
+  }
+  .call-title-link {
+    text-decoration: none;
+    color: inherit;
+    transition: color 0.15s;
+  }
+  .call-title-link:hover {
+    color: var(--rt-blue);
+    text-decoration: none;
   }
   .call-meta {
     margin-left: auto;

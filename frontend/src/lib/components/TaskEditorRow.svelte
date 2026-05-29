@@ -132,18 +132,18 @@
 
 <style>
   .task-row {
-    border: 1px solid var(--rt-gray-200, #e4dfda);
-    border-radius: var(--card-radius);
-    background: var(--rt-white, #ffffff);
-    margin-bottom: var(--spacing-sm);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-sm);
+    background: var(--surface-1);
+    margin-bottom: var(--sp-3);
     overflow: hidden;
   }
 
   /* Expanded row reads as one unit: light-green background flowing through
      summary and form, no internal divider. */
   .task-row.expanded {
-    background: var(--rt-success-bg, #e6f4ea);
-    border-color: var(--rt-success-text, #2f7a45);
+    background: var(--rt-success-bg);
+    border-color: var(--rt-success-text);
   }
 
   .summary-row {
@@ -154,10 +154,10 @@
   .summary {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
+    gap: var(--sp-3);
     flex: 1;
     min-width: 0;
-    padding: var(--spacing-sm) var(--spacing-md);
+    padding: var(--sp-3) var(--sp-4);
     background: none;
     border: none;
     cursor: pointer;
@@ -168,7 +168,7 @@
   }
 
   .task-row:not(.expanded) .summary:hover {
-    background: var(--rt-gray-100, #f5f3ef);
+    background: var(--surface-2);
   }
 
   /* Assignee chips — compact initials beside the description so an admin
@@ -190,28 +190,28 @@
     height: 24px;
     padding: 0 6px;
     border-radius: 12px;
-    background: var(--rt-gray-100, #f0ece8);
-    color: var(--rt-text-light, #555);
+    background: var(--surface-3);
+    color: var(--rt-text-light);
     font-size: 11px;
     font-weight: 600;
     line-height: 1;
-    border: 1px solid var(--rt-gray-200, #e4dfda);
+    border: 1px solid var(--hairline);
   }
 
   .assignee-chip.assignee-lead {
-    background: var(--color-primary, #3a6db5);
+    background: var(--color-primary);
     color: #fff;
-    border-color: var(--color-primary, #3a6db5);
+    border-color: var(--color-primary);
   }
 
   .action-btn {
     align-self: center;
-    margin-right: var(--spacing-sm);
-    padding: var(--spacing-xs) var(--spacing-md);
-    background: var(--color-primary, #3a6db5);
+    margin-right: var(--sp-3);
+    padding: var(--sp-2) var(--sp-4);
+    background: var(--color-primary);
     color: white;
     border: none;
-    border-radius: var(--card-radius);
+    border-radius: var(--radius-sm);
     font: inherit;
     font-weight: 600;
     cursor: pointer;
@@ -220,8 +220,8 @@
   }
 
   .action-btn:disabled {
-    background: var(--rt-gray-200, #e4dfda);
-    color: var(--rt-text-muted, #888);
+    background: var(--rt-gray-200);
+    color: var(--rt-text-muted);
     cursor: not-allowed;
   }
 
@@ -232,21 +232,21 @@
   .trash-btn {
     background: none;
     border: none;
-    padding: 0 var(--spacing-md);
+    padding: 0 var(--sp-4);
     font-size: 1.2em;
     line-height: 1;
     cursor: pointer;
     flex-shrink: 0;
-    color: var(--rt-text-muted, #888);
+    color: var(--rt-text-muted);
   }
 
   .trash-btn:hover {
-    background: var(--rt-danger-bg, #fdecea);
+    background: var(--rt-error-bg);
   }
 
   .caret {
     width: 1em;
-    color: var(--rt-text-muted, #777);
+    color: var(--rt-text-muted);
     flex-shrink: 0;
   }
 
@@ -257,14 +257,14 @@
   }
 
   .volunteers {
-    color: var(--rt-text-muted, #777);
+    color: var(--rt-text-muted);
     font-variant-numeric: tabular-nums;
     flex-shrink: 0;
   }
 
   .city {
     flex-shrink: 0;
-    color: var(--rt-text-muted, #777);
+    color: var(--rt-text-muted);
   }
 
   .description {
@@ -276,6 +276,6 @@
   }
 
   .form-wrapper {
-    padding: var(--spacing-md);
+    padding: var(--sp-4);
   }
 </style>
