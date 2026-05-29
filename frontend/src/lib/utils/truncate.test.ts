@@ -8,7 +8,8 @@ describe("truncateOnWord", () => {
   });
 
   it("truncates at a word boundary and appends an ellipsis when over the limit", () => {
-    const input = "Stage driftwood pulled from the upper beach into the sort pile by the lot";
+    const input =
+      "Stage driftwood pulled from the upper beach into the sort pile by the lot";
     const out = truncateOnWord(input, 65);
     expect(out.endsWith("…")).toBe(true);
     expect(out.length).toBeLessThanOrEqual(66); // 65 + the ellipsis itself

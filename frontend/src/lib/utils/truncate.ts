@@ -11,6 +11,7 @@ export function truncateOnWord(text: string, maxChars: number): string {
 
   const window = normalized.slice(0, maxChars + 1);
   const lastSpace = window.lastIndexOf(" ");
-  const cut = lastSpace > 0 ? window.slice(0, lastSpace) : window.slice(0, maxChars);
+  const cut =
+    lastSpace > 0 ? window.slice(0, lastSpace) : window.slice(0, maxChars);
   return `${cut}…`;
 }

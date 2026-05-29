@@ -4,7 +4,6 @@ import TaskRow from "./TaskRow.svelte";
 
 const baseProps = {
   name: "Driftwood collection",
-  summary: "Stage driftwood pulled from the upper beach into the sort pile…",
   description:
     "Stage driftwood pulled from the upper beach into the sort pile by the lot.\n\nAnything over 6 ft. goes to the structural side.",
   city: "Pacifica",
@@ -14,13 +13,23 @@ const baseProps = {
 };
 
 describe("TaskRow", () => {
-  it("renders the summary text in the .task-summary slot when collapsed", () => {
+  it("renders the derived 65-char summary when collapsed", () => {
     const { container } = render(TaskRow, { props: baseProps });
     const summary = container.querySelector(".task-summary") as HTMLElement;
     expect(summary).not.toBeNull();
-    expect(summary.textContent).toContain(
+    expect(summary.textContent!.endsWith("…")).toBe(true);
+    expect(summary.textContent!.length).toBeLessThanOrEqual(66);
+    expect(summary.textContent!).toContain(
       "Stage driftwood pulled from the upper beach",
     );
+  });
+
+  it("does not append an ellipsis when description fits within 65 chars", () => {
+    const { container } = render(TaskRow, {
+      props: { ...baseProps, description: "Short and sweet." },
+    });
+    const summary = container.querySelector(".task-summary") as HTMLElement;
+    expect(summary.textContent).toBe("Short and sweet.");
   });
 
   it("collapsed: .task wrapper does NOT carry .expanded (CSS hides the detail dl)", () => {
