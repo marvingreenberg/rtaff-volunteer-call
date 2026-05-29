@@ -395,7 +395,7 @@
     border: 1px solid var(--rt-input-border);
     border-radius: var(--radius-sm);
     background: var(--rt-input-bg);
-    color: var(--color-text);
+    color: var(--rt-text);
     font-size: var(--fz-body);
     font-family: var(--font-body);
   }
@@ -403,7 +403,7 @@
   .search-input:focus {
     outline: none;
     border-color: var(--rt-blue);
-    box-shadow: 0 0 0 3px rgba(58, 109, 181, 0.18);
+    box-shadow: var(--ring-focus);
   }
 
   /* Hairline-divider list: chosen over per-row cards to keep visual
@@ -441,7 +441,7 @@
   }
 
   .person-row:active {
-    background: var(--rt-bg-subtle);
+    background: var(--surface-3);
   }
 
   .avatar {
@@ -459,7 +459,7 @@
 
   .person-name {
     font-weight: 500;
-    color: var(--color-primary);
+    color: var(--rt-blue);
     min-width: 140px;
   }
 
