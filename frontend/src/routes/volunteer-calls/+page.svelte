@@ -4,6 +4,8 @@
   import { volunteerCalls, people, type VolunteerCallListResponse, type VolunteerCallCreate, type Program, type TaskCreate } from '$lib/api/client';
   import { ALL_PROGRAMS, PROGRAM_LABELS, SINGLE_TASK_PROGRAMS, suggestCallTitle } from '$lib/api/types';
   import Breadcrumb from '$lib/components/Breadcrumb.svelte';
+  import PageHeader from '$lib/components/PageHeader.svelte';
+  import CallCard from '$lib/components/CallCard.svelte';
   import Select from '$lib/components/Select.svelte';
   import TaskEntryForm from '$lib/components/TaskEntryForm.svelte';
   import { callStatusBadgeClass, programLabel } from '$lib/utils/badges';
@@ -239,19 +241,20 @@
 
 <div class="calls-page page-md">
   <Breadcrumb crumbs={[{label: 'Volunteer Calls'}]} />
-  <div class="page-header">
-    <h1>Volunteer Calls</h1>
-    <button class="btn btn-primary" onclick={() => showAddForm = !showAddForm}>
-      {showAddForm ? 'Cancel' : 'New Call'}
-    </button>
-  </div>
+  <PageHeader title="Volunteer Calls">
+    {#snippet actions()}
+      <button class="btn btn-primary btn-sm" onclick={() => showAddForm = !showAddForm}>
+        {showAddForm ? 'Cancel' : '+ New Call'}
+      </button>
+    {/snippet}
+  </PageHeader>
 
   {#if error}
     <div class="error-banner">{error}</div>
   {/if}
 
   {#if showAddForm}
-    <div class="card add-form">
+    <section class="card add-form">
       <h2>New Volunteer Call</h2>
       <form onsubmit={(e) => { e.preventDefault(); handleAdd(); }}>
         <div class="form-row program-row">
@@ -307,7 +310,7 @@
           {saving ? 'Creating...' : 'Create Call'}
         </button>
       </form>
-    </div>
+    </section>
   {/if}
 
   <div class="filters">
@@ -331,65 +334,56 @@
   {:else if calls.length === 0}
     <p class="empty">No volunteer calls found.</p>
   {:else}
-    <table class="data-table calls-table">
-      <thead>
-        <tr>
-          <th class="title-col">Title</th>
-          <th>Tasks</th>
-          <th>Status</th>
-          <th>Action</th>
-          <th>Notes</th>
-          <th aria-label="Delete"></th>
-        </tr>
-      </thead>
-      <tbody>
-        {#each calls as call (call.id)}
-          {@const actions = rowAction(call)}
-          {@const busy = busyCallIds.has(call.id)}
-          {@const notes = rowNotes(call)}
-          <tr data-testid="call-row" data-call-id={call.id}>
-            <td class="title-col">
-              <a href="/volunteer-calls/{call.id}" class="row-link">{call.title}</a>
-            </td>
-            <td>{call.task_count}</td>
-            <td>
-              <span class="badge {callStatusBadgeClass(call.status)}">{call.status}</span>
-            </td>
-            <td class="action-cell">
-              {#each actions as action (action.action)}
-                <button
-                  type="button"
-                  class="btn btn-primary action-btn"
-                  data-testid="row-action-{action.action}"
-                  disabled={busy}
-                  onclick={() => handleRowAction(call, action.action)}
-                >
-                  {busy ? '...' : action.label}
-                </button>
-              {/each}
-            </td>
-            <td class="notes-cell">{notes}</td>
-            <td class="trash-cell">
-              <button
-                type="button"
-                class="trash-btn"
-                onclick={() => handleDeleteCall(call)}
-                aria-label="Delete call {call.title}"
-                title="Delete call"
-              >
-                🗑️
-              </button>
-            </td>
-          </tr>
-        {/each}
-      </tbody>
-    </table>
+    <ul class="calls-list">
+      {#each calls as call (call.id)}
+        {@const actions = rowAction(call)}
+        {@const busy = busyCallIds.has(call.id)}
+        {@const notes = rowNotes(call)}
+        <li data-testid="call-row" data-call-id={call.id}>
+          <a href="/volunteer-calls/{call.id}" class="call-link">
+            <CallCard
+              title={call.title}
+              meta={`${call.task_count} task${call.task_count === 1 ? '' : 's'}`}
+            >
+              {#snippet controls()}
+                <span class="badge {callStatusBadgeClass(call.status)}">{call.status}</span>
+                {#if notes}
+                  <span class="notes">{notes}</span>
+                {/if}
+                <span class="row-actions">
+                  {#each actions as action (action.action)}
+                    <button
+                      type="button"
+                      class="btn btn-primary btn-sm action-btn"
+                      data-testid="row-action-{action.action}"
+                      disabled={busy}
+                      onclick={(e) => { e.preventDefault(); e.stopPropagation(); handleRowAction(call, action.action); }}
+                    >
+                      {busy ? '...' : action.label}
+                    </button>
+                  {/each}
+                  <button
+                    type="button"
+                    class="trash-btn"
+                    onclick={(e) => { e.preventDefault(); e.stopPropagation(); handleDeleteCall(call); }}
+                    aria-label="Delete call {call.title}"
+                    title="Delete call"
+                  >
+                    🗑️
+                  </button>
+                </span>
+              {/snippet}
+            </CallCard>
+          </a>
+        </li>
+      {/each}
+    </ul>
   {/if}
 </div>
 
 <style>
   .add-form {
-    margin-bottom: var(--spacing-lg);
+    margin-bottom: var(--sp-5);
   }
 
   .add-form h2 {
@@ -398,8 +392,8 @@
 
   .form-row {
     display: flex;
-    gap: var(--spacing-md);
-    margin-bottom: var(--spacing-md);
+    gap: var(--sp-4);
+    margin-bottom: var(--sp-4);
   }
 
   .program-row {
@@ -409,131 +403,128 @@
   .form-label {
     font-weight: 500;
     color: var(--rt-gray-600);
-    margin-right: var(--spacing-sm);
+    margin-right: var(--sp-3);
   }
 
   .program-options {
     display: flex;
-    gap: var(--spacing-md);
+    gap: var(--sp-4);
     flex-wrap: wrap;
   }
 
   .radio-label {
     display: inline-flex;
     align-items: center;
-    gap: var(--spacing-xs);
+    gap: var(--sp-2);
     cursor: pointer;
   }
 
   .single-task-block {
     /* Same green palette as an expanded TaskRow + the
-       /volunteer-calls/[id] new-task panel (--rt-success-bg /
-       --rt-success-text), so single-task program create forms read
-       visually as "this is the task you're editing", not a sub-section. */
-    margin: var(--spacing-md) 0;
-    padding: var(--spacing-md);
-    background: var(--rt-success-bg, #e6f4ea);
-    border: 1px solid var(--rt-success-text, #2f7a45);
-    border-radius: var(--card-radius);
+       /volunteer-calls/[id] new-task panel, so single-task program create
+       forms read visually as "this is the task you're editing", not a
+       sub-section. */
+    margin: var(--sp-4) 0;
+    padding: var(--sp-4);
+    background: var(--rt-success-bg);
+    border: 1px solid var(--rt-success-text);
+    border-radius: var(--radius);
   }
 
   .single-task-block h3 {
-    margin: 0 0 var(--spacing-xs) 0;
+    margin: 0 0 var(--sp-2) 0;
     font-size: var(--btn-font-size);
   }
 
   .hint {
     font-size: var(--font-size-sm);
     color: var(--rt-text-muted);
-    margin: 0 0 var(--spacing-sm) 0;
+    margin: 0 0 var(--sp-3) 0;
   }
 
   .filters {
     display: flex;
-    gap: var(--spacing-md);
-    margin-bottom: var(--spacing-md);
+    gap: var(--sp-4);
+    margin-bottom: var(--sp-4);
   }
 
-
-  .row-link {
-    font-weight: 600;
+  /* Calls list — each row is a CallCard wrapped in an <a> so the whole
+     card is the navigation target. The per-row admin buttons stop event
+     propagation so they don't trigger the link. */
+  .calls-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
   }
 
-  .action-cell {
-    white-space: nowrap;
-    /* Two stacked buttons on Update + Send rows; arrange them side-by-side
-       within a single cell. flex-wrap keeps them readable on narrow widths. */
-    display: flex;
+  .call-link {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.12s, box-shadow 0.12s;
+  }
+
+  .call-link:hover :global(.call) {
+    box-shadow: 0 8px 24px -16px rgba(30, 47, 61, 0.25);
+    transform: translateY(-1px);
+  }
+
+  .row-actions {
+    margin-left: auto;
+    display: inline-flex;
     flex-wrap: wrap;
-    gap: var(--spacing-xs);
-    align-items: stretch;
+    gap: var(--sp-2);
+    align-items: center;
   }
 
   .action-btn {
-    padding: var(--spacing-xs) var(--spacing-md);
-    font-size: var(--font-size-sm);
-    min-height: 32px;
     /* Button labels carry literal newlines ("Send\nCall") so the words
-       stack vertically — narrow columns, taller cells. Centred so the
-       two lines read cleanly. */
+       stack vertically — keep the pre-line whitespace handling. */
     white-space: pre-line;
     text-align: center;
     line-height: 1.15;
   }
 
-  .notes-cell {
-    color: var(--rt-text-muted, #777);
+  .notes {
+    color: var(--rt-text-muted);
     font-size: var(--font-size-sm);
-    /* Wrap when the available width forces it (the "filled · fully
-       assigned" string can be long on narrow viewports). */
-    white-space: normal;
-    word-break: break-word;
-  }
-
-  /* Title gets roughly a third of the available width — call titles
-     are the row's anchor and should have visible room. */
-  .calls-table .title-col {
-    width: 33%;
-  }
-
-  .trash-cell {
-    width: 44px;
-    text-align: right;
+    font-style: italic;
   }
 
   .trash-btn {
     background: none;
     border: none;
-    padding: 0 var(--spacing-sm);
+    padding: 0 var(--sp-3);
     font-size: 1.2em;
     line-height: 1;
     cursor: pointer;
-    color: var(--rt-text-muted, #888);
+    color: var(--rt-text-muted);
+    border-radius: var(--radius-sm);
   }
 
   .trash-btn:hover {
-    background: var(--rt-danger-bg, #fdecea);
+    background: var(--rt-error-bg);
   }
 
   .result-banner {
-    padding: var(--spacing-sm) var(--spacing-md);
+    padding: var(--sp-3) var(--sp-4);
     background: var(--rt-success-bg);
     color: var(--rt-success-text);
-    border-radius: var(--card-radius);
-    margin-bottom: var(--spacing-md);
+    border-radius: var(--radius);
+    margin-bottom: var(--sp-4);
   }
 
-  /* Status badges. Re-uses the success/error pair already defined for
-     draft/open/closed callStatusBadgeClass mapping (now mapped to
-     open/waiting/assigned/archived). */
+  /* Status badges. callStatusBadgeClass maps call lifecycle states to
+     these palette buckets: open→draft, waiting→open, assigned→full,
+     archived→cancelled. */
   .badge-draft {
-    background: var(--rt-gray-100, #f5f3ef);
-    color: var(--rt-text-muted, #777);
+    background: var(--rt-gray-100);
+    color: var(--rt-text-muted);
   }
 
   .badge-open {
-    background: var(--rt-info-bg, #e7f1fb);
-    color: var(--rt-info-text, #2c5aa0);
+    background: var(--rt-info-bg);
+    color: var(--rt-info-text);
   }
 
   .badge-full {
@@ -542,13 +533,17 @@
   }
 
   .badge-cancelled {
-    background: var(--rt-error-bg, #fce8e8);
-    color: var(--rt-error, #c53030);
+    background: var(--rt-error-bg);
+    color: var(--rt-error);
   }
 
   @media (max-width: 768px) {
     .form-row {
       flex-direction: column;
+    }
+    .row-actions {
+      margin-left: 0;
+      width: 100%;
     }
   }
 </style>
