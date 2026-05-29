@@ -19,35 +19,45 @@
 <style>
   .breadcrumb {
     margin-bottom: var(--spacing-md, 1rem);
-    font-size: var(--font-size-sm, 0.875rem);
+    font-size: 0.85rem;
+    color: var(--rt-text-muted);
   }
 
   ol {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--spacing-xs);
+    gap: 6px;
     list-style: none;
     margin: 0;
     padding: 0;
   }
 
+  li {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* Chevron separator (rotated unicode arrow) replaces the old slash. */
   li:not(:last-child)::after {
-    content: '/';
-    margin-left: var(--spacing-xs);
-    color: var(--rt-text-muted, #777);
+    content: '›';
+    color: var(--rt-text-muted);
+    opacity: 0.5;
   }
 
   a {
-    color: var(--color-primary, #3a6db5);
+    color: var(--rt-text-muted);
     text-decoration: none;
   }
 
   a:hover {
-    text-decoration: underline;
+    color: var(--rt-blue);
+    text-decoration: none;
   }
 
   span[aria-current='page'] {
-    color: var(--rt-text-muted, #777);
+    color: var(--rt-dark);
+    font-weight: 600;
   }
 </style>
