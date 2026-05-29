@@ -634,14 +634,14 @@
 
 <style>
   .section {
-    margin-bottom: var(--spacing-xl, 2rem);
+    margin-bottom: var(--sp-6, 2rem);
   }
 
   .section h2 {
     font-size: 1.25rem;
-    margin-bottom: var(--spacing-md, 1rem);
+    margin-bottom: var(--sp-4, 1rem);
     border-bottom: 1px solid var(--rt-gray-200, #e4dfda);
-    padding-bottom: var(--spacing-sm);
+    padding-bottom: var(--sp-3);
   }
 
   .section-sub {
@@ -659,14 +659,14 @@
   /* Deep-link halo: a thin ring around the CallCard when the user
      landed via an invite email. */
   .call-section-deeplink :global(.call) {
-    border-color: var(--color-primary, #3a6db5);
+    border-color: var(--rt-blue, #3a6db5);
     box-shadow: 0 0 0 2px rgba(58, 109, 181, 0.12);
   }
 
   /* Status banners (rendered inside the CallCard controls slot). */
   .call-banner {
-    padding: var(--spacing-sm) var(--spacing-md);
-    border-radius: var(--card-radius, 8px);
+    padding: var(--sp-3) var(--sp-4);
+    border-radius: var(--radius, 8px);
     font-size: var(--font-size-sm);
     line-height: 1.4;
     flex-basis: 100%;
@@ -687,7 +687,7 @@
   .max-week-row {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm) var(--spacing-md);
+    gap: var(--sp-3) var(--sp-4);
     flex-wrap: wrap;
   }
   .max-week-label {
@@ -697,7 +697,7 @@
   .week-pick {
     display: inline-flex;
     align-items: center;
-    gap: var(--spacing-xs);
+    gap: var(--sp-2);
     font-size: var(--font-size-sm);
   }
   .week-pick-label {
@@ -734,23 +734,23 @@
   .success-banner {
     background: var(--rt-success-bg);
     color: var(--rt-success-text);
-    padding: var(--spacing-md) var(--spacing-md, 1rem);
-    border-radius: var(--card-radius);
+    padding: var(--sp-4) var(--sp-4, 1rem);
+    border-radius: var(--radius);
     flex-basis: 100%;
   }
   .submit-btn {
     min-height: 48px;
-    font-size: var(--btn-font-size);
+    font-size: var(--btn-fz);
   }
 
   /* Assignment cards */
   .assignment-list {
     display: grid;
-    gap: var(--spacing-md);
+    gap: var(--sp-4);
   }
   .assignment-card {
     display: grid;
-    gap: var(--spacing-xs);
+    gap: var(--sp-2);
   }
   .assignment-header {
     display: flex;
@@ -759,25 +759,25 @@
   }
   .assignment-name {
     font-weight: 600;
-    font-size: var(--btn-font-size);
+    font-size: var(--btn-fz);
   }
   .assignment-role {
     font-size: var(--font-size-sm);
-    padding: 2px var(--spacing-sm);
+    padding: 2px var(--sp-3);
     border-radius: 4px;
     background: var(--rt-gray-100, #f0ece8);
   }
   .assignment-detail {
     display: flex;
-    gap: var(--spacing-md);
+    gap: var(--sp-4);
     font-size: var(--font-size-sm);
     color: var(--rt-text-light, #555);
   }
   .assignment-actions {
     display: flex;
-    gap: var(--spacing-md);
+    gap: var(--sp-4);
     align-items: center;
-    margin-top: var(--spacing-xs);
+    margin-top: var(--sp-2);
   }
   .confirmed-badge {
     font-size: var(--font-size-sm);
@@ -788,7 +788,7 @@
     font-weight: 500;
   }
   .btn-sm {
-    padding: var(--spacing-xs) var(--spacing-md);
+    padding: var(--sp-2) var(--sp-4);
     font-size: var(--font-size-sm);
   }
   .btn-outline {
@@ -799,7 +799,7 @@
     color: inherit;
   }
   .btn-outline:hover {
-    border-color: var(--color-primary, #3a6db5);
-    color: var(--color-primary, #3a6db5);
+    border-color: var(--rt-blue, #3a6db5);
+    color: var(--rt-blue, #3a6db5);
   }
 </style>
