@@ -1,9 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { people, type PersonResponse, type PersonUpdate } from '$lib/api/client';
+  import { people, type PersonUpdate } from '$lib/api/client';
   import { authState } from '$lib/stores/auth.svelte';
   import Breadcrumb from '$lib/components/Breadcrumb.svelte';
+  import PageHeader from '$lib/components/PageHeader.svelte';
   import { roleLabel, skillLabel } from '$lib/utils/badges';
 
   const ROLE_COLORS: Record<string, string> = {
@@ -41,7 +42,8 @@
     saveError = null;
   }
 
-  async function save() {
+  async function save(e: Event) {
+    e.preventDefault();
     if (!user) return;
     saving = true;
     saveError = null;
@@ -62,7 +64,6 @@
       saving = false;
     }
   }
-
 </script>
 
 <svelte:head>
@@ -76,248 +77,180 @@
 {:else if !user}
   <p>Not logged in.</p>
 {:else}
-  <div class="profile-card card">
-    <div class="profile-header">
-      <div class="profile-name-row">
-        <div class="profile-avatar">{user.first_name.charAt(0)}{user.last_name.charAt(0)}</div>
-        <div class="profile-name">
-          <h1>{user.first_name} {user.last_name}</h1>
-          <div class="profile-roles">
-            {#each user.roles as role (role)}
-              <span class="role-badge" style="background-color: {ROLE_COLORS[role] || 'var(--rt-gray-600)'}">{roleLabel(role)}</span>
-            {/each}
+  <div class="page-sm">
+    <PageHeader title="Profile">
+      {#snippet actions()}
+        {#if !editing}
+          <button class="btn btn-secondary btn-sm" onclick={startEdit}>Edit</button>
+        {/if}
+      {/snippet}
+    </PageHeader>
+
+    <form onsubmit={save}>
+      <section class="card identity-card">
+        <div class="identity-row">
+          <div class="profile-avatar">{user.first_name.charAt(0)}{user.last_name.charAt(0)}</div>
+          <div class="identity-text">
+            <div class="display-name">{user.first_name} {user.last_name}</div>
+            <div class="profile-roles">
+              {#each user.roles as role (role)}
+                <span class="role-badge" style="background-color: {ROLE_COLORS[role] || 'var(--rt-gray-600)'}">{roleLabel(role)}</span>
+              {/each}
+            </div>
           </div>
         </div>
-        {#if !editing}
-          <button class="edit-btn" onclick={startEdit} aria-label="Edit profile">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+      </section>
+
+      <section class="card">
+        <h2>Contact</h2>
+        <div class="field">
+          <label for="profile-email">Email</label>
+          {#if editing}
+            <input id="profile-email" type="email" bind:value={editEmail} placeholder="email@example.com" />
+          {:else}
+            <span id="profile-email" class="field-value">{user.email || '—'}</span>
+          {/if}
+        </div>
+
+        <div class="field">
+          <label for="profile-phone">Phone</label>
+          {#if editing}
+            <input id="profile-phone" type="tel" bind:value={editPhone} placeholder="703-555-1234" />
+          {:else}
+            <span id="profile-phone" class="field-value">{user.phone || '—'}</span>
+          {/if}
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Volunteering</h2>
+        <div class="field">
+          <span class="field-label">Skills</span>
+          <span class="field-value">
+            {user.skills.length ? user.skills.map(skillLabel).join(', ') : '—'}
+          </span>
+        </div>
+
+        <div class="field">
+          <span class="field-label">Status</span>
+          <span class="field-value">{user.active ? 'Active' : 'Inactive'}</span>
+        </div>
+      </section>
+
+      {#if saveError}
+        <p class="save-error">{saveError}</p>
+      {/if}
+
+      {#if saveSuccess}
+        <p class="save-success">Profile updated.</p>
+      {/if}
+
+      {#if editing}
+        <div class="profile-actions">
+          <button type="submit" class="btn btn-primary" disabled={saving}>
+            {saving ? 'Saving...' : 'Save'}
           </button>
-        {/if}
-      </div>
-    </div>
-
-    <div class="profile-fields">
-      <div class="field">
-        <label for="profile-email">Email</label>
-        {#if editing}
-          <input id="profile-email" type="email" bind:value={editEmail} class="field-input" placeholder="email@example.com" />
-        {:else}
-          <span id="profile-email" class="field-value">{user.email || '---'}</span>
-        {/if}
-      </div>
-
-      <div class="field">
-        <label for="profile-phone">Phone</label>
-        {#if editing}
-          <input id="profile-phone" type="tel" bind:value={editPhone} class="field-input" placeholder="703-555-1234" />
-        {:else}
-          <span id="profile-phone" class="field-value">{user.phone || '---'}</span>
-        {/if}
-      </div>
-
-      <div class="field">
-        <span class="field-label">Skills</span>
-        <span class="field-value">
-          {user.skills.length ? user.skills.map(skillLabel).join(', ') : '—'}
-        </span>
-      </div>
-
-      <div class="field">
-        <span class="field-label">Status</span>
-        <span class="field-value">{user.active ? 'Active' : 'Inactive'}</span>
-      </div>
-    </div>
-
-    {#if saveError}
-      <p class="save-error">{saveError}</p>
-    {/if}
-
-    {#if saveSuccess}
-      <p class="save-success">Profile updated.</p>
-    {/if}
-
-    {#if editing}
-      <div class="profile-actions">
-        <button class="btn btn-primary" onclick={save} disabled={saving}>
-          {saving ? 'Saving...' : 'Save'}
-        </button>
-        <button class="btn btn-secondary" onclick={cancelEdit} disabled={saving}>Cancel</button>
-      </div>
-    {/if}
+          <button type="button" class="btn btn-secondary" onclick={cancelEdit} disabled={saving}>Cancel</button>
+        </div>
+      {/if}
+    </form>
   </div>
 {/if}
 
 <style>
   .loading {
     color: var(--rt-text-muted);
-    padding: var(--spacing-xl);
+    padding: var(--sp-5);
   }
 
-  .profile-card {
-    max-width: 600px;
-    margin: 0 auto;
+  .card + .card {
+    margin-top: var(--sp-4);
   }
 
-  .profile-header {
-    margin-bottom: var(--spacing-lg);
-  }
-
-  .profile-name-row {
+  .identity-row {
     display: flex;
     align-items: center;
-    gap: var(--spacing-md);
+    gap: var(--sp-4);
   }
 
   .profile-avatar {
     width: 56px;
     height: 56px;
     border-radius: 50%;
-    background: var(--color-primary, #3a6db5);
+    background: var(--rt-blue);
     color: white;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: var(--btn-font-size);
+    font-size: 1.1rem;
     font-weight: 600;
     flex-shrink: 0;
   }
 
-  .profile-name {
+  .identity-text {
     flex: 1;
+    min-width: 0;
   }
 
-  .profile-name h1 {
-    margin: 0;
-    font-size: 1.5rem;
-    line-height: 1.2;
+  .display-name {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    color: var(--rt-dark);
   }
 
   .profile-roles {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--spacing-xs);
-    margin-top: var(--spacing-xs);
+    gap: var(--sp-2);
+    margin-top: var(--sp-2);
   }
 
   .role-badge {
     display: inline-block;
-    padding: 2px var(--spacing-sm);
+    padding: 2px var(--sp-3);
     color: white;
-    border-radius: var(--spacing-xs);
+    border-radius: 999px;
     font-size: var(--font-size-xs);
-    font-weight: 500;
-  }
-
-  .edit-btn {
-    background: transparent;
-    border: 1px solid var(--rt-gray-300, #ccc);
-    border-radius: var(--spacing-xs);
-    padding: var(--spacing-sm);
-    cursor: pointer;
-    color: var(--rt-text-light, #666);
-    min-width: var(--btn-min-height);
-    min-height: var(--btn-min-height);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-
-  .edit-btn:hover {
-    background: var(--rt-gray-100, #f5f5f5);
-    color: var(--color-primary, #3a6db5);
-  }
-
-  .profile-fields {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-md);
+    font-weight: 600;
   }
 
   .field {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-xs);
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-3);
+  }
+
+  .field:last-child {
+    margin-bottom: 0;
   }
 
   .field label,
   .field-label {
     font-size: var(--font-size-sm);
     font-weight: 600;
-    color: var(--rt-text-muted, #777);
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
+    color: var(--rt-text-muted);
   }
 
   .field-value {
-    font-size: var(--btn-font-size);
-    color: var(--rt-dark, #333);
-  }
-
-  .field-input {
-    font-size: var(--btn-font-size);
-    padding: var(--spacing-sm) var(--spacing-md);
-    border: 1px solid var(--rt-gray-300, #ccc);
-    border-radius: var(--spacing-xs);
-    min-height: var(--btn-min-height);
-    width: 100%;
-    box-sizing: border-box;
-  }
-
-  .field-input:focus {
-    outline: none;
-    border-color: var(--color-primary, #3a6db5);
-    box-shadow: 0 0 0 2px rgba(58, 109, 181, 0.15);
+    color: var(--rt-text);
   }
 
   .profile-actions {
     display: flex;
-    gap: var(--spacing-md);
-    margin-top: var(--spacing-lg);
-  }
-
-  .profile-actions .btn {
-    min-height: var(--btn-min-height);
-    padding: var(--spacing-sm) var(--spacing-lg);
-    border-radius: var(--spacing-xs);
-    font-size: var(--btn-font-size);
-    font-weight: 500;
-    cursor: pointer;
-    border: none;
-  }
-
-  .btn-primary {
-    background: var(--color-primary, #3a6db5);
-    color: white;
-  }
-
-  .btn-primary:hover:not(:disabled) {
-    opacity: 0.9;
-  }
-
-  .btn-primary:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-
-  .btn-secondary {
-    background: var(--rt-gray-200, #e5e5e5);
-    color: var(--rt-dark, #333);
-  }
-
-  .btn-secondary:hover:not(:disabled) {
-    background: var(--rt-gray-300, #ccc);
+    gap: var(--sp-3);
+    margin-top: var(--sp-4);
   }
 
   .save-error {
-    color: var(--color-danger, #d32f2f);
-    margin-top: var(--spacing-md);
+    color: var(--rt-error);
+    margin-top: var(--sp-3);
     font-size: var(--font-size-sm);
   }
 
   .save-success {
-    color: var(--color-success, #388e3c);
-    margin-top: var(--spacing-md);
+    color: var(--rt-success-text);
+    margin-top: var(--sp-3);
     font-size: var(--font-size-sm);
   }
 </style>
