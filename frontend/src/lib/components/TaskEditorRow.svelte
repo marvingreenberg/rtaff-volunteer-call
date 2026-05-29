@@ -164,7 +164,7 @@
     font: inherit;
     color: inherit;
     text-align: left;
-    min-height: var(--btn-min-height);
+    min-height: var(--btn-h);
   }
 
   .task-row:not(.expanded) .summary:hover {
@@ -199,16 +199,16 @@
   }
 
   .assignee-chip.assignee-lead {
-    background: var(--color-primary);
+    background: var(--rt-blue);
     color: #fff;
-    border-color: var(--color-primary);
+    border-color: var(--rt-blue);
   }
 
   .action-btn {
     align-self: center;
     margin-right: var(--sp-3);
     padding: var(--sp-2) var(--sp-4);
-    background: var(--color-primary);
+    background: var(--rt-blue);
     color: white;
     border: none;
     border-radius: var(--radius-sm);
