@@ -152,7 +152,7 @@
     height: 40px;
     border-radius: 50%;
     border: none;
-    background: var(--color-primary, #3a6db5);
+    background: var(--rt-blue);
     color: white;
     font-size: var(--font-size-sm);
     font-weight: 600;
@@ -290,7 +290,7 @@
   .density-seg {
     display: inline-flex;
     background: var(--surface-2);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     padding: 3px;
     width: 100%;
   }
@@ -301,7 +301,7 @@
     background: transparent;
     flex: 1;
     padding: 6px 10px;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     font: inherit;
     font-size: 0.82rem;
     font-weight: 600;
