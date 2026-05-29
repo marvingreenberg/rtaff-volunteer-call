@@ -133,7 +133,7 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
 
   await say("Adding two tasks by hand", 1200);
   await addTaskByForm(page, {
-    desc: "Roof patch at 102 Maple Ave",
+    desc: "Dishwasher replacement.  Install baseboard trim in kitchen.  Update lighting in kitchen and dining area.",
     date: scheduleSlotMMDD(0),
     address: "102 Maple Ave",
     city: "Arlington",

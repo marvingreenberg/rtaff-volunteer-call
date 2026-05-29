@@ -704,7 +704,10 @@ async def add_task(
     await db.refresh(task)
     result = await db.execute(
         select(Task)
-        .options(selectinload(Task.assignments), selectinload(Task.team_lead))
+        .options(
+            selectinload(Task.assignments).selectinload(TeamAssignment.person),
+            selectinload(Task.team_lead),
+        )
         .where(Task.id == task.id)
     )
     task = result.scalar_one()
@@ -742,7 +745,10 @@ async def update_task(
     await db.commit()
     result = await db.execute(
         select(Task)
-        .options(selectinload(Task.assignments), selectinload(Task.team_lead))
+        .options(
+            selectinload(Task.assignments).selectinload(TeamAssignment.person),
+            selectinload(Task.team_lead),
+        )
         .where(Task.id == task_id)
     )
     task = result.scalar_one()
