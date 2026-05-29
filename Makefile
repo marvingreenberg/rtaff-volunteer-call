@@ -16,7 +16,6 @@ export DEMO_MODE
 
 .PHONY: help check-prereqs setup setup-backend setup-frontend \
         bootstrap bootstrap-gcp bootstrap-creds bootstrap-neon bootstrap-secrets \
-        build-image deploy \
         dev dev-db-reset db-snapshot mailpit \
         test test-backend test-frontend test-e2e test-mobile-smoke types \
         lint lint-be lint-fe format format-be format-fe \
@@ -36,8 +35,7 @@ help:
 	@echo "  bootstrap-creds    - Service accounts + GitHub Actions secrets"
 	@echo "  bootstrap-neon     - Neon project / role / database (prints asyncpg URL)"
 	@echo "  bootstrap-secrets  - DATABASE_URL + JWT_SECRET in GCP Secret Manager"
-	@echo "  build-image        - Build the deploy container image locally"
-	@echo "  deploy             - Build, push, and deploy to Cloud Run (use a tag in CI normally)"
+	@echo "                       (deploy itself happens in GitHub Actions on a tag push)"
 	@echo ""
 	@echo "Development:"
 	@echo "  dev            - Start Mailpit + DB + backend + frontend (Ctrl+C stops all)"
@@ -75,8 +73,8 @@ setup-frontend:
 
 bootstrap: check-prereqs bootstrap-gcp bootstrap-creds bootstrap-secrets
 	@echo ""
-	@echo "Bootstrap complete. Next: tag a release (git tag vX.Y.Z && git push --tags)"
-	@echo "  or run 'make deploy' locally for an out-of-band push."
+	@echo "Bootstrap complete. To deploy: tag a release (git tag vX.Y.Z && git push --tags)."
+	@echo "CI (.github/workflows/deploy.yml) runs on the tag and ships to Cloud Run."
 
 bootstrap-gcp:
 	@./scripts/setup-gcp-project
@@ -91,43 +89,6 @@ bootstrap-neon:
 
 bootstrap-secrets:
 	@./scripts/setup-secrets
-
-# ── Container build / local deploy ─────────────────────────────
-# CI deploys via .github/workflows/deploy.yml on version tags. These
-# targets exist for out-of-band pushes from a maintainer's laptop.
-
-# Sourced from scripts/_project-config.sh so the Makefile, scripts, and
-# deploy.yml all see the same identity. Override at the command line:
-#   make deploy GCP_PROJECT=rtaff-volunteer-call-staging
-GCP_PROJECT          ?= $(shell . scripts/_project-config.sh && echo $$GCP_PROJECT_NAME)
-GCP_REGION_VAR       ?= $(shell . scripts/_project-config.sh && echo $$GCP_REGION)
-GCP_REPOSITORY       := $(shell . scripts/_project-config.sh && echo $$AR_REPO)
-SERVICE_NAME_DEPLOY  := $(shell . scripts/_project-config.sh && echo $$SERVICE_NAME)
-GCP_IMAGE            := $(GCP_REGION_VAR)-docker.pkg.dev/$(GCP_PROJECT)/$(GCP_REPOSITORY)/$(SERVICE_NAME_DEPLOY)
-
-build-image:
-	docker buildx build --platform=linux/amd64 \
-	  --build-arg VERSION=$(VERSION) \
-	  -t $(GCP_IMAGE):$(DOCKER_TAG) \
-	  -t $(GCP_IMAGE):latest \
-	  --load .
-
-deploy: build-image
-	gcloud auth configure-docker $(GCP_REGION_VAR)-docker.pkg.dev --quiet
-	docker push $(GCP_IMAGE):$(DOCKER_TAG)
-	docker push $(GCP_IMAGE):latest
-	gcloud run deploy $(SERVICE_NAME_DEPLOY) \
-	  --image=$(GCP_IMAGE):$(DOCKER_TAG) \
-	  --platform=managed \
-	  --region=$(GCP_REGION_VAR) \
-	  --project=$(GCP_PROJECT) \
-	  --allow-unauthenticated \
-	  --port=8000 --memory=1Gi --cpu=1 \
-	  --min-instances=0 --max-instances=3 \
-	  --service-account=volunteer-call-runtime@$(GCP_PROJECT).iam.gserviceaccount.com \
-	  --set-secrets=DATABASE_URL=volunteer-call-database-url:latest,JWT_SECRET=volunteer-call-jwt-secret:latest \
-	  --set-env-vars=PYTHONUNBUFFERED=1
-	@echo "Deployed: $$(gcloud run services describe $(SERVICE_NAME_DEPLOY) --region=$(GCP_REGION_VAR) --project=$(GCP_PROJECT) --format='value(status.url)')"
 
 dev-db-reset:
 	@SEED="$(SEED)" scripts/dev-db.sh reset

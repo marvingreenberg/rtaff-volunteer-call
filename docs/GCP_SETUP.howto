@@ -125,19 +125,24 @@ To tear down everything created by these scripts:
 
 Project deletion is reversible for ~30 days.
 
-7. Other GitHub Actions secrets (forward reference)
----------------------------------------------------
-Once a CI/deploy workflow is ported from the rtaff sibling project, two
-other secrets are referenced by `.github/workflows/deploy.yml`:
+7. Other GitHub Actions secrets
+-------------------------------
+The deploy workflow used to require a `GHCR_PAT` secret (a classic
+personal access token with `write:packages`) for pushing images to
+ghcr.io. It no longer does: the workflow now logs in to ghcr.io with
+the workflow-issued `GITHUB_TOKEN`, with `permissions: packages: write`
+declared at the job level. This is the GitHub-recommended path and
+removes one credential from the rotation list.
 
-- `GHCR_PAT` — a GitHub Personal Access Token with `write:packages` for
-  pushing images to ghcr.io. Create one at
-  https://github.com/settings/tokens?type=beta and set it via:
+If a `GHCR_PAT` secret is left over from a previous setup, delete it:
 
-      gh secret set GHCR_PAT --body '<token>'
+      gh secret delete GHCR_PAT
 
-- A Codecov token, if coverage upload is wanted (set via `gh secret set
-  CODECOV_TOKEN`). Optional.
+Note on token types if you ever need a PAT for local `docker push` to
+ghcr.io: GitHub Container Registry does not accept fine-grained tokens
+(the new tokens at /settings/tokens?type=beta have no "packages"
+permission at all). Use a classic token from
+https://github.com/settings/tokens with the `write:packages` scope.
 
-These are not handled by `set-gcloud-creds-for-deploy` because they are
-not GCP credentials.
+Optional: a Codecov token, if coverage upload is wanted (set via
+`gh secret set CODECOV_TOKEN`).

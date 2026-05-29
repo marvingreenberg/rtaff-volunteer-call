@@ -4,8 +4,9 @@ The deployed app runs on Cloud Run, fronted by Cloud Run's managed URL,
 with Postgres on Neon (free tier). The container is built from the root
 `Dockerfile` (multi-stage: SvelteKit frontend + Python backend; frontend
 assets embedded in the backend Python package). Releases are tag-driven
-GitHub Actions (`.github/workflows/deploy.yml`); a maintainer can also
-deploy out-of-band with `make deploy`.
+GitHub Actions (`.github/workflows/deploy.yml`) — there is intentionally
+no "deploy from my laptop" path; everything ships through CI so the
+build environment and audit trail are consistent.
 
 ## Identity
 
@@ -60,12 +61,16 @@ for inspection.
 | Secret Manager: `volunteer-call-jwt-secret` | `openssl rand -hex 32` | `./scripts/setup-secrets --rotate-jwt` |
 
 Cloud Run reads the two Secret Manager secrets via `--set-secrets` at
-deploy time; `deploy.yml` and `make deploy` both pin to `:latest`, so
-rotation takes effect on the next deploy.
+deploy time, pinned to `:latest`; rotation takes effect on the next
+deploy.
+
+GHCR push uses the workflow-issued `GITHUB_TOKEN` (with job-level
+`permissions: packages: write`), not a personal access token —
+no `GHCR_PAT` secret needed.
 
 ## Deploy
 
-Normal flow: tag a release.
+Tag a release; CI does the rest.
 
 ```
 git tag v0.1.2
@@ -73,10 +78,7 @@ git push --tags
 ```
 
 `.github/workflows/deploy.yml` runs CI, builds the image, pushes to
-both ghcr.io and GCP Artifact Registry, deploys to Cloud Run.
-
-Out-of-band flow: `make deploy` from a maintainer's machine. Builds for
-`linux/amd64`, pushes to GCP only, deploys the same way.
+both ghcr.io and GCP Artifact Registry, and deploys to Cloud Run.
 
 ## What the .howto files cover
 

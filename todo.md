@@ -63,6 +63,7 @@ of full subscription_status), and calendar connection into the
 Avatar menu (gear icon). Retain a one-line hint on `/volunteering`:
 "See user settings to connect your calendar to detect conflicts."
 
+<<<<<<< HEAD
 Follow-ups on the same branch:
 - `feat/06b` — `calendar_kind` setting + provider-aware Add to Calendar.
 - `feat/06c` — AvatarMenu redesign per the user's reference screenshot:
@@ -72,7 +73,10 @@ Follow-ups on the same branch:
   shape doesn't have a home for the radio group. Inventory item
   removed — there's no `/inventory` route in this project.
 
+### [ ] feat/07-recurring-events
+=======
 ### ✅ feat/07-recurring-events
+>>>>>>> feat/17-convert-native-selects
 
 Install `recurring-ical-events`. In
 `services/calendar.py::parse_ics`, expand RRULE-bearing VEVENTs
@@ -147,7 +151,7 @@ verification), `deploy.yml` (Docker build to GHCR + GCP Artifact
 Registry, Cloud Run deploy on `v*` tags), Dependabot config for npm
 + uv lockfiles.
 
-### ✅ feat/15-multiple-calendars
+### [/] feat/15-multiple-calendars
 
 **Decision recorded**: store a list of `(provider, url, label)` per
 person in a child table; conflict detection merges events from every
@@ -169,7 +173,7 @@ connected calendar (so personal + work meetings both block a task).
   adding/removing a calendar invalidates correctly. Continue to use
   the existing per-URL fetcher under the hood.
 
-### ✅ feat/16-people-pagination
+### [/] feat/16-people-pagination
 
 `routes/people.py::list_people` silently truncates results at
 `.limit(25)`. With 57 volunteers in the seed and 25 visible, an
@@ -201,7 +205,7 @@ otherwise the pluralized role name ("staff", "team leaders",
 - Backend test: `total` reflects the filter (`role`, `program`,
   `search`, `active`) and is independent of `start` / `count`.
 
-### ✅ feat/17-convert-remaining-native-selects
+### [/] feat/17-convert-remaining-native-selects
 
 The Select.svelte component (feat/09) only got adopted in a few
 spots; eight native `<select>`s remain that still pop the OS-native
