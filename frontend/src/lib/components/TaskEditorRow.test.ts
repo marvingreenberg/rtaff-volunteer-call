@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/svelte";
-import TaskRow from "./TaskRow.svelte";
+import TaskEditorRow from "./TaskEditorRow.svelte";
 import type { TaskResponse } from "$lib/api/client";
 
 function makeTask(overrides: Partial<TaskResponse> = {}): TaskResponse {
@@ -39,9 +39,9 @@ function makeProps(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe("TaskRow", () => {
+describe("TaskEditorRow", () => {
   it("renders weekday + month + day in the summary", () => {
-    render(TaskRow, {
+    render(TaskEditorRow, {
       props: makeProps({ task: makeTask({ date: "2026-07-01" }) }),
     });
     expect(screen.getByText("Wednesday, July 1")).toBeInTheDocument();
@@ -50,14 +50,14 @@ describe("TaskRow", () => {
   it("shows the trash glyph (not an ×)", () => {
     // User explicitly asked for a trash can, not an X. Pin both directions
     // so a stylistic regression to "×" gets caught.
-    render(TaskRow, { props: makeProps() });
+    render(TaskEditorRow, { props: makeProps() });
     const trash = screen.getByRole("button", { name: /delete task/i });
     expect(trash.textContent?.trim()).toBe("🗑️");
     expect(trash.textContent?.trim()).not.toBe("×");
   });
 
   it("only renders the Update button when expanded", () => {
-    const { rerender } = render(TaskRow, { props: makeProps() });
+    const { rerender } = render(TaskEditorRow, { props: makeProps() });
     expect(
       screen.queryByRole("button", { name: /update task/i }),
     ).not.toBeInTheDocument();
@@ -72,7 +72,7 @@ describe("TaskRow", () => {
     // opens (since the task is already valid). Without valid-gating, the
     // user could wipe a required field and still click Update, which would
     // silently fail or persist garbage.
-    const { container } = render(TaskRow, {
+    const { container } = render(TaskEditorRow, {
       props: makeProps({ expanded: true }),
     });
     const update = screen.getByRole("button", { name: /update task/i });
@@ -91,7 +91,7 @@ describe("TaskRow", () => {
 
   it("clicking Update fires onupdate(taskId, payload)", async () => {
     const onupdate = vi.fn();
-    const { container } = render(TaskRow, {
+    const { container } = render(TaskEditorRow, {
       props: makeProps({ expanded: true, onupdate }),
     });
     const description = container.querySelector(
@@ -115,7 +115,7 @@ describe("TaskRow", () => {
     const confirmSpy = vi
       .spyOn(window, "confirm")
       .mockImplementation(() => false);
-    render(TaskRow, { props: makeProps({ ontoggle, ondelete }) });
+    render(TaskEditorRow, { props: makeProps({ ontoggle, ondelete }) });
     await fireEvent.click(screen.getByRole("button", { name: /delete task/i }));
     expect(ontoggle).not.toHaveBeenCalled();
     expect(ondelete).not.toHaveBeenCalled();
@@ -129,7 +129,7 @@ describe("TaskRow", () => {
       promptedText = msg ?? "";
       return true;
     });
-    render(TaskRow, {
+    render(TaskEditorRow, {
       props: makeProps({
         task: makeTask({ date: "2026-07-01" }),
         ondelete,
@@ -144,7 +144,7 @@ describe("TaskRow", () => {
   it("renders assignee chips with team-lead marker", () => {
     // Bug it catches: the assignee chip block silently skips
     // is_team_lead, so the admin can't see at a glance who's leading.
-    render(TaskRow, {
+    render(TaskEditorRow, {
       props: makeProps({
         task: makeTask({
           assignees: [
@@ -175,7 +175,7 @@ describe("TaskRow", () => {
   it("renders no chip block when assignees is empty", () => {
     // Bug it catches: the {#if assignees && length} guard is dropped,
     // so an empty list paints a stray container with no contents.
-    const { container } = render(TaskRow, {
+    const { container } = render(TaskEditorRow, {
       props: makeProps({ task: makeTask({ assignees: [] }) }),
     });
     expect(container.querySelector(".assignees")).toBeNull();
@@ -186,7 +186,7 @@ describe("TaskRow", () => {
     const confirmSpy = vi
       .spyOn(window, "confirm")
       .mockImplementation(() => false);
-    render(TaskRow, { props: makeProps({ expanded: true, ondelete }) });
+    render(TaskEditorRow, { props: makeProps({ expanded: true, ondelete }) });
     await fireEvent.click(screen.getByRole("button", { name: /delete task/i }));
     expect(ondelete).not.toHaveBeenCalled();
     confirmSpy.mockRestore();
@@ -196,7 +196,7 @@ describe("TaskRow", () => {
     // Closing without clicking Update discards the changes — pin that
     // the pending payload + dirty flag don't survive a collapse/reopen.
     const onupdate = vi.fn();
-    const { container, rerender } = render(TaskRow, {
+    const { container, rerender } = render(TaskEditorRow, {
       props: makeProps({ expanded: true, onupdate }),
     });
     const description = container.querySelector(
