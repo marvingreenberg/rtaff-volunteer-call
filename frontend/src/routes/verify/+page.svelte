@@ -27,8 +27,8 @@
   });
 </script>
 
-<div class="verify-container">
-  <div class="card verify-card">
+<div class="centered-card-page">
+  <div class="card centered-card">
     {#if status === 'loading'}
       <div class="spinner"></div>
       <p>Verifying your login...</p>
@@ -41,21 +41,6 @@
 </div>
 
 <style>
-  .verify-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 80vh;
-    padding: var(--sp-4);
-  }
-
-  .verify-card {
-    text-align: center;
-    max-width: 400px;
-    width: 100%;
-    padding: var(--sp-6);
-  }
-
   .spinner {
     width: var(--btn-h);
     height: var(--btn-h);

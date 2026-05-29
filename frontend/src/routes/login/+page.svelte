@@ -34,8 +34,8 @@
   <title>Login - RT-AFF</title>
 </svelte:head>
 
-<div class="login-container">
-  <div class="card login-card">
+<div class="centered-card-page">
+  <div class="card centered-card">
     <div class="logo-wrap">
       <img src="/images/rt-aff-logo.png" alt="RT-AFF Logo" class="logo" />
     </div>
@@ -77,21 +77,6 @@
 </div>
 
 <style>
-  .login-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 80vh;
-    padding: var(--sp-4);
-  }
-
-  .login-card {
-    width: 100%;
-    max-width: 400px;
-    text-align: center;
-    padding: var(--sp-6);
-  }
-
   .logo-wrap {
     margin-bottom: var(--sp-5);
   }

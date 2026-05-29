@@ -497,6 +497,24 @@ main:has(.page-full) {
   border-top: 1px solid var(--hairline);
 }
 
+/* Centered-card page scaffolding — used by /login and /verify (auth pages
+   that render outside the main app shell). Compose .centered-card with
+   .card to inherit surface/border/radius/shadow; this rule only adds the
+   centering constraints (max-width, width, text-align). */
+.centered-card-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
+  padding: var(--sp-4);
+}
+.centered-card {
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+  padding: var(--sp-6);
+}
+
 /* ──────────────────────────────
    Status badges
    ────────────────────────────── */
