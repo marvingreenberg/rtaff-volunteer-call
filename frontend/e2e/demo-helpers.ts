@@ -873,7 +873,9 @@ export async function addTaskByForm(
   await sleep(400);
   await page.fill('[data-testid="task-date"]', t.date);
   await page.fill('[data-testid="task-address"]', t.address);
-  await page.selectOption('[data-testid="task-city"]', t.city);
+  // City is a Select.svelte combobox (feat/17); drive it through the
+  // same trigger-then-option click flow used elsewhere in the demo.
+  await pickComboboxByAriaLabel(page, "City", t.city);
   await page.fill('[data-testid="task-description"]', t.desc);
   const submit = page.locator('[data-testid="task-add-submit"]');
   await submit.waitFor({ state: "visible" });

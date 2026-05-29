@@ -454,6 +454,30 @@
     padding-left: calc(var(--spacing-sm) * 2 + 18px);
   }
 
+  /* City picker is a Select.svelte combobox wrapped in .city-wrap. The
+     Select renders an inline-flex <span>; without these rules it
+     collapses to the placeholder text width and the leading-icon
+     overlaps the label. Match the native-input shape: fill the field,
+     pad-left past the icon, and absorb the icon-field's focus ring. */
+  .city-wrap {
+    width: 100%;
+  }
+
+  .city-wrap :global(.app-select),
+  .city-wrap :global(.app-select-trigger) {
+    width: 100%;
+  }
+
+  .city-wrap :global(.app-select-trigger) {
+    padding-left: calc(var(--spacing-sm) * 2 + 18px);
+    min-height: var(--btn-min-height);
+  }
+
+  /* Match the validity treatment used on inputs/textarea. */
+  .city-wrap.invalid :global(.app-select-trigger) {
+    border-color: var(--rt-error, #c53030);
+  }
+
   .inline-row {
     align-items: center;
     gap: var(--spacing-lg);
@@ -510,12 +534,6 @@
 
   input.invalid,
   textarea.invalid {
-    border-color: var(--rt-error, #c53030);
-  }
-
-  /* City wrapper turns red when the Select inside is in an invalid
-     state — pierces into the child component's trigger border. */
-  .city-wrap.invalid :global(.app-select-trigger) {
     border-color: var(--rt-error, #c53030);
   }
 
