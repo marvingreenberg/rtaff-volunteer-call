@@ -22,10 +22,13 @@
     type CalendarEvent,
   } from '$lib/utils/add-to-calendar';
   import { tasksSpanMultipleWeeks } from '$lib/utils/task-weeks';
-  import ItemCard from '$lib/components/ItemCard.svelte';
   import ListViewToggle from '$lib/components/ListViewToggle.svelte';
   import DataTable from '$lib/components/DataTable.svelte';
   import Select from '$lib/components/Select.svelte';
+  import PageHeader from '$lib/components/PageHeader.svelte';
+  import CallCard from '$lib/components/CallCard.svelte';
+  import TaskRow from '$lib/components/TaskRow.svelte';
+
   import { settingsState, setListView } from '$lib/stores/settings.svelte';
   import { truncateText } from '$lib/components/data-table';
   import type { Column, SortDir } from '$lib/components/data-table';
@@ -416,7 +419,7 @@
 </svelte:head>
 
 <div class="page-md">
-  <h1>Volunteering</h1>
+  <PageHeader title="Volunteering" />
 
   {#if loading}
     <p class="loading-text">Loading...</p>
@@ -436,65 +439,62 @@
         {#each openCalls as call (call.id)}
           {@const banner = bannerFor(call.status)}
           {@const canSubmit = canSubmitAvailability(call.status)}
+          {@const jobs = callJobs[call.id] || []}
+          {@const selected = checkedTasks[call.id] || new Set()}
+          {@const mpw = maxPerWeek[call.id] ?? DEFAULT_MAX_PER_WEEK}
+          {@const mpw2 = maxPerWeek2[call.id] ?? DEFAULT_MAX_PER_WEEK}
+          {@const showWeek2 = tasksSpanMultipleWeeks(jobs)}
+          {@const hasTasks = canSubmit && !loadingCalls.has(call.id) && jobs.length > 0}
           <div
-            class="call-section"
-            class:call-section-deeplink={deepLinkCallId === call.id}
             id={`call-${call.id}`}
+            class:call-section-deeplink={deepLinkCallId === call.id}
           >
-            <div class="call-header">
-              <span class="call-title">{call.title}</span>
-              <span class="call-meta">{call.task_count} task{call.task_count === 1 ? '' : 's'}</span>
-            </div>
-
-            {#if banner}
-              <div class="call-banner call-banner-{banner.tone}" role="status">
-                {banner.text}
-              </div>
-            {/if}
-
-            {#if !canSubmit}
-              <!-- Archived/open: banner says enough; suppress task list & controls. -->
-            {:else if loadingCalls.has(call.id)}
-              <p class="loading-text">Loading tasks...</p>
-            {:else}
-              {@const jobs = callJobs[call.id] || []}
-              {@const selected = checkedTasks[call.id] || new Set()}
-              {@const mpw = maxPerWeek[call.id] ?? DEFAULT_MAX_PER_WEEK}
-              {@const mpw2 = maxPerWeek2[call.id] ?? DEFAULT_MAX_PER_WEEK}
-              {@const showWeek2 = tasksSpanMultipleWeeks(jobs)}
-
-              {#if jobs.length === 0}
-                <p class="empty-text">No tasks posted yet for this call.</p>
-              {:else}
-                <div class="max-week-row">
-                  <span class="max-week-label">Maximum tasks:</span>
-                  <label class="week-pick">
-                    <span class="week-pick-label">{showWeek2 ? 'Week 1' : 'per week'}</span>
-                    <Select
-                      value={mpw}
-                      options={MAX_WEEK_OPTIONS.map((n) => ({ value: n, label: String(n) }))}
-                      ariaLabel={showWeek2 ? 'Maximum tasks, week 1' : 'Maximum tasks per week'}
-                      onchange={(v) => setMaxPerWeek(call.id, Number(v))}
-                    />
-                  </label>
-                  {#if showWeek2}
+            <CallCard
+              title={call.title}
+              meta={`${call.task_count} task${call.task_count === 1 ? '' : 's'}`}
+            >
+              {#snippet controls()}
+                {#if banner}
+                  <div class="call-banner call-banner-{banner.tone}" role="status">
+                    {banner.text}
+                  </div>
+                {/if}
+                {#if hasTasks}
+                  <div class="max-week-row">
+                    <span class="max-week-label">Maximum tasks:</span>
                     <label class="week-pick">
-                      <span class="week-pick-label">Week 2</span>
+                      <span class="week-pick-label">{showWeek2 ? 'Week 1' : 'per week'}</span>
                       <Select
-                        value={mpw2}
+                        value={mpw}
                         options={MAX_WEEK_OPTIONS.map((n) => ({ value: n, label: String(n) }))}
-                        ariaLabel="Maximum tasks, week 2"
-                        onchange={(v) => setMaxPerWeek2(call.id, Number(v))}
+                        ariaLabel={showWeek2 ? 'Maximum tasks, week 1' : 'Maximum tasks per week'}
+                        onchange={(v) => setMaxPerWeek(call.id, Number(v))}
                       />
                     </label>
-                  {/if}
-                </div>
-
-                <div class="list-header-row">
+                    {#if showWeek2}
+                      <label class="week-pick">
+                        <span class="week-pick-label">Week 2</span>
+                        <Select
+                          value={mpw2}
+                          options={MAX_WEEK_OPTIONS.map((n) => ({ value: n, label: String(n) }))}
+                          ariaLabel="Maximum tasks, week 2"
+                          onchange={(v) => setMaxPerWeek2(call.id, Number(v))}
+                        />
+                      </label>
+                    {/if}
+                  </div>
                   <ListViewToggle view={settingsState.listView} onchange={setListView} />
-                </div>
+                {/if}
+              {/snippet}
 
-                {#if settingsState.listView === 'table'}
+              {#snippet body()}
+                {#if !canSubmit}
+                  <!-- Archived/open: banner above says enough. -->
+                {:else if loadingCalls.has(call.id)}
+                  <p class="loading-text">Loading tasks...</p>
+                {:else if jobs.length === 0}
+                  <p class="empty-text">No tasks posted yet for this call.</p>
+                {:else if settingsState.listView === 'table'}
                   <DataTable
                     items={jobs}
                     columns={jobColumns}
@@ -507,7 +507,7 @@
                       {@const isChecked = selected.has(job.task_id)}
                       <tr class:table-row-checked={isChecked}>
                         <td class="check-cell">
-                          <label class="task-check">
+                          <label class="cell-check">
                             <input
                               type="checkbox"
                               checked={isChecked}
@@ -525,81 +525,40 @@
                     {/snippet}
                   </DataTable>
                 {:else}
-                  <div class="task-list">
+                  <ul class="task-list">
                     {#each jobs as job (job.task_id)}
                       {@const expanded = expandedTasks.has(job.task_id)}
                       {@const checked = selected.has(job.task_id)}
                       {@const conflict = callConflicts[call.id]?.[job.task_id]}
-                      <ItemCard {checked}>
-                        <div class="task-row">
-                          <label class="task-check">
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onchange={() => toggleTask(call.id, job.task_id)}
-                            />
-                          </label>
-                          <div class="task-info" role="button" tabindex="0"
-                            onclick={() => toggleExpand(job.task_id)}
-                            onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleExpand(job.task_id); } }}
-                          >
-                            <span class="task-name">
-                              {job.short_description}
-                              {#if conflict?.has_conflict}
-                                <span class="conflict-flag" title={conflict.conflicts.map(c => c.summary ?? 'Calendar event').join('; ')}>
-                                  ⚠ calendar conflict
-                                </span>
-                              {/if}
-                            </span>
-                            <span class="task-meta">
-                              {#if job.city}{job.city} &middot; {/if}{job.date ? formatDate(job.date) : 'Unscheduled'}
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            class="expand-btn"
-                            aria-label={expanded ? 'Collapse' : 'Expand'}
-                            onclick={() => toggleExpand(job.task_id)}
-                          >
-                            <span class="chevron" class:open={expanded}>&#9660;</span>
-                          </button>
-                        </div>
-
-                        {#if expanded}
-                          <div class="task-details">
-                            {#if job.time_start || job.time_end}
-                              <div class="detail-row">
-                                <span class="detail-label">Time:</span>
-                                <span>{formatTimeRange(job.time_start, job.time_end)}</span>
-                              </div>
-                            {/if}
-                            <div class="detail-row">
-                              <span class="detail-label">Volunteers needed:</span>
-                              <span>{job.volunteers_needed}</span>
-                            </div>
-                            {#if job.skilled_needed > 0}
-                              <div class="detail-row">
-                                <span class="detail-label">Skilled needed:</span>
-                                <span>{job.skilled_needed}</span>
-                              </div>
-                            {/if}
-                            {#if job.notes}
-                              <div class="detail-row notes-row">
-                                <span class="detail-label">Notes:</span>
-                                <span>{job.notes}</span>
-                              </div>
-                            {/if}
-                          </div>
-                        {/if}
-                      </ItemCard>
+                      <!-- short_description is a misnomer — the column carries the full
+                           task description (<=500 chars). TaskRow derives the collapsed
+                           summary from `description` via truncateOnWord; `name` is the
+                           headline shown in both collapsed and expanded views. -->
+                      <TaskRow
+                        name={job.short_description}
+                        description={job.short_description}
+                        city={job.city ?? undefined}
+                        date={job.date ? formatDate(job.date) : 'Unscheduled'}
+                        time={formatTimeRange(job.time_start, job.time_end) || undefined}
+                        volunteersNeeded={job.volunteers_needed}
+                        skilledNeeded={job.skilled_needed}
+                        notes={job.notes ?? undefined}
+                        {checked}
+                        {expanded}
+                        conflict={!!conflict?.has_conflict}
+                        conflictTitle={conflict?.conflicts?.map((c) => c.summary ?? 'Calendar event').join('; ') ?? ''}
+                        onToggleChecked={() => toggleTask(call.id, job.task_id)}
+                        onToggleExpanded={() => toggleExpand(job.task_id)}
+                      />
                     {/each}
-                  </div>
+                  </ul>
                 {/if}
+              {/snippet}
 
+              {#snippet footer()}
                 {#if saveMessage[call.id]}
                   <div class="success-banner">{saveMessage[call.id]}</div>
                 {/if}
-
                 {#if canSubmit}
                   <button
                     class="btn btn-primary submit-btn"
@@ -615,8 +574,8 @@
                     {/if}
                   </button>
                 {/if}
-              {/if}
-            {/if}
+              {/snippet}
+            </CallCard>
           </div>
         {/each}
       {/if}
@@ -632,7 +591,7 @@
       {:else}
         <div class="assignment-list">
           {#each assignments as a (a.assignment_id)}
-            <ItemCard>
+            <div class="card assignment-card">
               <div class="assignment-header">
                 <span class="assignment-name">{a.task_description}</span>
                 <span class="assignment-role badge badge-{a.role}">{a.role === 'team_leader' ? 'Team Leader' : 'Volunteer'}</span>
@@ -665,7 +624,7 @@
                   {/if}
                 {/if}
               </div>
-            </ItemCard>
+            </div>
           {/each}
         </div>
       {/if}
@@ -697,212 +656,79 @@
     font-style: italic;
   }
 
-  /* Call section */
-  .call-section {
-    margin-bottom: var(--spacing-xl);
-    padding: var(--spacing-md);
-    background: var(--rt-gray-50, #f8f6f3);
-    border-radius: var(--card-radius, 8px);
-    border: 1px solid var(--rt-gray-200, #e4dfda);
-  }
-
-  .call-section-deeplink {
+  /* Deep-link halo: a thin ring around the CallCard when the user
+     landed via an invite email. */
+  .call-section-deeplink :global(.call) {
     border-color: var(--color-primary, #3a6db5);
     box-shadow: 0 0 0 2px rgba(58, 109, 181, 0.12);
   }
 
+  /* Status banners (rendered inside the CallCard controls slot). */
   .call-banner {
     padding: var(--spacing-sm) var(--spacing-md);
     border-radius: var(--card-radius, 8px);
-    margin-bottom: var(--spacing-md);
     font-size: var(--font-size-sm);
     line-height: 1.4;
+    flex-basis: 100%;
   }
-
   .call-banner-amber {
     background: var(--rt-warning-bg, #fff5e6);
     color: var(--rt-warning-text, #b35900);
     border: 1px solid #f0c476;
   }
-
   .call-banner-gray {
     background: var(--rt-gray-100, #f0ece8);
     color: var(--rt-text-light, #555);
     border: 1px solid var(--rt-gray-200, #e4dfda);
   }
 
-  .call-header {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: var(--spacing-sm);
-    margin-bottom: var(--spacing-md);
-  }
-
-  .call-title {
-    font-weight: 600;
-    font-size: 1.1rem;
-    color: var(--color-primary, #3a6db5);
-  }
-
-  .call-meta {
-    font-size: var(--font-size-sm);
-    color: var(--rt-text-muted, #777);
-  }
-
-  /* Maximum-tasks row: a compact single-line picker with per-week
-     pulldowns. Week 2 is appended only when the call's tasks actually
-     span into a second ISO week. */
+  /* Maximum-tasks row: compact per-week pulldowns. Week 2 only when
+     the call's tasks actually span a second ISO week. */
   .max-week-row {
     display: flex;
     align-items: center;
     gap: var(--spacing-sm) var(--spacing-md);
-    margin-bottom: var(--spacing-sm);
     flex-wrap: wrap;
   }
-
   .max-week-label {
     font-weight: 600;
     font-size: var(--font-size-sm);
   }
-
   .week-pick {
     display: inline-flex;
     align-items: center;
     gap: var(--spacing-xs);
     font-size: var(--font-size-sm);
   }
-
   .week-pick-label {
     color: var(--rt-text-muted, #777);
   }
 
-
-  .list-header-row {
-    display: flex;
-    justify-content: flex-end;
-    margin-bottom: var(--spacing-sm);
+  /* DataTable view */
+  .task-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: var(--sp-2);
   }
-
   .check-cell {
     width: 44px;
     text-align: center;
   }
-
-  .table-row-checked {
-    background: var(--rt-checked-bg, #f0f7f2);
-  }
-
-  .align-right {
-    text-align: right;
-  }
-
-  @media (max-width: 600px) {
-    .hide-narrow {
-      display: none;
-    }
-  }
-
-  /* Task cards */
-  .task-list {
-    display: grid;
-    gap: var(--spacing-sm);
-    margin-bottom: var(--spacing-md);
-  }
-
-  .task-row {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-md);
-    padding: var(--spacing-md) var(--spacing-md);
-    min-height: 56px;
-  }
-
-  .task-check {
-    display: flex;
-    align-items: center;
-    flex-shrink: 0;
-  }
-
-  .task-check input[type=checkbox] {
+  .cell-check input[type=checkbox] {
     width: 22px;
     height: 22px;
     cursor: pointer;
     accent-color: var(--rt-green, #4a7c59);
   }
-
-  .task-info {
-    flex: 1;
-    min-width: 0;
-    cursor: pointer;
+  .table-row-checked {
+    background: var(--rt-checked-bg, #f0f7f2);
   }
-
-  .task-name {
-    display: block;
-    font-weight: 600;
-    font-size: var(--btn-font-size);
-  }
-
-  .task-meta {
-    display: block;
-    font-size: var(--font-size-sm);
-    color: var(--rt-text-muted, #777);
-    margin-top: 0.125rem;
-  }
-
-  .conflict-flag {
-    display: inline-block;
-    margin-left: var(--spacing-sm);
-    padding: 1px 6px;
-    background: var(--rt-warning-bg, #fff5e6);
-    color: var(--rt-warning-text, #b35900);
-    border-radius: 10px;
-    font-size: var(--font-size-xs);
-    font-weight: 500;
-  }
-
-  .expand-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: var(--spacing-sm);
-    min-width: 44px;
-    min-height: var(--btn-min-height);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-
-  .chevron {
-    display: inline-block;
-    font-size: var(--font-size-xs);
-    color: var(--rt-text-muted, #777);
-    transition: transform 0.2s;
-  }
-
-  .chevron.open {
-    transform: rotate(180deg);
-  }
-
-  .task-details {
-    padding: var(--spacing-xs) var(--spacing-md) var(--spacing-md) 3.5rem;
-  }
-
-  .detail-row {
-    font-size: var(--font-size-sm);
-    color: var(--rt-text-light, #555);
-    padding: 0.125rem 0;
-  }
-
-  .detail-label {
-    font-weight: 500;
-    margin-right: var(--spacing-xs);
-  }
-
-  .notes-row {
-    white-space: pre-wrap;
+  @media (max-width: 600px) {
+    .hide-narrow {
+      display: none;
+    }
   }
 
   .success-banner {
@@ -910,14 +736,11 @@
     color: var(--rt-success-text);
     padding: var(--spacing-md) var(--spacing-md, 1rem);
     border-radius: var(--card-radius);
-    margin-bottom: var(--spacing-md);
+    flex-basis: 100%;
   }
-
   .submit-btn {
     min-height: 48px;
     font-size: var(--btn-font-size);
-    width: 100%;
-    max-width: 300px;
   }
 
   /* Assignment cards */
@@ -925,54 +748,49 @@
     display: grid;
     gap: var(--spacing-md);
   }
-
+  .assignment-card {
+    display: grid;
+    gap: var(--spacing-xs);
+  }
   .assignment-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
   }
-
   .assignment-name {
     font-weight: 600;
     font-size: var(--btn-font-size);
   }
-
   .assignment-role {
     font-size: var(--font-size-sm);
     padding: 2px var(--spacing-sm);
     border-radius: 4px;
     background: var(--rt-gray-100, #f0ece8);
   }
-
   .assignment-detail {
     display: flex;
     gap: var(--spacing-md);
     font-size: var(--font-size-sm);
     color: var(--rt-text-light, #555);
   }
-
   .assignment-actions {
     display: flex;
     gap: var(--spacing-md);
     align-items: center;
     margin-top: var(--spacing-xs);
   }
-
   .confirmed-badge {
     font-size: var(--font-size-sm);
     color: var(--rt-text-muted, #777);
   }
-
   .confirmed-badge.confirmed {
     color: var(--rt-green, #4a7c59);
     font-weight: 500;
   }
-
   .btn-sm {
     padding: var(--spacing-xs) var(--spacing-md);
     font-size: var(--font-size-sm);
   }
-
   .btn-outline {
     background: transparent;
     border: 1px solid var(--rt-gray-200, #e4dfda);
@@ -980,7 +798,6 @@
     cursor: pointer;
     color: inherit;
   }
-
   .btn-outline:hover {
     border-color: var(--color-primary, #3a6db5);
     color: var(--color-primary, #3a6db5);

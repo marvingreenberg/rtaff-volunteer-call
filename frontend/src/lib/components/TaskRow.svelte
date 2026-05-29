@@ -1,7 +1,8 @@
 <script lang="ts">
+  import { truncateOnWord } from "$lib/utils/truncate";
+
   let {
     name,
-    summary,
     description,
     city,
     date,
@@ -17,8 +18,7 @@
     onToggleExpanded,
   }: {
     name: string;
-    summary: string;
-    description?: string;
+    description: string;
     city?: string;
     date?: string;
     time?: string;
@@ -32,6 +32,8 @@
     onToggleChecked?: () => void;
     onToggleExpanded?: () => void;
   } = $props();
+
+  const summary = $derived(truncateOnWord(description, 65));
 
   function bodyKey(e: KeyboardEvent) {
     if (e.key === "Enter" || e.key === " ") {
