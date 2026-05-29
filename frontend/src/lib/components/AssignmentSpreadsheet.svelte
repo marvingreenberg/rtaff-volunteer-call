@@ -186,7 +186,7 @@
   .spreadsheet {
     overflow-x: auto;
     border: 1px solid var(--rt-gray-200, #e4dfda);
-    border-radius: var(--card-radius);
+    border-radius: var(--radius);
     background: var(--rt-white, #fff);
   }
 
@@ -200,7 +200,7 @@
   thead th {
     position: sticky;
     top: 0;
-    background: var(--rt-bg-subtle, #f9f7f2);
+    background: var(--surface-3, #f9f7f2);
     z-index: 2;
     border-bottom: 2px solid var(--rt-gray-200, #e4dfda);
     padding: 8px 10px;
@@ -215,7 +215,7 @@
   th.row-header {
     position: sticky;
     left: 0;
-    background: var(--rt-bg-subtle, #f9f7f2);
+    background: var(--surface-3, #f9f7f2);
     z-index: 1;
     text-align: left;
     padding: 8px 12px;
@@ -229,7 +229,7 @@
 
   .task-date {
     font-weight: 600;
-    color: var(--color-text);
+    color: var(--rt-text);
   }
   .task-city {
     color: var(--rt-text-muted, #777);
