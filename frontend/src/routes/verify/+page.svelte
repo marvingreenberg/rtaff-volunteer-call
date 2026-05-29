@@ -28,16 +28,14 @@
 </script>
 
 <div class="verify-container">
-  <div class="verify-card">
+  <div class="card verify-card">
     {#if status === 'loading'}
       <div class="spinner"></div>
       <p>Verifying your login...</p>
     {:else}
-      <div class="alert alert-error">
-        <h1>Login Failed</h1>
-        <p>{error}</p>
-        <a href="/login" class="btn btn-primary mt-4">Try Again</a>
-      </div>
+      <h1>Login Failed</h1>
+      <p class="error-msg">{error}</p>
+      <a href="/login" class="btn btn-primary">Try Again</a>
     {/if}
   </div>
 </div>
@@ -48,21 +46,24 @@
     justify-content: center;
     align-items: center;
     min-height: 80vh;
-    padding: var(--spacing-md);
+    padding: var(--sp-4);
   }
 
   .verify-card {
     text-align: center;
+    max-width: 400px;
+    width: 100%;
+    padding: var(--sp-6);
   }
 
   .spinner {
-    width: var(--btn-min-height);
-    height: var(--btn-min-height);
-    border: 4px solid var(--rt-gray-200);
-    border-top: 4px solid var(--color-primary);
+    width: var(--btn-h);
+    height: var(--btn-h);
+    border: 4px solid var(--surface-3);
+    border-top: 4px solid var(--rt-blue);
     border-radius: 50%;
     animation: spin 1s linear infinite;
-    margin: 0 auto var(--spacing-md) auto;
+    margin: 0 auto var(--sp-4) auto;
   }
 
   @keyframes spin {
@@ -70,14 +71,14 @@
     100% { transform: rotate(360deg); }
   }
 
-  .alert-error h1 {
+  h1 {
     font-size: 1.5rem;
-    color: #9b2c2c;
-    margin-bottom: var(--spacing-md);
+    color: var(--rt-error);
+    margin: 0 0 var(--sp-3) 0;
   }
 
-  .mt-4 {
-    margin-top: var(--spacing-lg);
-    display: inline-block;
+  .error-msg {
+    color: var(--rt-text-muted);
+    margin: 0 0 var(--sp-5) 0;
   }
 </style>
