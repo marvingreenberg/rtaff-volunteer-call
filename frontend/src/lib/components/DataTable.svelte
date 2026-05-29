@@ -135,12 +135,12 @@
   }
 
   thead tr {
-    background: var(--rt-bg-subtle, #f4f1ec);
+    background: var(--surface-3, #f4f1ec);
   }
 
   th {
     text-align: left;
-    padding: var(--spacing-sm) var(--spacing-md);
+    padding: var(--sp-3) var(--sp-4);
     font-weight: 600;
     font-size: var(--font-size-sm);
     color: var(--rt-text-light, #555);
@@ -165,7 +165,7 @@
   }
 
   .header-btn:hover {
-    color: var(--color-primary, #3a6db5);
+    color: var(--rt-blue, #3a6db5);
   }
 
   .sort-arrow {
@@ -173,7 +173,7 @@
   }
 
   td {
-    padding: var(--spacing-sm) var(--spacing-md);
+    padding: var(--sp-3) var(--sp-4);
     border-bottom: 1px solid var(--rt-gray-200, #e4dfda);
     color: var(--rt-text, #333);
     vertical-align: middle;

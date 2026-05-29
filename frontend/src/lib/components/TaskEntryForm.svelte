@@ -385,12 +385,12 @@
   .task-entry-form {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-sm);
+    gap: var(--sp-3);
   }
 
   .form-row {
     display: flex;
-    gap: var(--spacing-md);
+    gap: var(--sp-4);
   }
 
   .field {
@@ -400,20 +400,20 @@
 
   .field input {
     width: 100%;
-    padding: var(--spacing-sm) var(--spacing-md);
-    min-height: var(--btn-min-height);
+    padding: var(--sp-3) var(--sp-4);
+    min-height: var(--btn-h);
     border: 1px solid var(--rt-gray-200, #e4dfda);
-    border-radius: var(--card-radius);
+    border-radius: var(--radius);
     font-size: inherit;
     font-family: var(--font-body);
     background: var(--rt-white);
-    color: var(--color-text);
+    color: var(--rt-text);
     box-sizing: border-box;
   }
 
   .field input:focus {
     outline: none;
-    border-color: var(--color-primary, #3a6db5);
+    border-color: var(--rt-blue, #3a6db5);
     box-shadow: 0 0 0 2px rgba(58, 109, 181, 0.2);
   }
 
@@ -434,7 +434,7 @@
 
   .leading-icon {
     position: absolute;
-    left: var(--spacing-sm);
+    left: var(--sp-3);
     top: 50%;
     transform: translateY(-50%);
     width: 18px;
@@ -451,7 +451,7 @@
   }
 
   .icon-field input {
-    padding-left: calc(var(--spacing-sm) * 2 + 18px);
+    padding-left: calc(var(--sp-3) * 2 + 18px);
   }
 
   /* City picker is a Select.svelte combobox wrapped in .city-wrap. The
@@ -469,8 +469,8 @@
   }
 
   .city-wrap :global(.app-select-trigger) {
-    padding-left: calc(var(--spacing-sm) * 2 + 18px);
-    min-height: var(--btn-min-height);
+    padding-left: calc(var(--sp-3) * 2 + 18px);
+    min-height: var(--btn-h);
   }
 
   /* Match the validity treatment used on inputs/textarea. */
@@ -480,13 +480,13 @@
 
   .inline-row {
     align-items: center;
-    gap: var(--spacing-lg);
+    gap: var(--sp-5);
   }
 
   .inline-num {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
+    gap: var(--sp-3);
     font-size: var(--font-size-sm);
     color: var(--rt-gray-600, #555);
     font-weight: 500;
@@ -494,41 +494,41 @@
 
   .inline-num input {
     width: 5em;
-    padding: var(--spacing-sm) var(--spacing-md);
-    min-height: var(--btn-min-height);
+    padding: var(--sp-3) var(--sp-4);
+    min-height: var(--btn-h);
     border: 1px solid var(--rt-gray-200, #e4dfda);
-    border-radius: var(--card-radius);
+    border-radius: var(--radius);
     font-size: inherit;
     font-family: var(--font-body);
     background: var(--rt-white);
-    color: var(--color-text);
+    color: var(--rt-text);
     box-sizing: border-box;
   }
 
   .inline-num input:focus {
     outline: none;
-    border-color: var(--color-primary, #3a6db5);
+    border-color: var(--rt-blue, #3a6db5);
     box-shadow: 0 0 0 2px rgba(58, 109, 181, 0.2);
   }
 
   .description {
     width: 100%;
-    padding: var(--spacing-sm) var(--spacing-md);
+    padding: var(--sp-3) var(--sp-4);
     border: 1px solid var(--rt-gray-200, #e4dfda);
-    border-radius: var(--card-radius);
+    border-radius: var(--radius);
     font-size: inherit;
     font-family: var(--font-body);
     background: var(--rt-white);
-    color: var(--color-text);
+    color: var(--rt-text);
     box-sizing: border-box;
     resize: vertical;
     field-sizing: content;
-    min-height: calc(var(--btn-min-height) + 0.5em);
+    min-height: calc(var(--btn-h) + 0.5em);
   }
 
   .description:focus {
     outline: none;
-    border-color: var(--color-primary, #3a6db5);
+    border-color: var(--rt-blue, #3a6db5);
     box-shadow: 0 0 0 2px rgba(58, 109, 181, 0.2);
   }
 

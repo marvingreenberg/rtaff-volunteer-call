@@ -40,6 +40,9 @@
     flex: 1;
   }
   .accent {
+    /* Dimensions are design-locked: the colored bar reads correctly
+       at exactly 22×4 — scaling it with density makes it feel either
+       weak (compact) or chunky (large). Keep the literals. */
     display: inline-block;
     width: 22px;
     height: 4px;
@@ -59,7 +62,7 @@
   }
   .page-header-meta {
     color: var(--rt-text-muted);
-    font-size: 0.85rem;
+    font-size: var(--font-size-sm);
     font-variant-numeric: tabular-nums;
   }
 </style>

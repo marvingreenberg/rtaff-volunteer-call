@@ -260,7 +260,7 @@
   {:else if personList.length === 0}
     <p class="empty">No people found.</p>
   {:else}
-    <ul class="people-list">
+    <ul class="hairline-list people-list">
       {#each personList as person (person.id)}
         <li>
           <a href="/people/{person.id}" class="person-row">
@@ -395,7 +395,7 @@
     border: 1px solid var(--rt-input-border);
     border-radius: var(--radius-sm);
     background: var(--rt-input-bg);
-    color: var(--color-text);
+    color: var(--rt-text);
     font-size: var(--fz-body);
     font-family: var(--font-body);
   }
@@ -403,36 +403,20 @@
   .search-input:focus {
     outline: none;
     border-color: var(--rt-blue);
-    box-shadow: 0 0 0 3px rgba(58, 109, 181, 0.18);
+    box-shadow: var(--ring-focus);
   }
 
-  /* Hairline-divider list: chosen over per-row cards to keep visual
-     weight down at scale (25/page). The page itself sits on the body
-     background; rows are separated only by hairlines. */
-  .people-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    background: var(--surface-1);
-    border: 1px solid var(--hairline);
-    border-radius: var(--radius);
-    overflow: hidden;
-  }
-
+  /* Row layout for the people list. Hairline-divider container and row
+     separators come from the global .hairline-list utility. */
   .person-row {
     display: flex;
     align-items: center;
     gap: var(--sp-4);
     padding: var(--sp-3) var(--card-pad-x);
     min-height: var(--btn-h);
-    border-top: 1px solid var(--hairline);
     text-decoration: none;
     color: inherit;
     transition: background-color 0.1s;
-  }
-
-  .people-list li:first-child .person-row {
-    border-top: 0;
   }
 
   .person-row:hover {
@@ -441,7 +425,7 @@
   }
 
   .person-row:active {
-    background: var(--rt-bg-subtle);
+    background: var(--surface-3);
   }
 
   .avatar {
@@ -459,7 +443,7 @@
 
   .person-name {
     font-weight: 500;
-    color: var(--color-primary);
+    color: var(--rt-blue);
     min-width: 140px;
   }
 

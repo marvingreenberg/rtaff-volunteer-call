@@ -691,7 +691,7 @@
   }
 
   .policy-prefix {
-    color: var(--color-text);
+    color: var(--rt-text);
   }
 
   .save-btn {
@@ -742,12 +742,12 @@
   }
 
   .view-tab.active {
-    color: var(--color-primary);
-    border-bottom-color: var(--color-primary);
+    color: var(--rt-blue);
+    border-bottom-color: var(--rt-blue);
   }
 
   .view-tab:hover:not(:disabled):not(.active) {
-    color: var(--color-text);
+    color: var(--rt-text);
   }
 
   .view-tab:disabled {
@@ -1070,7 +1070,7 @@
 
   .conflicts-toggle:hover {
     background: var(--surface-2);
-    color: var(--color-text);
+    color: var(--rt-text);
   }
 
   ul.people.conflicts {
@@ -1084,7 +1084,7 @@
   }
 
   .person-row:hover:not(:disabled) .action {
-    color: var(--color-primary);
+    color: var(--rt-blue);
   }
 
   @media (max-width: 768px) {

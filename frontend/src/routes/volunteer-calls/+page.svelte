@@ -432,7 +432,7 @@
 
   .single-task-block h3 {
     margin: 0 0 var(--sp-2) 0;
-    font-size: var(--btn-font-size);
+    font-size: var(--btn-fz);
   }
 
   .hint {

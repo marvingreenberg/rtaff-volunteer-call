@@ -46,22 +46,10 @@
   --tint-green: rgba(90, 173, 68, 0.1);
   --tint-orange: rgba(245, 183, 78, 0.14);
 
-  /* Legacy aliases kept so non-converted CSS doesn't break mid-rollout */
-  --rt-bg: var(--surface-2);
-  --rt-bg-subtle: var(--surface-3);
-  --color-primary: var(--rt-blue);
-  --color-primary-dark: var(--rt-blue-dark);
-  --color-accent: var(--rt-green);
-  --color-accent-dark: var(--rt-green-dark);
-  --color-highlight: var(--rt-orange);
-  --color-bg: var(--surface-2);
-  --color-text: var(--rt-text);
-
   /* Typography */
   --font-display: "DM Serif Display", Georgia, serif;
   --font-body:
     "Plus Jakarta Sans", "DM Sans", "Segoe UI", Helvetica, sans-serif;
-  --font-heading: var(--font-display); /* legacy alias */
 
   /* Volunteer-name display budget (preserved — see prior comment in file) */
   --volunteer-name-display-max: 22;
@@ -72,6 +60,8 @@
   --fz-body: 15px;
   --fz-h1: 2rem;
   --fz-h2: 1.05rem;
+  --font-size-sm: 0.85rem;
+  --font-size-xs: 0.75rem;
   --lh-body: 1.55;
   --sp-2: 6px;
   --sp-3: 10px;
@@ -80,50 +70,28 @@
   --sp-6: 28px;
   --radius: 12px;
   --radius-sm: 8px;
+  --radius-pill: 999px;
+  --ring-focus: 0 0 0 3px rgba(58, 109, 181, 0.18);
   --card-pad-y: 14px;
   --card-pad-x: 18px;
   --task-pad-y: 12px;
   --task-pad-x: 16px;
-  --task-gap: 8px;
   --check-size: 22px;
   --btn-h: 40px;
   --btn-pad-x: 16px;
+  --btn-pad-y: 10px;
   --btn-fz: 0.92rem;
+  --table-cell-pad: 0.875rem 0.75rem;
+  --textarea-min-h: 72px;
   --heading-weight: 400;
-
-  /* Legacy density aliases — consumed by per-page CSS not yet swept.
-     Removed in phase 8. */
-  --font-size-body: var(--fz-body);
-  --font-size-sm: 0.85rem;
-  --font-size-xs: 0.75rem;
-  --line-height-body: var(--lh-body);
-  --spacing-xs: var(--sp-2);
-  --spacing-sm: var(--sp-3);
-  --spacing-md: var(--sp-4);
-  --spacing-lg: var(--sp-5);
-  --spacing-xl: var(--sp-6);
-  --card-padding-y: var(--card-pad-y);
-  --card-padding-x: var(--card-pad-x);
-  --card-radius: var(--radius);
-  --btn-min-height: var(--btn-h);
-  --btn-padding-y: 10px;
-  --btn-padding-x: var(--btn-pad-x);
-  --btn-font-size: var(--btn-fz);
-  --table-cell-padding: 0.875rem 0.75rem;
-  --item-radius: var(--radius-sm);
-  --item-gap: var(--task-gap);
-  --item-row-height: 52px;
-  --item-row-gap: 0.625rem;
-  --item-row-padding: var(--task-pad-y) var(--task-pad-x);
-  --item-font-size: 0.95rem;
-  --check-inner: calc(var(--check-size) - 4px);
-  --textarea-min-height: 72px;
 }
 
 [data-density="compact"] {
   --fz-body: 13.5px;
   --fz-h1: 1.55rem;
   --fz-h2: 0.95rem;
+  --font-size-sm: 0.8rem;
+  --font-size-xs: 0.7rem;
   --lh-body: 1.45;
   --sp-2: 4px;
   --sp-3: 6px;
@@ -136,41 +104,21 @@
   --card-pad-x: 14px;
   --task-pad-y: 7px;
   --task-pad-x: 12px;
-  --task-gap: 2px;
   --check-size: 18px;
   --btn-h: 34px;
   --btn-pad-x: 12px;
+  --btn-pad-y: 6px;
   --btn-fz: 0.85rem;
-
-  --font-size-body: var(--fz-body);
-  --font-size-sm: 0.8rem;
-  --font-size-xs: 0.7rem;
-  --line-height-body: var(--lh-body);
-  --spacing-xs: var(--sp-2);
-  --spacing-sm: var(--sp-3);
-  --spacing-md: var(--sp-4);
-  --spacing-lg: var(--sp-5);
-  --spacing-xl: var(--sp-6);
-  --card-padding-y: var(--card-pad-y);
-  --card-padding-x: var(--card-pad-x);
-  --card-radius: var(--radius);
-  --btn-min-height: var(--btn-h);
-  --btn-padding-y: 6px;
-  --btn-padding-x: var(--btn-pad-x);
-  --btn-font-size: var(--btn-fz);
-  --table-cell-padding: 0.5rem 0.5rem;
-  --item-radius: var(--radius-sm);
-  --item-row-height: 36px;
-  --item-row-padding: 4px 10px;
-  --item-font-size: 0.85rem;
-  --check-inner: 14px;
-  --textarea-min-height: 56px;
+  --table-cell-pad: 0.5rem 0.5rem;
+  --textarea-min-h: 56px;
 }
 
 [data-density="large"] {
   --fz-body: 17px;
   --fz-h1: 2.5rem;
   --fz-h2: 1.2rem;
+  --font-size-sm: 0.95rem;
+  --font-size-xs: 0.85rem;
   --lh-body: 1.65;
   --sp-2: 8px;
   --sp-3: 14px;
@@ -183,36 +131,14 @@
   --card-pad-x: 24px;
   --task-pad-y: 18px;
   --task-pad-x: 22px;
-  --task-gap: 12px;
   --check-size: 26px;
   --btn-h: 48px;
   --btn-pad-x: 22px;
+  --btn-pad-y: 14px;
   --btn-fz: 1rem;
+  --table-cell-pad: 1rem 0.875rem;
+  --textarea-min-h: 96px;
   --heading-weight: 700;
-
-  --font-size-body: var(--fz-body);
-  --font-size-sm: 0.95rem;
-  --font-size-xs: 0.85rem;
-  --line-height-body: var(--lh-body);
-  --spacing-xs: var(--sp-2);
-  --spacing-sm: var(--sp-3);
-  --spacing-md: var(--sp-4);
-  --spacing-lg: var(--sp-5);
-  --spacing-xl: var(--sp-6);
-  --card-padding-y: var(--card-pad-y);
-  --card-padding-x: var(--card-pad-x);
-  --card-radius: var(--radius);
-  --btn-min-height: var(--btn-h);
-  --btn-padding-y: 14px;
-  --btn-padding-x: var(--btn-pad-x);
-  --btn-font-size: var(--btn-fz);
-  --table-cell-padding: 1rem 0.875rem;
-  --item-radius: var(--radius-sm);
-  --item-row-height: 60px;
-  --item-row-padding: 14px 20px;
-  --item-font-size: 1.05rem;
-  --check-inner: 22px;
-  --textarea-min-height: 96px;
   --rt-text: #1f262f;
 }
 
@@ -233,7 +159,7 @@ body {
     radial-gradient(900px 500px at -10% 30%, var(--tint-blue), transparent 60%),
     var(--surface-2);
   background-attachment: fixed;
-  color: var(--color-text);
+  color: var(--rt-text);
   line-height: var(--lh-body);
   -webkit-font-smoothing: antialiased;
 }
@@ -251,7 +177,7 @@ h6 {
 }
 
 a {
-  color: var(--color-primary);
+  color: var(--rt-blue);
   text-decoration: none;
 }
 a:hover {
@@ -308,7 +234,7 @@ header nav a {
   font-weight: 600;
   font-size: 0.92rem;
   padding: 8px 14px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -333,7 +259,7 @@ header nav .nav-icon {
 /* Main content area */
 main {
   flex: 1;
-  padding: var(--spacing-lg);
+  padding: var(--sp-5);
   max-width: 1200px;
   margin: 0 auto;
   width: 100%;
@@ -343,7 +269,7 @@ main {
    viewport (e.g. the assignment spreadsheet). */
 main:has(.page-full) {
   max-width: none;
-  padding-inline: var(--spacing-md);
+  padding-inline: var(--sp-4);
 }
 
 /* ──────────────────────────────
@@ -370,7 +296,7 @@ main:has(.page-full) {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: var(--spacing-lg);
+  margin-bottom: var(--sp-5);
 }
 
 .page-header h1 {
@@ -378,11 +304,11 @@ main:has(.page-full) {
 }
 
 .back-link {
-  margin-top: var(--spacing-xl);
+  margin-top: var(--sp-6);
 }
 
 .back-link a {
-  color: var(--color-primary);
+  color: var(--rt-blue);
   text-decoration: none;
   font-weight: 500;
 }
@@ -391,17 +317,17 @@ main:has(.page-full) {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: var(--spacing-sm) var(--spacing-md);
+  padding: var(--sp-3) var(--sp-4);
   background: var(--rt-white);
-  border-radius: var(--card-radius);
+  border-radius: var(--radius);
   border: 1px solid var(--rt-gray-200);
 }
 
 .summary-stat .stat-value {
   font-size: 1.5rem;
   font-weight: 600;
-  color: var(--color-primary);
-  font-family: var(--font-heading);
+  color: var(--rt-blue);
+  font-family: var(--font-display);
 }
 
 .summary-stat .stat-label {
@@ -443,7 +369,7 @@ main:has(.page-full) {
   min-height: var(--btn-h);
   padding: 0 var(--btn-pad-x);
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-family: var(--font-body);
   font-weight: 600;
   font-size: var(--btn-fz);
@@ -552,6 +478,40 @@ main:has(.page-full) {
   color: var(--rt-text-muted);
 }
 
+/* Hairline-divider list — surface-1 container with hairline-separated rows.
+   Used by /people and /inbox. Each row sits inside a <li>; the row
+   element (typically an <a> or <button>) carries hover treatment. */
+.hairline-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.hairline-list > li + li {
+  border-top: 1px solid var(--hairline);
+}
+
+/* Centered-card page scaffolding — used by /login and /verify (auth pages
+   that render outside the main app shell). Compose .centered-card with
+   .card to inherit surface/border/radius/shadow; this rule only adds the
+   centering constraints (max-width, width, text-align). */
+.centered-card-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
+  padding: var(--sp-4);
+}
+.centered-card {
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+  padding: var(--sp-6);
+}
+
 /* ──────────────────────────────
    Status badges
    ────────────────────────────── */
@@ -560,7 +520,7 @@ main:has(.page-full) {
   align-items: center;
   gap: 6px;
   padding: 2px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: var(--font-size-sm);
   font-weight: 600;
   text-transform: capitalize;
@@ -614,7 +574,7 @@ main:has(.page-full) {
 }
 .data-table th,
 .data-table td {
-  padding: var(--table-cell-padding);
+  padding: var(--table-cell-pad);
   text-align: left;
   border-bottom: 1px solid var(--hairline);
 }
@@ -651,21 +611,21 @@ main:has(.page-full) {
   border: 1px solid var(--rt-input-border);
   border-radius: var(--radius-sm);
   background: var(--rt-input-bg);
-  color: var(--color-text);
+  color: var(--rt-text);
   font-size: var(--fz-body);
   font-family: var(--font-body);
   font-weight: 400;
 }
 .form-field textarea {
   padding: var(--sp-3) var(--sp-4);
-  min-height: var(--textarea-min-height);
+  min-height: var(--textarea-min-h);
 }
 .form-field input:focus,
 .form-field select:focus,
 .form-field textarea:focus {
   outline: none;
   border-color: var(--rt-blue);
-  box-shadow: 0 0 0 3px rgba(58, 109, 181, 0.18);
+  box-shadow: var(--ring-focus);
 }
 
 /* ──────────────────────────────
@@ -700,7 +660,7 @@ select:not(.native-select) {
 .loading,
 .error,
 .empty {
-  padding: var(--spacing-xl);
+  padding: var(--sp-6);
   text-align: center;
   color: var(--rt-text-muted);
 }
@@ -717,10 +677,10 @@ select:not(.native-select) {
 .error-banner {
   background: var(--rt-error-bg);
   color: var(--rt-error);
-  padding: var(--spacing-md) var(--spacing-md);
-  border-radius: var(--card-radius);
+  padding: var(--sp-4) var(--sp-4);
+  border-radius: var(--radius);
   border: 1px solid #f0bfbf;
-  margin-bottom: var(--spacing-md);
+  margin-bottom: var(--sp-4);
 }
 
 /* ──────────────────────────────
@@ -728,8 +688,8 @@ select:not(.native-select) {
    ────────────────────────────── */
 @media (hover: none) {
   .btn {
-    min-height: var(--btn-min-height);
-    padding: var(--btn-padding-y) var(--btn-padding-x);
+    min-height: var(--btn-h);
+    padding: var(--btn-pad-y) var(--btn-pad-x);
   }
 
   .btn:active {
@@ -742,7 +702,7 @@ select:not(.native-select) {
   }
 
   header nav a {
-    min-height: var(--btn-min-height);
+    min-height: var(--btn-h);
   }
 }
 
@@ -751,8 +711,8 @@ select:not(.native-select) {
    ────────────────────────────── */
 @media (max-width: 768px) {
   header {
-    padding: var(--spacing-sm) var(--spacing-md);
-    gap: var(--spacing-sm);
+    padding: var(--sp-3) var(--sp-4);
+    gap: var(--sp-3);
   }
 
   header .logo img {
@@ -770,9 +730,9 @@ select:not(.native-select) {
   }
 
   header nav a {
-    font-size: var(--btn-font-size);
-    padding: var(--spacing-sm) var(--spacing-md);
-    min-height: var(--btn-min-height);
+    font-size: var(--btn-fz);
+    padding: var(--sp-3) var(--sp-4);
+    min-height: var(--btn-h);
   }
 
   header nav .nav-icon {
@@ -780,14 +740,14 @@ select:not(.native-select) {
   }
 
   main {
-    padding: var(--spacing-md);
+    padding: var(--sp-4);
   }
 }
 
 /* Desktop breakpoint */
 @media (max-width: 900px) and (min-width: 769px) {
   header nav a {
-    font-size: var(--btn-font-size);
-    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: var(--btn-fz);
+    padding: var(--sp-3) var(--sp-4);
   }
 }
