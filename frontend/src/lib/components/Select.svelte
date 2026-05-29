@@ -238,7 +238,13 @@
           role="option"
           aria-selected={i === selectedIdx}
           data-idx={i}
-          onclick={() => commit(i)}
+          onclick={(e) => {
+            // Stop propagation so an enclosing <label> doesn't forward
+            // a synthetic click to the labeled trigger button, which
+            // would immediately re-open the popup we just closed.
+            e.stopPropagation();
+            commit(i);
+          }}
           onmouseenter={() => (highlightIdx = i)}
         >
           {opt.label}

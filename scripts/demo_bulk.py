@@ -167,11 +167,8 @@ async def _respond_availability(call_id: str, count: int) -> int:
 
         n_tasks = len(tasks)
         for person in picks:
-            # Realistic respondent: each volunteer picks 1–3 tasks
-            # (slightly favoring 2). The demo's one "outlier" who
-            # signs up for everything is Vick, driven separately by
-            # the live UI flow — not via this bulk path.
-            pick_count = min(n_tasks, rng.choices([1, 2, 3], weights=[3, 4, 3])[0])
+            # Realistic respondent: each volunteer picks 1–4 tasks
+            pick_count = min(n_tasks, rng.choices([1, 2, 3, 4], weights=[2, 3, 4, 3])[0])
             subset = rng.sample(tasks, pick_count)
             for task in subset:
                 session.add(
