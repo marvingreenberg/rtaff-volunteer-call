@@ -143,20 +143,20 @@
 
   :global(.autocomplete-input) {
     width: 100%;
-    padding: var(--spacing-sm) var(--spacing-md);
-    min-height: var(--btn-min-height);
+    padding: var(--sp-3) var(--sp-4);
+    min-height: var(--btn-h);
     border: 1px solid var(--rt-gray-200, #e4dfda);
-    border-radius: var(--card-radius);
-    font-size: var(--btn-font-size);
+    border-radius: var(--radius);
+    font-size: var(--btn-fz);
     font-family: var(--font-body, sans-serif);
     background: var(--rt-white, #ffffff);
-    color: var(--color-text, #3b3b3b);
+    color: var(--rt-text, #3b3b3b);
     box-sizing: border-box;
   }
 
   :global(.autocomplete-input:focus) {
     outline: none;
-    border-color: var(--color-primary, #3a6db5);
+    border-color: var(--rt-blue, #3a6db5);
     box-shadow: 0 0 0 2px rgba(58, 109, 181, 0.2);
   }
 
@@ -170,7 +170,7 @@
     list-style: none;
     background: var(--rt-white, #ffffff);
     border: 1px solid var(--rt-gray-200, #e4dfda);
-    border-radius: var(--card-radius);
+    border-radius: var(--radius);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
     z-index: 100;
     max-height: 280px;
@@ -180,10 +180,10 @@
   :global(.autocomplete-item) {
     display: flex;
     flex-direction: column;
-    padding: var(--spacing-sm) var(--spacing-md);
+    padding: var(--sp-3) var(--sp-4);
     cursor: pointer;
     border-bottom: 1px solid var(--rt-gray-100, #f5f3ef);
-    min-height: var(--btn-min-height);
+    min-height: var(--btn-h);
     justify-content: center;
   }
 
