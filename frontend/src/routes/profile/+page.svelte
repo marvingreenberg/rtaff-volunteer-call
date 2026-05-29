@@ -215,7 +215,7 @@
     display: inline-block;
     padding: 2px var(--sp-3);
     color: white;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     font-size: var(--font-size-xs);
     font-weight: 600;
   }
