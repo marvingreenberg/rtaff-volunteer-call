@@ -17,16 +17,11 @@
   import AssignmentSpreadsheet from "$lib/components/AssignmentSpreadsheet.svelte";
   import { skillBadgeClass } from "$lib/utils/badges";
   import { confirmDialog } from "$lib/stores/confirm.svelte";
+  import { setAssignmentFlash } from "$lib/stores/flash.svelte";
   import { formatDate, volunteersLabel } from "$lib/utils/format";
   import {
-    ASSIGNMENT_POLICY_LABELS,
-    type AssignmentPolicy,
-  } from "$lib/api/types";
-  import {
     computeCounts,
-    countsMessage as computeCountsMessage,
-    gateMessage as computeGateMessage,
-    canSave as computeCanSave,
+    assignmentIssues,
   } from "$lib/utils/assignment-policy";
   import {
     buildFairnessContext,
@@ -43,8 +38,6 @@
   let busyTaskIds = $state<Set<string>>(new Set());
   let teamLeads = $state<TeamLead[]>([]);
 
-  // Policy is in-page state only (per spec). Default: Exact required.
-  let policy = $state<AssignmentPolicy>("exact");
   let saving = $state(false);
 
   // View toggle: task-card view (default) or spreadsheet matrix. Persisted
@@ -96,16 +89,19 @@
     return { needed, assigned, full, tasks: overview.tasks.length };
   });
 
-  // Counts and gate text are derived from the overview + selected policy.
-  // The actual logic lives in $lib/utils/assignment-policy so it can be
-  // unit-tested without the SvelteKit route runtime; this component just
-  // wires the reactive values through.
+  // Outstanding-issue warnings are derived from the overview. The logic
+  // lives in $lib/utils/assignment-policy so it can be unit-tested without
+  // the SvelteKit runtime; this component just wires the reactive values
+  // through. Issues are advisory — they no longer gate "Done Assigning".
   let counts = $derived(overview ? computeCounts(overview.tasks) : { under: 0, over: 0, noLead: 0 });
-  let countsMessage = $derived(computeCountsMessage(counts));
-  let gateMessage = $derived(computeGateMessage(counts, policy));
-  let canSave = $derived(
-    !!overview && computeCanSave(overview.tasks, counts, policy),
+  let issues = $derived(
+    overview ? assignmentIssues(counts, overview.tasks.length) : [],
   );
+  // Single-line form for the header callout (and the calls-list banner).
+  let issueLine = $derived(issues.join("  "));
+  // Meter fill fractions; the bar paints green once its metric is complete.
+  let spotsComplete = $derived(totals.assigned >= totals.needed);
+  let tasksComplete = $derived(totals.tasks > 0 && totals.full === totals.tasks);
   // Per-call fairness context drives the badges + sort. Rebuilds whenever
   // the overview changes — including after an assign/unassign round-trip,
   // which is what gives us live re-ranking on other task-cards.
@@ -284,8 +280,10 @@
     if (saving) return;
     // Re-entry case: no API call needed; assignments persisted on each
     // assign/unassign click. The button is just an explicit "back to list".
-    if (!canSave) return;
+    // Done Assigning never blocks on outstanding issues — any remaining
+    // warnings ride along to the calls list (and the Send confirmation).
     if (isAlreadyAssigned) {
+      setAssignmentFlash(issueLine);
       await goto("/volunteer-calls");
       return;
     }
@@ -296,6 +294,7 @@
       // (which emails volunteers) is a separate row button on the list
       // page; admins explicitly fire it from there once ready.
       await volunteerCalls.doneAssigning(callId);
+      setAssignmentFlash(issueLine);
       await goto("/volunteer-calls");
     } catch (e) {
       error = e instanceof Error ? e.message : "Failed to complete assignment";
@@ -326,60 +325,56 @@
     <PageHeader title="Assign — {overview.call_title}" />
 
     <div class="top-bar">
-      <div class="counts-col">
-        <div class="counts-line">
-          {totals.assigned}/{totals.needed} spots filled
+      <div class="meters-col">
+        <div class="stat">
+          <span class="stat-label">Spots filled</span>
+          <span class="meter" class:complete={spotsComplete}>
+            <i style:width="{totals.needed > 0 ? Math.min(100, (totals.assigned / totals.needed) * 100) : 100}%"></i>
+          </span>
+          <span class="stat-num">{totals.assigned}/{totals.needed}</span>
         </div>
-        <div class="counts-line">
-          {totals.full}/{totals.tasks} task{totals.tasks === 1 ? "" : "s"} complete
+        <div class="stat">
+          <span class="stat-label">Tasks done</span>
+          <span class="meter" class:complete={tasksComplete}>
+            <i style:width="{totals.tasks > 0 ? (totals.full / totals.tasks) * 100 : 0}%"></i>
+          </span>
+          <span class="stat-num">{totals.full}/{totals.tasks}</span>
         </div>
       </div>
 
-      <div class="messages-col">
-        <div class="message-area" data-area="counts">{countsMessage}</div>
-        <div class="message-area" data-area="gate" class:hidden={!gateMessage}>
-          {#if gateMessage}<span class="gate-icon" aria-hidden="true">⚠️</span>{/if}
-          {gateMessage}
-        </div>
+      <div class="callout-col">
+        {#if issueLine}
+          <span class="status-callout warn">
+            <span class="callout-text">{issueLine}</span>
+            {#if needsLeadCount > 0}
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm auto-leads-btn"
+                disabled={autoLeadsBusy}
+                onclick={autoAssignLeads}
+                title="Pick the least-recently-assigned team lead for each unstaffed task"
+              >
+                {autoLeadsBusy
+                  ? "Picking…"
+                  : `Auto-pick Team Leads (${needsLeadCount})`}
+              </button>
+            {/if}
+          </span>
+        {:else}
+          <span class="status-callout ok">All tasks staffed</span>
+        {/if}
       </div>
 
       <div class="actions-col">
-        <label class="policy-label">
-          <span class="policy-prefix">Desired</span>
-          <Select
-            bind:value={policy}
-            options={[
-              { value: "exact", label: ASSIGNMENT_POLICY_LABELS.exact },
-              { value: "over", label: ASSIGNMENT_POLICY_LABELS.over },
-              { value: "over_under", label: ASSIGNMENT_POLICY_LABELS.over_under },
-            ]}
-            ariaLabel="Desired"
-          />
-        </label>
-        <div class="action-buttons">
-          {#if needsLeadCount > 0}
-            <button
-              type="button"
-              class="btn btn-secondary auto-leads-btn"
-              disabled={autoLeadsBusy}
-              onclick={autoAssignLeads}
-              title="Pick the least-recently-assigned team lead for each unstaffed task"
-            >
-              {autoLeadsBusy
-                ? "Picking…"
-                : `Auto-pick Team Leads (${needsLeadCount})`}
-            </button>
-          {/if}
-          <button
-            type="button"
-            class="btn btn-primary save-btn"
-            disabled={saving || !canSave}
-            onclick={handleSave}
-            aria-label={isAlreadyAssigned ? "Back to calls" : "Complete assignment"}
-          >
-            {saveButtonLabel}
-          </button>
-        </div>
+        <button
+          type="button"
+          class="btn btn-primary save-btn"
+          disabled={saving || totals.tasks === 0}
+          onclick={handleSave}
+          aria-label={isAlreadyAssigned ? "Back to calls" : "Complete assignment"}
+        >
+          {saveButtonLabel}
+        </button>
       </div>
     </div>
 
@@ -607,17 +602,17 @@
     width: 100%;
   }
 
-  /* Sticky two-row top bar that pins to the top of the viewport while the
-     task cards below scroll. Uses the soft-modular surface + hairline
-     tokens so it reads as a peer to the .card surfaces below. */
+  /* Sticky top bar that pins to the top of the viewport while the task
+     cards below scroll. Uses the soft-modular surface + hairline tokens so
+     it reads as a peer to the .card surfaces below. Three columns: quiet
+     progress meters · a soft status callout · the Done action. */
   .top-bar {
     position: sticky;
     top: 0;
     z-index: 5;
     display: grid;
     grid-template-columns: max-content 1fr max-content;
-    grid-template-rows: auto auto;
-    gap: var(--sp-2) var(--sp-5);
+    gap: var(--sp-3) var(--sp-5);
     align-items: center;
     padding: var(--sp-3) var(--sp-4);
     margin-bottom: var(--sp-4);
@@ -626,85 +621,95 @@
     border-radius: var(--radius);
   }
 
-  .counts-col {
-    grid-column: 1;
-    grid-row: 1 / span 2;
+  .meters-col {
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    font-size: calc(var(--font-size-sm) * 1.5);
-    font-weight: 700;
-    color: var(--rt-text-light);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .counts-line {
-    line-height: 1.4;
-  }
-
-  .messages-col {
-    grid-column: 2;
-    grid-row: 1 / span 2;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
     gap: var(--sp-2);
-    min-width: 0;
   }
 
-  .message-area {
-    font-size: calc(var(--font-size-sm) * 1.6);
-    color: var(--rt-text-light);
-    line-height: 1.3;
-  }
-
-  .message-area[data-area="gate"] {
-    color: var(--rt-warning-text);
-    font-weight: 700;
+  .stat {
     display: flex;
     align-items: center;
     gap: var(--sp-3);
   }
 
-  .gate-icon {
-    font-size: 1em;
-    line-height: 1;
+  .stat-label {
+    color: var(--rt-text-muted);
+    font-size: var(--font-size-sm);
+    min-width: 6em;
+  }
+
+  .meter {
+    width: 130px;
+    height: 7px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-3);
+    overflow: hidden;
     flex-shrink: 0;
   }
 
-  .message-area.hidden {
-    visibility: hidden;
+  /* Amber while short; flips to green once the metric is complete. */
+  .meter > i {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--rt-orange);
+    transition: width 0.25s ease;
+  }
+
+  .meter.complete > i {
+    background: var(--rt-green);
+  }
+
+  .stat-num {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    color: var(--rt-text);
+    min-width: 3.4em;
+  }
+
+  .callout-col {
+    min-width: 0;
+    display: flex;
+    justify-content: flex-start;
+  }
+
+  /* Soft status pill — the warning variant uses the gentle warning tokens
+     (not bold-brown shout text), the ok variant the success tokens. */
+  .status-callout {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-2) var(--sp-4);
+    border-radius: var(--radius-pill);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    min-width: 0;
+  }
+
+  .status-callout.warn {
+    background: var(--rt-warning-bg);
+    color: var(--rt-warning-text);
+    border: 1px solid #f0e0bb;
+  }
+
+  .status-callout.ok {
+    background: var(--rt-success-bg);
+    color: var(--rt-success-text);
+    border: 1px solid #bfe3c6;
+  }
+
+  .callout-text {
+    min-width: 0;
   }
 
   .actions-col {
-    grid-column: 3;
-    grid-row: 1 / span 2;
     display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: var(--sp-2);
-  }
-
-  .policy-label {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-    font-size: calc(var(--font-size-sm) * 1.5);
-    font-weight: 700;
-  }
-
-  .policy-prefix {
-    color: var(--rt-text);
+    justify-content: flex-end;
   }
 
   .save-btn {
     min-width: 6em;
-  }
-
-  .action-buttons {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
   }
 
   .auto-leads-btn {
@@ -714,14 +719,12 @@
   @media (max-width: 720px) {
     .top-bar {
       grid-template-columns: 1fr;
-      grid-template-rows: auto auto auto;
     }
-    .counts-col,
-    .messages-col,
     .actions-col {
-      grid-column: 1;
-      grid-row: auto;
-      align-items: flex-start;
+      justify-content: flex-start;
+    }
+    .status-callout {
+      flex-wrap: wrap;
     }
   }
 

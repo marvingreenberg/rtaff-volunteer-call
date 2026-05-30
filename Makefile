@@ -73,8 +73,7 @@ setup-frontend:
 
 bootstrap: check-prereqs bootstrap-gcp bootstrap-creds bootstrap-secrets
 	@echo ""
-	@echo "Bootstrap complete. To deploy: tag a release (git tag vX.Y.Z && git push --tags)."
-	@echo "CI (.github/workflows/deploy.yml) runs on the tag and ships to Cloud Run."
+	@echo "Bootstrap complete. Next: tag a release (git tag vX.Y.Z && git push --tags)"
 
 bootstrap-gcp:
 	@./scripts/setup-gcp-project

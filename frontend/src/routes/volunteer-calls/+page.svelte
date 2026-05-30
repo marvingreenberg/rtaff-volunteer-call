@@ -10,6 +10,8 @@
   import TaskEntryForm from '$lib/components/TaskEntryForm.svelte';
   import { callStatusBadgeClass, programLabel } from '$lib/utils/badges';
   import { confirmDialog } from '$lib/stores/confirm.svelte';
+  import { assignmentFlash, dismissAssignmentFlash } from '$lib/stores/flash.svelte';
+  import { computeCounts, assignmentIssues } from '$lib/utils/assignment-policy';
   import { rowAction, type RowAction } from '$lib/utils/call-row-action';
   import { rowNotes } from '$lib/utils/call-row-notes';
 
@@ -177,6 +179,23 @@
         action === 'send_assignments' ||
         action === 'send_changed_assignments'
       ) {
+        // Last chance to catch a half-finished assignment before emails go
+        // out: if any task is short/over or missing a team lead, confirm
+        // with the same warning the coordinator saw — cancelling lets them
+        // go back and edit.
+        const overview = await volunteerCalls.assignmentOverview(call.id);
+        const issues = assignmentIssues(
+          computeCounts(overview.tasks),
+          overview.tasks.length,
+        );
+        if (issues.length > 0) {
+          const ok = await confirmDialog({
+            title: 'Send assignments?',
+            body: issues.join('\n'),
+            okLabel: 'Send anyway',
+          });
+          if (!ok) return; // finally clears the busy flag
+        }
         // Backend decides what to send based on call.last_sent_roster:
         // first send → everyone; subsequent → per-task diff.
         const res = await volunteerCalls.sendAssignmentNotices(call.id);
@@ -338,6 +357,20 @@
       onchange={handleFilterChange}
     />
   </div>
+
+  {#if assignmentFlash.message}
+    <div class="warning-banner" role="status">
+      <span>{assignmentFlash.message}</span>
+      <button
+        type="button"
+        class="warning-dismiss"
+        onclick={dismissAssignmentFlash}
+        aria-label="Dismiss warning"
+      >
+        ✕
+      </button>
+    </div>
+  {/if}
 
   {#if rowMessage}
     <div class="result-banner">{rowMessage}</div>
@@ -519,6 +552,43 @@
     color: var(--rt-success-text);
     border-radius: var(--radius);
     margin-bottom: var(--sp-4);
+  }
+
+  /* Transient warning surfaced after "Done Assigning" when the call still
+     has outstanding issues. Mirrors .result-banner but in the gentle
+     warning palette; auto-clears via the flash store's timer. */
+  .warning-banner {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4);
+    background: var(--rt-warning-bg);
+    color: var(--rt-warning-text);
+    border: 1px solid #f0e0bb;
+    border-radius: var(--radius);
+    margin-bottom: var(--sp-4);
+  }
+
+  .warning-banner span {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .warning-dismiss {
+    flex-shrink: 0;
+    background: none;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    opacity: 0.7;
+  }
+
+  .warning-dismiss:hover {
+    opacity: 1;
   }
 
   /* Status badges. callStatusBadgeClass maps call lifecycle states to

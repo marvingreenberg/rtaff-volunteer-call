@@ -2,10 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   type PolicyTask,
   computeCounts,
-  countsMessage,
-  countsViolatePolicy,
-  canSave,
-  gateMessage,
+  assignmentIssues,
 } from "./assignment-policy";
 
 function task(partial: {
@@ -45,105 +42,41 @@ describe("computeCounts", () => {
   });
 });
 
-describe("countsMessage", () => {
-  it("reports 'fewer' when any task is under, even if others are over", () => {
-    // The spec explicitly says: reporting fewer overrides reporting
-    // extra. Pinning this catches a regression to a naive "first thing
-    // I find" ordering.
-    expect(countsMessage({ under: 1, over: 3, noLead: 0 })).toBe(
-      "Some tasks have fewer than requested volunteers.",
-    );
+describe("assignmentIssues", () => {
+  it("reports the team-lead line as 'noLead/total' with the ‼️ icon", () => {
+    // Catches a regression to the wrong denominator (e.g. noLead/noLead)
+    // or dropping the count — the coordinator needs "3 of 7", not "3".
+    expect(assignmentIssues({ under: 0, over: 0, noLead: 3 }, 7)).toEqual([
+      "‼️ 3/7 tasks have no team lead",
+    ]);
   });
-  it("reports 'extra' when only over", () => {
-    expect(countsMessage({ under: 0, over: 1, noLead: 0 })).toBe(
-      "Some tasks have extra volunteers.",
-    );
-  });
-  it("reports 'all requested' when neither", () => {
-    expect(countsMessage({ under: 0, over: 0, noLead: 5 })).toBe(
-      "All tasks have requested volunteers.",
-    );
-  });
-});
 
-describe("countsViolatePolicy", () => {
-  it("exact: any under OR over violates", () => {
-    expect(countsViolatePolicy({ under: 1, over: 0, noLead: 0 }, "exact")).toBe(
-      true,
-    );
-    expect(countsViolatePolicy({ under: 0, over: 1, noLead: 0 }, "exact")).toBe(
-      true,
-    );
-    expect(countsViolatePolicy({ under: 0, over: 0, noLead: 0 }, "exact")).toBe(
-      false,
-    );
+  it("reports the counts line for under-filled tasks", () => {
+    expect(assignmentIssues({ under: 2, over: 0, noLead: 0 }, 5)).toEqual([
+      "⚠️ not all tasks have desired volunteers",
+    ]);
   });
-  it("over: only under violates", () => {
-    expect(countsViolatePolicy({ under: 1, over: 0, noLead: 0 }, "over")).toBe(
-      true,
-    );
-    expect(countsViolatePolicy({ under: 0, over: 5, noLead: 0 }, "over")).toBe(
-      false,
-    );
-  });
-  it("over_under: nothing violates by counts", () => {
-    expect(
-      countsViolatePolicy({ under: 9, over: 9, noLead: 0 }, "over_under"),
-    ).toBe(false);
-  });
-});
 
-describe("canSave", () => {
-  it("false when there are no tasks at all (Save should not enable on an empty call)", () => {
-    // A new call with zero tasks would otherwise pass every other gate
-    // because there's nothing to be under/over/missing-lead. Without an
-    // explicit empty-tasks guard, Save would let the admin "finalize"
-    // a call that has nothing to assign.
-    expect(canSave([], { under: 0, over: 0, noLead: 0 }, "exact")).toBe(false);
+  it("reports the counts line for over-filled tasks too", () => {
+    // Over-fill is still "not desired" — catches a regression that only
+    // warns on under and silently accepts extras.
+    expect(assignmentIssues({ under: 0, over: 1, noLead: 0 }, 5)).toEqual([
+      "⚠️ not all tasks have desired volunteers",
+    ]);
   });
-  it("true when both gates pass", () => {
-    const tasks = [task({ needed: 4, assigned: 4, team_lead_id: "lead-1" })];
-    expect(canSave(tasks, computeCounts(tasks), "exact")).toBe(true);
-  });
-  it("false when any task is missing a team lead, even if counts are fine", () => {
-    const tasks = [task({ needed: 4, assigned: 4, team_lead_id: null })];
-    expect(canSave(tasks, computeCounts(tasks), "over_under")).toBe(false);
-  });
-  it("false when counts violate, even with leads everywhere", () => {
-    const tasks = [task({ needed: 4, assigned: 2, team_lead_id: "lead-1" })];
-    expect(canSave(tasks, computeCounts(tasks), "exact")).toBe(false);
-  });
-});
 
-describe("gateMessage", () => {
-  it("team-lead failure takes precedence over counts-policy failure", () => {
-    // Pin the precedence the user specified: when both gates fail, the
-    // user should see the team-lead message first (it's actionable in a
-    // way the policy message isn't — they have to fix something either
-    // way, but the lead is concrete).
-    const msg = gateMessage({ under: 1, over: 0, noLead: 2 }, "exact");
-    expect(msg).toBe("Cannot close assignment: 2 tasks need a team lead");
+  it("lists the team-lead line first, then counts, when both apply", () => {
+    // Order matters: the popup shows these as two lines and the banner
+    // joins them — team-lead is the higher-priority, more concrete fix.
+    expect(assignmentIssues({ under: 1, over: 0, noLead: 2 }, 4)).toEqual([
+      "‼️ 2/4 tasks have no team lead",
+      "⚠️ not all tasks have desired volunteers",
+    ]);
   });
-  it("subject-verb agreement: singular 'task needs' for 1, plural 'tasks need' for >1", () => {
-    // Catches a regression to a naïve `${n} task${n === 1 ? '' : 's'}
-    // need` rendering, which produces 'tasks need' fine but '1 task need'
-    // (no 's' on the verb). The verb has to flip with the noun.
-    expect(gateMessage({ under: 0, over: 0, noLead: 1 }, "exact")).toBe(
-      "Cannot close assignment: 1 task needs a team lead",
-    );
-    expect(gateMessage({ under: 0, over: 0, noLead: 3 }, "exact")).toBe(
-      "Cannot close assignment: 3 tasks need a team lead",
-    );
-  });
-  it("falls back to the policy message when only counts violate", () => {
-    expect(gateMessage({ under: 1, over: 0, noLead: 0 }, "exact")).toBe(
-      `Tasks don't have desired volunteers`,
-    );
-    expect(gateMessage({ under: 1, over: 0, noLead: 0 }, "over")).toBe(
-      `Tasks don't have desired volunteers`,
-    );
-  });
-  it("returns an empty string when both gates pass (Message area 2 hides)", () => {
-    expect(gateMessage({ under: 0, over: 0, noLead: 0 }, "exact")).toBe("");
+
+  it("returns an empty array when everything is staffed", () => {
+    // Drives the 'no warning' path — a non-empty array here would pop a
+    // spurious confirmation at Send and a banner with nothing to say.
+    expect(assignmentIssues({ under: 0, over: 0, noLead: 0 }, 6)).toEqual([]);
   });
 });
