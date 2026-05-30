@@ -25,6 +25,7 @@ from volunteer_call_api.services.tokens import (
     TokenError,
     decode_token,
     issue_login_token,
+    issue_session_token,
 )
 
 logger = logging.getLogger(__name__)
@@ -33,15 +34,20 @@ GENERIC_LOGIN_MSG = "If {email} is registered, a login link has been sent."
 
 # Name of the HttpOnly session cookie set on /verify.
 SESSION_COOKIE = "session"
-# Cookie lifetime mirrors the JWT TTL — clients won't carry a longer
-# cookie than the token inside it is valid.
-SESSION_COOKIE_MAX_AGE = 60 * 60 * 24 * 14  # 14 days
+# Cookie lifetime mirrors the session-token TTL — clients won't carry a
+# longer cookie than the token inside it is valid.
+SESSION_COOKIE_MAX_AGE = 60 * 60 * 24 * settings.jwt_session_ttl_days
 
 router = APIRouter()
 
 
-def _set_session_cookie(request: Request, response: Response, token: str) -> None:
-    """Set the session JWT as an HttpOnly cookie.
+def _set_session_cookie(request: Request, response: Response, person_id: str) -> None:
+    """Mint a fresh session token for ``person_id`` and set it as an HttpOnly cookie.
+
+    The session token is minted here rather than reusing the inbound
+    magic-link/invite token: those are short-lived (a login link lives
+    ~10 minutes), but the session should last ``jwt_session_ttl_days``.
+    Storing the link token would expire the session with the link.
 
     SameSite=Lax is enough to block cross-site POST CSRF on cookie-only
     auth; a follow-up should add explicit CSRF tokens before any
@@ -51,7 +57,7 @@ def _set_session_cookie(request: Request, response: Response, token: str) -> Non
     """
     response.set_cookie(
         key=SESSION_COOKIE,
-        value=token,
+        value=issue_session_token(person_id),
         max_age=SESSION_COOKIE_MAX_AGE,
         httponly=True,
         secure=request.url.scheme == "https",
@@ -153,7 +159,7 @@ async def verify_magic_link(
 ) -> VerifyResponse:
     """Verify a magic-link/invite JWT, set the session cookie, return person + call context."""
     person, call_id = await _person_by_token(req.token, db)
-    _set_session_cookie(request, response, req.token)
+    _set_session_cookie(request, response, person.id)
     return VerifyResponse(person=_person_response(person), invited_call_id=call_id)
 
 
@@ -165,18 +171,35 @@ async def get_me(
     token: str | None = Query(default=None, min_length=1),
     session: str | None = Cookie(default=None),
 ) -> PersonResponse:
-    """Return the current user. Prefer the session cookie; fall back to the
-    legacy ``?token=`` query param so existing magic links still hydrate
-    when the cookie hasn't been set yet."""
-    raw = session or token
-    if not raw:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    person, _ = await _person_by_token(raw, db)
-    if token and not session:
-        # First hit via URL-token — set the cookie so subsequent requests
-        # don't need the URL credential.
-        _set_session_cookie(request, response, token)
-    return _person_response(person)
+    """Return the current user.
+
+    A *valid* ``?token=`` from a freshly clicked email link takes
+    precedence over an existing session cookie, so a new link always wins
+    (switching accounts, re-authenticating). When the URL token is used we
+    (re)mint the session cookie for that person, upgrading the short-lived
+    link into a normal-length session and dropping the need to carry the
+    URL credential on later requests.
+
+    An invalid or expired URL token does *not* clobber an existing
+    session — we fall back to the cookie rather than 401, so clicking a
+    stale link while already signed in doesn't sign you out.
+    """
+    if token is not None:
+        try:
+            decode_token(token)
+        except TokenError:
+            token = None  # fall through to the session cookie
+
+    if token is not None:
+        person, _ = await _person_by_token(token, db)
+        _set_session_cookie(request, response, person.id)
+        return _person_response(person)
+
+    if session is not None:
+        person, _ = await _person_by_token(session, db)
+        return _person_response(person)
+
+    raise HTTPException(status_code=401, detail="Not authenticated")
 
 
 @router.post("/logout")
