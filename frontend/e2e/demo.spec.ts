@@ -41,7 +41,6 @@ import {
   logout,
   narrate,
   pauseForUser,
-  pickComboboxByAriaLabel,
   pickTasks,
   scrollMailpitToHref,
   setMaxPerWeek,
@@ -289,39 +288,62 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
   await pauseForUser(page, "Spreadsheet view shown");
   await clickViewTab(page, "task");
 
-  // Walk through the completion-policy gate. Every task is at or above
-  // its volunteers_needed, but two were deliberately over-filled — so the
-  // default "exact" policy still blocks closing and the Done button is
-  // disabled. The demo narrates the gate, then the admin relaxes the
-  // policy to "Allow extra" and clicks Done.
+  // Close out the assignment phase. "Done Assigning" no longer gates on a
+  // completion policy — over-filling (and gaps) are allowed; the system
+  // warns rather than blocks. The two deliberate over-fills mean the call
+  // carries a "not all tasks have desired volunteers" warning that will
+  // resurface as a confirmation at send-time.
   await say(
-    "By default, can't close the assignment unless every task has exactly its requested volunteers.",
-    1500,
+    "Done Assigning is never blocked — over-fill or gaps are fine; the system warns instead of walling.",
+    1600,
   );
-  await say(
-    "But the admin can override — for example, allow extras if more volunteers would help.",
-    1500,
-  );
-  // Desired-policy picker is a Select.svelte combobox (feat/17); drive
-  // it through the trigger-then-option click flow.
-  await pickComboboxByAriaLabel(page, "Desired", "Allow extra").catch(() => {});
-  await pause(1000);
-  await say("Now Done Assigning is enabled — close the call.", 1600);
+  await say("Close the call — Done Assigning.", 1400);
   await clickWithCursor(page.locator("button:has-text('Done Assigning')"), {
     preMs: 500,
     postMs: 1500,
   });
 
   // ===========================================================================
-  // STEP 10: Send Assignments — show one assignment + one team-lead roster
+  // STEP 10: Send Assignments — confirm-before-send, then show one
+  // assignment + one team-lead roster
   // ===========================================================================
-  await page.goto(`${BASE_URL}/volunteer-calls`);
+  // "Done Assigning" client-navigates back to the calls list (carrying the
+  // transient warning banner). Wait for that nav rather than a hard reload,
+  // which would wipe the flash banner before it's seen.
+  await page
+    .waitForURL((url) => url.pathname === "/volunteer-calls", {
+      timeout: 10_000,
+    })
+    .catch(() => {});
   await pauseForUser(page, "Assignments finished — back on Calls");
   await say(
-    "Sending assignments. Volunteers get individual emails; team leads get rosters.",
+    "Back on the calls list — a warning flags that not every task has its exact headcount.",
     1800,
   );
+
+  // Deliberate beat before the consequential, outward-facing action.
+  await pauseForUser(page, "About to send assignments");
+  await say(
+    "Sending assignments — because of the over-fill, it double-checks first.",
+    1600,
+  );
   await clickCallAction(page, callId, "send_assignments");
+
+  // The in-app "Are you sure?" dialog now guards the send: it shows the
+  // same warning and lets the admin back out to edit. Confirm it (only if
+  // it appeared — a perfectly-staffed call sends without asking).
+  const sendConfirm = page.locator('dialog:has-text("Send assignments?")');
+  if (await sendConfirm.isVisible().catch(() => false)) {
+    await say(
+      "It confirms before emailing — the admin could still cancel and edit.",
+      1600,
+    );
+    await pauseForUser(page, "Send-assignments confirmation shown");
+    await clickWithCursor(page.locator("button:has-text('Send anyway')"), {
+      preMs: 400,
+      postMs: 1500,
+    });
+  }
   await pause(1000);
   await pauseForUser(page, "Assignment notifications sent");
 
