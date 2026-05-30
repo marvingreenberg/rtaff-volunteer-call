@@ -91,9 +91,6 @@ Neon (free tier) or Cloud SQL. Setup is staged across three docs:
    string, Secret Manager wiring, seeding.
 3. `docs/CLOUD_SQL.howto` — upgrade path from Neon to Cloud SQL.
 
-A CI/deploy workflow modelled on the parent rtaff project still needs to
-be ported (see `# todo.md`).
-
 ## Status
 
 Phase-1 implementation is in place: backend (FastAPI + SQLAlchemy +
