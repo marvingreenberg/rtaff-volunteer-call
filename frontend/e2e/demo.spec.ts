@@ -67,8 +67,6 @@ const BRYAN_PICK_INDICES = [0, 2, 6, 8];
 // timings are left at their unscaled values so the magic-link
 // interactions stay snappy.
 const DISPLAY_HOLD_MULTIPLIER = 2.5;
-const display = (ms: number): number =>
-  Math.round(ms * DISPLAY_HOLD_MULTIPLIER);
 
 test("RT-AFF volunteer-call demo", async ({ page }) => {
   // 20 minutes — long enough that manual-stepping pauses for discussion
@@ -81,8 +79,9 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
   // `say` and `pause` bake the display-hold multiplier into the two call
   // shapes that dominate this file. Local closures so they pick up `page`
   // without threading it through.
-  const say = (text: string, ms: number) => narrate(page, text, display(ms));
-  const pause = (ms: number) => sleep(display(ms));
+  const say = (text: string, ms: number) =>
+    narrate(page, text, ms * DISPLAY_HOLD_MULTIPLIER);
+  const pause = (ms: number) => sleep(ms * DISPLAY_HOLD_MULTIPLIER);
 
   // Register the narration overlay BEFORE any navigation so it re-attaches
   // automatically on every page load. Same for the click-ripple visualizer
@@ -111,7 +110,10 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
   await page.goto(`${BASE_URL}/volunteer-calls`);
   await page.waitForSelector(".calls-page");
   await say("Don creates a new volunteer call.", 1500);
-  await clickWithCursor(page.locator("text=New Call"), { postMs: 600 });
+  await clickWithCursor(page.locator("text=New Call"), {
+    postMs: 600,
+    preMs: 500,
+  });
 
   const callTitle = `Call for Volunteers ${suggestCallTitle("RTX")}`;
   await page.fill('input[placeholder*="Spring NRD"]', callTitle);
@@ -156,7 +158,7 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
   await bulkAddTasks(callId, 9, 2);
   await page.reload();
   await page.waitForSelector(".call-detail, .task-row, table");
-  await pause(1500);
+  await pause(1000);
 
   // ===========================================================================
   // STEP 4 + 5: Send the call (transitions open → waiting; invites go out)
@@ -165,7 +167,7 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
   await page.waitForSelector(".calls-page");
   await say("Don sends the call out to volunteers.", 2000);
   await clickCallAction(page, callId, "send_invites");
-  await pause(2000);
+  await pause(1000);
   await pauseForUser(page, "Call sent — invites going out");
 
   // Don's role in this scene is done — log him out, then narrate over the
@@ -176,7 +178,7 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
 
   await showMailpitInbox(page);
   await say("Every active volunteer gets an email — here's the outbox.", 2400);
-  await pause(4000);
+  await pause(1500);
 
   // Zoom in on Vick's invite specifically, then scroll the panel to the
   // verify button before navigating away.
@@ -185,7 +187,7 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
     2800,
   );
   const inviteMsg = await showEmailFor(api, page, VICK, /invite|call/i);
-  await pause(3500);
+  await pause(1000);
   await pauseForUser(page, "Vick's invite shown");
 
   // ===========================================================================
@@ -227,7 +229,7 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
   await page.waitForSelector("text=/Volunteer|Open Volunteer Calls/i");
   await say(
     "Bryan picks a couple of projects in week 1, then a couple more in week 2.",
-    1800,
+    1500,
   );
   await pickTasks(page, BRYAN_PICK_INDICES, LIVE_PICK_DELAY_MS);
   await submitAvailability(page);
@@ -240,7 +242,7 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
   await page.goto(`${BASE_URL}/login`);
   await say(
     "Selection continues for the remaining tasks (23 more volunteers respond).",
-    2200,
+    1500,
   );
   await bulkRespondAvailability(callId, 23);
 
@@ -253,18 +255,19 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
   await say("Don opens the Assignment Dashboard, now full of responses.", 2000);
   await clickCallAction(page, callId, "assign");
   await page.waitForURL(/\/assign/);
-  await pause(2500);
+  await pause(1500);
   await pauseForUser(page, "Assignment pane open");
 
   // Auto-pick team leads — clears the "9 tasks need a team lead" gate in
   // one click using the new endpoint.
   await say("Auto-assign all the team leads (for the demo).", 2400);
   await clickWithCursor(page.locator("button.auto-leads-btn"), {
-    postMs: display(2500),
+    preMs: 500,
+    postMs: 2500,
   });
 
   // Assign volunteers task-by-task. Two cards get a deliberate over-fill
-  // to surface the "Extra!" / 🥵 state.
+  // to surface the "Extra!" state.
   await say(
     "Volunteers are assigned task by task — prioritize idle (😴) and skilled (🛠️) where available.",
     1600,
@@ -280,13 +283,11 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
   // assignment phase — same data, all-tasks-at-once matrix.
   await say(
     "There's also an alternate spreadsheet view showing every volunteer × task at once.",
-    2400,
+    800,
   );
   await clickViewTab(page, "spreadsheet");
-  await pause(3500);
   await pauseForUser(page, "Spreadsheet view shown");
   await clickViewTab(page, "task");
-  await pause(800);
 
   // Walk through the completion-policy gate. Every task is at or above
   // its volunteers_needed, but two were deliberately over-filled — so the
@@ -295,12 +296,11 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
   // policy to "Allow extra" and clicks Done.
   await say(
     "By default, can't close the assignment unless every task has exactly its requested volunteers.",
-    2600,
+    1500,
   );
-  await pause(800);
   await say(
     "But the admin can override — for example, allow extras if more volunteers would help.",
-    2400,
+    1500,
   );
   // Desired-policy picker is a Select.svelte combobox (feat/17); drive
   // it through the trigger-then-option click flow.
@@ -308,7 +308,8 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
   await pause(1000);
   await say("Now Done Assigning is enabled — close the call.", 1600);
   await clickWithCursor(page.locator("button:has-text('Done Assigning')"), {
-    postMs: display(1500),
+    preMs: 500,
+    postMs: 1500,
   });
 
   // ===========================================================================
@@ -318,10 +319,10 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
   await pauseForUser(page, "Assignments finished — back on Calls");
   await say(
     "Sending assignments. Volunteers get individual emails; team leads get rosters.",
-    2400,
+    1800,
   );
   await clickCallAction(page, callId, "send_assignments");
-  await pause(2500);
+  await pause(1000);
   await pauseForUser(page, "Assignment notifications sent");
 
   // Best-effort peek at Vick's assignment email + a team-lead roster
@@ -332,14 +333,14 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
     pause,
     "Here's Vick's individual assignment email.",
     () => showEmailFor(api, page, VICK, /assign|task/i),
-    4000,
+    2000,
   );
   await peekEmail(
     say,
     pause,
     "And here's what a team lead gets — the full roster for their task.",
     () => showEmailMatching(api, page, /^Your team for /i),
-    4500,
+    2000,
   );
   await pauseForUser(page, "Assignment emails reviewed");
 
@@ -349,7 +350,7 @@ test("RT-AFF volunteer-call demo", async ({ page }) => {
   await logout(page);
   await loginViaMagicLink(page, api, VICK, { showInMailpit: false });
   await say("Vick logs in and sees his assignment(s).", 2500);
-  await pause(3000);
+  await pause(2500);
 });
 
 // ---------------------------------------------------------------------------

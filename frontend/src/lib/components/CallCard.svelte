@@ -76,12 +76,12 @@
   }
   .call-meta {
     margin-left: auto;
-    font-size: var(--font-size-xs);
+    font-size: var(--font-size-sm);
     color: var(--rt-text-muted);
     background: var(--surface-3);
     padding: 4px 10px;
     border-radius: var(--radius-pill);
-    font-weight: 600;
+    font-weight: 700;
   }
   .call-controls {
     display: flex;

@@ -679,28 +679,34 @@ export async function clickWithCursor(
 }
 
 /**
- * Tick task rows on the /volunteering page with a deliberate "scroll,
+ * Tick task checkboxes on the /volunteering page with a deliberate "scroll,
  * hover-then-click" rhythm so the recording reads as a human picking.
- * Pass `"all"` to tick every row, or an explicit list of 0-based indices.
- * Returns the number of rows actually ticked.
+ * Pass `"all"` to tick every task, or an explicit list of 0-based indices.
+ * Returns the number of tasks actually ticked.
+ *
+ * The redesign exposes one checkbox per task in either list view: the
+ * pill/card view (default) renders `input.task-check` inside each TaskRow,
+ * the table view renders a plain checkbox inside `.check-cell`. We target
+ * the checkbox directly (not the row) — in pill view a row-body click only
+ * toggles expansion; the checkbox is what toggles selection.
  */
 export async function pickTasks(
   page: Page,
   which: number[] | "all",
   delayMs: number,
 ): Promise<number> {
-  const rows = page.locator(".task-row");
-  const total = await rows.count();
+  const checkboxes = page.locator(
+    '.task-check, .check-cell input[type="checkbox"]',
+  );
+  const total = await checkboxes.count();
   const targets =
     which === "all"
       ? Array.from({ length: total }, (_, i) => i)
       : which.filter((i) => i >= 0 && i < total);
   for (const idx of targets) {
-    const row = rows.nth(idx);
-    await row.scrollIntoViewIfNeeded().catch(() => {});
-    await clickWithCursor(row.locator('input[type="checkbox"]'), {
-      postMs: delayMs,
-    });
+    const box = checkboxes.nth(idx);
+    await box.scrollIntoViewIfNeeded().catch(() => {});
+    await clickWithCursor(box, { postMs: delayMs });
   }
   return targets.length;
 }
@@ -794,6 +800,29 @@ export function bulkRespondAvailability(
     "--count",
     String(count),
   ]);
+}
+
+/**
+ * Create a WAITING call with `count` scheduled tasks, in a program the
+ * given volunteer actively belongs to (so it shows on their /volunteering
+ * page). Returns the new call id. Used by specs that need a populated
+ * volunteer page on a fresh seed, which ships no waiting calls.
+ */
+export function bulkCreateCall(
+  volunteerEmail: string,
+  count: number,
+): Promise<string> {
+  return runBulk([
+    "create-call",
+    "--volunteer-email",
+    volunteerEmail,
+    "--count",
+    String(count),
+  ]);
+}
+
+export function bulkDeleteCall(callId: string): Promise<string> {
+  return runBulk(["delete-call", "--call-id", callId]);
 }
 
 // ---------------------------------------------------------------------------

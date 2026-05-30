@@ -19,12 +19,14 @@ from sqlalchemy import select
 
 from volunteer_call_api.database import async_session_factory
 from volunteer_call_api.models import (
+    CallStatus,
     Person,
     PersonRole,
     RoleType,
     Task,
     VolunteerAvailability,
     VolunteerCall,
+    VolunteerProgram,
 )
 
 ADDRESS_POOL: list[tuple[str, str]] = [
@@ -164,6 +166,64 @@ async def _add_tasks(call_id: str, count: int, offset: int) -> int:
         return count
 
 
+async def _create_call(volunteer_email: str, count: int, title: str) -> str:
+    """Create a WAITING call with `count` scheduled tasks in a program the
+    given volunteer actively belongs to, so the call is visible on that
+    volunteer's /volunteering page. Returns the new call id.
+
+    The program is derived from the volunteer's membership rather than
+    hard-coded: a volunteer only sees calls for programs they're an active
+    member of (see `list_volunteer_calls`), so picking the call's program
+    any other way risks an invisible-to-them call.
+    """
+    async with async_session_factory() as session:
+        person_rows = await session.execute(
+            select(Person).where(Person.email == volunteer_email)
+        )
+        person = person_rows.scalars().first()
+        if person is None:
+            raise click.ClickException(f"No person with email {volunteer_email}")
+
+        membership_rows = await session.execute(
+            select(VolunteerProgram).where(
+                VolunteerProgram.person_id == person.id,
+                VolunteerProgram.active.is_(True),
+            )
+        )
+        membership = membership_rows.scalars().first()
+        if membership is None:
+            raise click.ClickException(
+                f"{volunteer_email} has no active program membership; "
+                "a call they would see can't be created."
+            )
+
+        call = VolunteerCall(
+            title=title,
+            program=membership.program,
+            status=CallStatus.WAITING,
+        )
+        session.add(call)
+        await session.commit()
+        call_id: str = call.id
+
+    # Reuse the task seeder so the call's tasks are scheduled the same way
+    # the demo schedules them (required for the call to be a valid WAITING
+    # call — every task carries a date).
+    await _add_tasks(call_id, count, 0)
+    return call_id
+
+
+async def _delete_call(call_id: str) -> None:
+    async with async_session_factory() as session:
+        call = await session.get(VolunteerCall, call_id)
+        if call is None:
+            # Idempotent: deleting an already-absent call is a no-op so
+            # test cleanup never fails the run.
+            return
+        await session.delete(call)
+        await session.commit()
+
+
 async def _respond_availability(call_id: str, count: int) -> int:
     async with async_session_factory() as session:
         call = await session.get(VolunteerCall, call_id)
@@ -225,6 +285,33 @@ async def _respond_availability(call_id: str, count: int) -> int:
 
         await session.commit()
         return len(picks)
+
+
+@cli.command("create-call")
+@click.option(
+    "--volunteer-email",
+    required=True,
+    help="Email of a volunteer the call must be visible to; the call's "
+    "program is taken from this person's active membership.",
+)
+@click.option("--count", type=int, default=3, show_default=True, help="Scheduled tasks to add")
+@click.option("--title", default="Smoke-test Volunteer Call", show_default=True)
+def create_call_cmd(volunteer_email: str, count: int, title: str) -> None:
+    """Create a WAITING call with scheduled tasks, visible to a volunteer.
+
+    Used by e2e specs that need a populated /volunteering page on a fresh
+    seed (which contains no waiting calls). Echoes only the new call id so
+    callers can capture it from stdout."""
+    call_id = asyncio.run(_create_call(volunteer_email, count, title))
+    click.echo(call_id)
+
+
+@cli.command("delete-call")
+@click.option("--call-id", required=True, help="VolunteerCall.id to delete (cascades)")
+def delete_call_cmd(call_id: str) -> None:
+    """Delete a call and its tasks/availabilities. No-op if already gone."""
+    asyncio.run(_delete_call(call_id))
+    click.echo(f"Deleted call {call_id}.")
 
 
 @cli.command("add-tasks")
