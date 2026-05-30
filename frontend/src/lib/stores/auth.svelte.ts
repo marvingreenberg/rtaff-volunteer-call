@@ -94,10 +94,18 @@ export async function initFromToken(
   authState.error = null;
 
   try {
-    const person = await authApi.me(urlToken ?? undefined);
-    authState.user = person;
+    const ctx = await authApi.me(urlToken ?? undefined);
+    authState.user = ctx.person;
+    // Capture the invite deep-link target when present. Only overwrite on a
+    // non-null value: an invite link triggers two hydrations (layout, then
+    // the /volunteering page), and the second often resolves via the
+    // freshly-set cookie — which carries no call_id. Guarding here keeps
+    // the id captured by the first hydration alive for consumeInvitedCallId.
+    if (ctx.invited_call_id) {
+      _invitedCallId = ctx.invited_call_id;
+    }
     authState.loading = false;
-    return person;
+    return ctx.person;
   } catch {
     if (urlToken) {
       authState.error =

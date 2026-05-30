@@ -30,7 +30,10 @@ beforeEach(() => {
 
 describe("initFromToken", () => {
   it("hits /auth/me with no token when cookie should already be present", async () => {
-    vi.mocked(auth.me).mockResolvedValue({ id: "p1" } as any);
+    vi.mocked(auth.me).mockResolvedValue({
+      person: { id: "p1" },
+      invited_call_id: null,
+    } as any);
     const result = await initFromToken(null);
     expect(auth.me).toHaveBeenCalledWith(undefined);
     expect(result).toEqual({ id: "p1" });
@@ -38,10 +41,42 @@ describe("initFromToken", () => {
   });
 
   it("passes urlToken to /auth/me to bootstrap the cookie", async () => {
-    vi.mocked(auth.me).mockResolvedValue({ id: "p1" } as any);
+    vi.mocked(auth.me).mockResolvedValue({
+      person: { id: "p1" },
+      invited_call_id: null,
+    } as any);
     await initFromToken("magic-link-token");
     expect(auth.me).toHaveBeenCalledWith("magic-link-token");
     expect(authState.user).toEqual({ id: "p1" });
+  });
+
+  it("captures invited_call_id from /auth/me for the /volunteering deep-link", async () => {
+    // The invite path hydrates via /me (not /verify). Catches the gap
+    // where /me never surfaced the call binding, so consumeInvitedCallId
+    // returned null and the page couldn't scroll to the invited call.
+    vi.mocked(auth.me).mockResolvedValue({
+      person: { id: "p1" },
+      invited_call_id: "call-99",
+    } as any);
+    await initFromToken("invite-token");
+    expect(consumeInvitedCallId()).toBe("call-99");
+  });
+
+  it("does not clobber a captured invited_call_id on a later cookie-only hydrate", async () => {
+    // An invite link triggers two hydrations; the second resolves via the
+    // freshly-set cookie, which carries no call_id. Catches a regression
+    // where that null overwrites the id before the page consumes it.
+    vi.mocked(auth.me).mockResolvedValueOnce({
+      person: { id: "p1" },
+      invited_call_id: "call-99",
+    } as any);
+    await initFromToken("invite-token");
+    vi.mocked(auth.me).mockResolvedValueOnce({
+      person: { id: "p1" },
+      invited_call_id: null,
+    } as any);
+    await initFromToken("invite-token");
+    expect(consumeInvitedCallId()).toBe("call-99");
   });
 
   it("sets error only when a urlToken was supplied and rejected", async () => {

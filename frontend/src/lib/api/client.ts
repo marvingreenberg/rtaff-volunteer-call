@@ -33,6 +33,7 @@ import type {
   LoginResponse,
   VerifyRequest,
   VerifyResponse,
+  AuthContextResponse,
   MyAssignment,
   NotificationResponse,
   Program,
@@ -121,14 +122,15 @@ export const auth = {
     }),
 
   /**
-   * Hydrate the current user from the session cookie. Pass `urlToken` to
-   * also bootstrap the cookie from a magic-link / invite token in the URL
-   * (the backend will set the cookie on first hit). Returns null if no
-   * session.
+   * Hydrate the current auth context from the session cookie. Pass
+   * `urlToken` to also bootstrap the cookie from a magic-link / invite
+   * token in the URL (the backend will set the cookie on first hit). When
+   * the token is an invite token the response carries `invited_call_id`
+   * for the /volunteering deep-link.
    */
   me: (urlToken?: string | null) => {
     const qs = urlToken ? `?token=${encodeURIComponent(urlToken)}` : "";
-    return request<PersonResponse>(`/auth/me${qs}`);
+    return request<AuthContextResponse>(`/auth/me${qs}`);
   },
 
   logout: () =>

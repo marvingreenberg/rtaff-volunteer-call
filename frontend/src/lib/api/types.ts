@@ -17,10 +17,19 @@ export interface VerifyRequest {
   token: string;
 }
 
-export interface VerifyResponse {
+/**
+ * Current-auth context returned by both `POST /auth/verify` and
+ * `GET /auth/me`. `invited_call_id` is set when the presented token is an
+ * invite token, so the /volunteering deep-link works whether the user
+ * arrives via /verify or hydrates straight from /me.
+ */
+export interface AuthContextResponse {
   person: PersonResponse;
   invited_call_id: string | null;
 }
+
+// /verify keeps its descriptive name; same shape.
+export type VerifyResponse = AuthContextResponse;
 
 // --- People ---
 

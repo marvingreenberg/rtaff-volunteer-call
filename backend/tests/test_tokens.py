@@ -160,7 +160,33 @@ async def test_me_endpoint_uses_cookie_when_no_query_token(
     # Subsequent /me request carries only the cookie — no ?token=.
     me_resp = await client.get("/api/auth/me")
     assert me_resp.status_code == 200, me_resp.text
-    assert me_resp.json()["id"] == person.id
+    body = me_resp.json()
+    assert body["person"]["id"] == person.id
+    # A login/session token carries no call binding.
+    assert body["invited_call_id"] is None
+
+
+@pytest.mark.asyncio
+async def test_me_endpoint_returns_invited_call_id_for_invite_token(
+    client: AsyncClient, db: AsyncSession
+) -> None:
+    """An invite token presented to /me surfaces its call binding so the
+    /volunteering deep-link works on the path that hydrates via /me (not
+    /verify).
+
+    Catches a regression where get_me discards the decoded call_id (the
+    original ``person, _ = ...``), leaving the invite link unable to scroll
+    to its call.
+    """
+    person = await _seed_person(db)
+    call = await _seed_call(db)
+    invite = issue_invite_token(person.id, call.id)
+
+    resp = await client.get(f"/api/auth/me?token={invite}")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["person"]["id"] == person.id
+    assert body["invited_call_id"] == call.id
 
 
 @pytest.mark.asyncio

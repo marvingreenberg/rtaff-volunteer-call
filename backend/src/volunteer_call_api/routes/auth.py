@@ -11,12 +11,12 @@ from volunteer_call_api.database import get_db
 from volunteer_call_api.models.person import Person, PersonLoginAlias
 from volunteer_call_api.routes.people import PERSON_LOAD_OPTIONS, _person_response
 from volunteer_call_api.schemas.auth import (
+    AuthContextResponse,
     LoginRequest,
     LoginResponse,
     VerifyRequest,
     VerifyResponse,
 )
-from volunteer_call_api.schemas.person import PersonResponse
 from volunteer_call_api.services.email import send_email
 from volunteer_call_api.services.email_render import jinja_env
 from volunteer_call_api.services.login_throttle import login_throttle
@@ -157,26 +157,32 @@ async def verify_magic_link(
     return VerifyResponse(person=_person_response(person), invited_call_id=call_id)
 
 
-@router.get("/me", response_model=PersonResponse)
+@router.get("/me", response_model=AuthContextResponse)
 async def get_me(
     request: Request,
     response: Response,
     db: AsyncSession = Depends(get_db),
     token: str | None = Query(default=None, min_length=1),
     session: str | None = Cookie(default=None),
-) -> PersonResponse:
-    """Return the current user. Prefer the session cookie; fall back to the
-    legacy ``?token=`` query param so existing magic links still hydrate
-    when the cookie hasn't been set yet."""
+) -> AuthContextResponse:
+    """Return the current auth context. Prefer the session cookie; fall back
+    to the ``?token=`` query param so a magic-link / invite token still
+    hydrates when the cookie hasn't been set yet.
+
+    ``invited_call_id`` carries the deep-link target when the presented
+    token is an invite token, so an invite link landing on /volunteering
+    (which hydrates via this endpoint, not /verify) can still scroll to the
+    right call.
+    """
     raw = session or token
     if not raw:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    person, _ = await _person_by_token(raw, db)
+    person, call_id = await _person_by_token(raw, db)
     if token and not session:
         # First hit via URL-token — set the cookie so subsequent requests
         # don't need the URL credential.
         _set_session_cookie(request, response, token)
-    return _person_response(person)
+    return AuthContextResponse(person=_person_response(person), invited_call_id=call_id)
 
 
 @router.post("/logout")
