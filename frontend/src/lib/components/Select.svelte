@@ -239,9 +239,16 @@
           aria-selected={i === selectedIdx}
           data-idx={i}
           onclick={(e) => {
-            // Stop propagation so an enclosing <label> doesn't forward
-            // a synthetic click to the labeled trigger button, which
-            // would immediately re-open the popup we just closed.
+            // An enclosing <label> (the policy picker, week-cap pickers,
+            // City field, …) natively forwards a click on any descendant
+            // to its first labelable control — our trigger button — which
+            // would re-open the popup we just committed. That forward is
+            // the click's *default action*, so stopPropagation does NOT
+            // cancel it (confirmed in Chromium); preventDefault does. Keep
+            // both: preventDefault kills the label re-forward,
+            // stopPropagation keeps the document outside-click handler
+            // from also firing on this same click.
+            e.preventDefault();
             e.stopPropagation();
             commit(i);
           }}
