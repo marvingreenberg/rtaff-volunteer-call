@@ -1,13 +1,14 @@
 /**
- * Pure helpers backing the /assign page's top-bar gating logic.
+ * Pure helpers backing the /assign page's header + the Send-Assignments
+ * confirmation. Kept out of the Svelte route component so the under/over/
+ * team-lead reckoning can be tested directly without the SvelteKit runtime.
  *
- * Kept out of the Svelte route component so the under/over/team-lead +
- * policy decisions can be tested directly without the SvelteKit runtime.
+ * The assignment phase no longer *blocks* on these conditions — they're
+ * surfaced as warnings (header callout, calls-list banner, and an
+ * "Are you sure?" confirmation at Send) rather than gating "Done Assigning".
  */
 
-import { type AssignmentPolicy } from "$lib/api/types";
-
-/** Subset of `TaskOverviewItem` that the gate cares about. */
+/** Subset of `TaskOverviewItem` that the warnings care about. */
 export interface PolicyTask {
   assignments: { assignment_id: string }[];
   volunteers_needed: number;
@@ -19,6 +20,10 @@ export interface PolicyCounts {
   over: number;
   noLead: number;
 }
+
+// Emoji prefixes for the two warning lines (per the agreed message format).
+const TEAM_LEAD_ICON = "‼️";
+const COUNTS_ICON = "⚠️";
 
 export function computeCounts(tasks: PolicyTask[]): PolicyCounts {
   let under = 0;
@@ -33,57 +38,28 @@ export function computeCounts(tasks: PolicyTask[]): PolicyCounts {
 }
 
 /**
- * Message for the top-bar's *counts* slot (Message area 1).
- * Reporting "fewer" overrides reporting "extra" per the user's spec.
+ * Human-readable warning lines for the current assignment state. Returns
+ * one entry per outstanding issue, in priority order (team-lead first):
+ *
+ *   ‼️ {noLead}/{totalTasks} tasks have no team lead
+ *   ⚠️ not all tasks have desired volunteers
+ *
+ * Empty array when everything is staffed. Callers join with a space for a
+ * single-line message (header / banner) or with "\n" for the two-line
+ * confirmation popup.
  */
-export function countsMessage(counts: PolicyCounts): string {
-  if (counts.under > 0)
-    return "Some tasks have fewer than requested volunteers.";
-  if (counts.over > 0) return "Some tasks have extra volunteers.";
-  return "All tasks have requested volunteers.";
-}
-
-export function countsViolatePolicy(
+export function assignmentIssues(
   counts: PolicyCounts,
-  policy: AssignmentPolicy,
-): boolean {
-  if (policy === "exact") return counts.under > 0 || counts.over > 0;
-  if (policy === "over") return counts.under > 0;
-  return false; // over_under
-}
-
-/**
- * The Save button's enabled state. Requires at least one task and both
- * gates (team-lead + counts/policy) to pass.
- */
-export function canSave(
-  tasks: PolicyTask[],
-  counts: PolicyCounts,
-  policy: AssignmentPolicy,
-): boolean {
-  return (
-    tasks.length > 0 &&
-    counts.noLead === 0 &&
-    !countsViolatePolicy(counts, policy)
-  );
-}
-
-/**
- * Text for the gate-failure slot (Message area 2). Empty string when
- * the Save button is enabled. Team-lead failure takes precedence over
- * the counts-policy failure when both fail.
- */
-export function gateMessage(
-  counts: PolicyCounts,
-  policy: AssignmentPolicy,
-): string {
+  totalTasks: number,
+): string[] {
+  const lines: string[] = [];
   if (counts.noLead > 0) {
-    const phrase =
-      counts.noLead === 1 ? "1 task needs" : `${counts.noLead} tasks need`;
-    return `Cannot close assignment: ${phrase} a team lead`;
+    lines.push(
+      `${TEAM_LEAD_ICON} ${counts.noLead}/${totalTasks} tasks have no team lead`,
+    );
   }
-  if (countsViolatePolicy(counts, policy)) {
-    return `Tasks don't have desired volunteers`;
+  if (counts.under > 0 || counts.over > 0) {
+    lines.push(`${COUNTS_ICON} not all tasks have desired volunteers`);
   }
-  return "";
+  return lines;
 }

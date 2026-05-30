@@ -122,6 +122,9 @@
     margin: 0 0 var(--sp-5) 0;
     color: var(--rt-text);
     line-height: 1.55;
+    /* Bodies may carry literal "\n" (e.g. the multi-line assignment
+       warning) — render those as real line breaks. */
+    white-space: pre-line;
   }
   .actions {
     display: flex;
