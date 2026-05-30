@@ -1,15 +1,22 @@
 """Signed-JWT auth tokens.
 
-Two token shapes share one signing key:
+Three token shapes share one signing key:
 
 - ``login`` — issued by ``POST /auth/login``; carries only the person id.
+  Short-lived (``settings.jwt_login_ttl_minutes``) — it only has to
+  survive the trip from inbox to first click.
 - ``invite`` — issued when a volunteer call's invites go out; carries
   ``person_id`` and ``call_id`` so the frontend can deep-link to the call
-  the email was about.
+  the email was about. Longer-lived (``settings.jwt_invite_ttl_days``)
+  since recipients may click days later.
+- ``session`` — minted on successful verification and stored in the
+  HttpOnly session cookie. Decoupled from the link TTLs
+  (``settings.jwt_session_ttl_days``) so a short magic link still
+  establishes a normal-length session.
 
 The token is the credential. There is no DB-side state — verification is
 purely a signature check plus an expiry check, so revocation is bounded
-by the TTL (default 14 days, see ``settings.jwt_ttl_days``).
+by the TTL.
 """
 
 from __future__ import annotations
@@ -24,7 +31,7 @@ from volunteer_call_api.config import settings
 
 ALGORITHM = "HS256"
 
-TokenType = Literal["login", "invite"]
+TokenType = Literal["login", "invite", "session"]
 
 
 class TokenError(Exception):
@@ -54,21 +61,29 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _issue(payload: dict[str, object], ttl: timedelta | None) -> str:
+def _issue(payload: dict[str, object], ttl: timedelta) -> str:
     now = _now()
-    exp = now + (ttl if ttl is not None else timedelta(days=settings.jwt_ttl_days))
+    exp = now + ttl
     payload = {**payload, "iat": int(now.timestamp()), "exp": int(exp.timestamp())}
     return jwt.encode(payload, settings.jwt_secret, algorithm=ALGORITHM)
 
 
 def issue_login_token(person_id: str, ttl: timedelta | None = None) -> str:
-    """Token for the email-magic-link login flow. No call binding."""
+    """Short-lived token for the email-magic-link login flow. No call binding."""
+    ttl = ttl if ttl is not None else timedelta(minutes=settings.jwt_login_ttl_minutes)
     return _issue({"sub": person_id, "typ": "login"}, ttl)
 
 
 def issue_invite_token(person_id: str, call_id: str, ttl: timedelta | None = None) -> str:
     """Token for a volunteer-call invite email. Carries the call id."""
+    ttl = ttl if ttl is not None else timedelta(days=settings.jwt_invite_ttl_days)
     return _issue({"sub": person_id, "typ": "invite", "call_id": call_id}, ttl)
+
+
+def issue_session_token(person_id: str, ttl: timedelta | None = None) -> str:
+    """Longer-lived session token stored in the cookie after verification."""
+    ttl = ttl if ttl is not None else timedelta(days=settings.jwt_session_ttl_days)
+    return _issue({"sub": person_id, "typ": "session"}, ttl)
 
 
 def decode_token(token: str) -> TokenClaims:
@@ -87,7 +102,7 @@ def decode_token(token: str) -> TokenClaims:
 
     sub = payload.get("sub")
     typ = payload.get("typ")
-    if not isinstance(sub, str) or typ not in ("login", "invite"):
+    if not isinstance(sub, str) or typ not in ("login", "invite", "session"):
         raise TokenInvalid("Missing or invalid sub/typ")
 
     call_id = payload.get("call_id")

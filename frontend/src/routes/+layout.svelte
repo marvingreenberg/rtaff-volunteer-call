@@ -2,9 +2,10 @@
   import "../app.css";
   import { onMount, onDestroy } from 'svelte';
   import { page } from '$app/state';
-  import { goto } from '$app/navigation';
+  import { goto, replaceState } from '$app/navigation';
   import type { Snippet } from 'svelte';
   import { loadSettings } from '$lib/stores/settings.svelte';
+  import { hasToken, urlWithoutToken } from '$lib/utils/auth-url';
   import { authState, initFromToken, logout } from '$lib/stores/auth.svelte';
   import AvatarMenu from '$lib/components/AvatarMenu.svelte';
   import ConfirmDialogHost from '$lib/components/ConfirmDialogHost.svelte';
@@ -44,6 +45,13 @@
   onMount(async () => {
     loadSettings();
     await initFromToken(page.url.searchParams.get('token'));
+    // The magic-link/invite JWT arrived in the URL. The session is now
+    // established (cookie set by the backend), so scrub the token from the
+    // address bar and history — it shouldn't linger as a visible
+    // credential. replaceState (not goto) so Back can't return to it.
+    if (hasToken(page.url)) {
+      replaceState(urlWithoutToken(page.url), {});
+    }
     if (authState.user) {
       if (isAuthPage || currentPath === '/verify') {
         const roles = authState.user.roles;

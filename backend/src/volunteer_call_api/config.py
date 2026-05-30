@@ -22,8 +22,17 @@ class Settings(BaseSettings):
     # in production via env var. The dev default is fine for local work but
     # tokens issued against it are obviously not safe to ship.
     jwt_secret: str = "dev-jwt-secret-change-me"
-    # Lifetime for magic-link and invite tokens.
-    jwt_ttl_days: int = 14
+    # Login magic links are short-lived: they only need to survive the
+    # round-trip from inbox to first click. Once verified, a separate,
+    # longer-lived session token (below) is minted for the cookie.
+    jwt_login_ttl_minutes: int = 10
+    # Invite links are emailed about a specific call and may be clicked
+    # days after they're sent, so they keep a longer lifetime.
+    jwt_invite_ttl_days: int = 14
+    # Lifetime of the session token stored in the HttpOnly cookie after a
+    # successful magic-link/invite verification. Decoupled from the link
+    # TTLs so shortening a magic link doesn't shorten the session.
+    jwt_session_ttl_days: int = 14
 
     # SMS provider. "stub" logs the outbound message; "disabled" silently
     # drops it. Real provider integration (Twilio etc.) will land as a

@@ -50,7 +50,12 @@ from volunteer_call_api.services.tokens import (
     decode_token,
     issue_invite_token,
     issue_login_token,
+    issue_session_token,
 )
+
+# Tolerance (seconds) when asserting a token's lifetime — covers the few
+# milliseconds between minting and decoding inside a test.
+TTL_TOLERANCE_SECONDS = 5
 
 # --- Unit tests for the token service ---
 
@@ -68,6 +73,44 @@ def test_invite_token_carries_call_id() -> None:
     claims = decode_token(token)
     assert claims.token_type == "invite"
     assert claims.call_id == "call-7"
+
+
+def _ttl_seconds(token: str) -> float:
+    claims = decode_token(token)
+    return (claims.expires_at - claims.issued_at).total_seconds()
+
+
+def test_login_token_default_ttl_is_short() -> None:
+    """Login magic links must be short-lived (~jwt_login_ttl_minutes).
+
+    Catches a regression that leaves login links on the old 14-day TTL,
+    defeating the whole point of the short magic-link window.
+    """
+    expected = settings.jwt_login_ttl_minutes * 60
+    assert abs(_ttl_seconds(issue_login_token("p")) - expected) < TTL_TOLERANCE_SECONDS
+
+
+def test_invite_token_default_ttl_is_long() -> None:
+    """Invite links keep a multi-day TTL — recipients click days later.
+
+    Catches accidentally applying the 10-minute login window to invites.
+    """
+    expected = settings.jwt_invite_ttl_days * 24 * 60 * 60
+    assert abs(_ttl_seconds(issue_invite_token("p", "c")) - expected) < TTL_TOLERANCE_SECONDS
+
+
+def test_session_token_round_trip_and_ttl() -> None:
+    """Session tokens decode with typ=session and the session TTL.
+
+    Catches forgetting ``"session"`` in ``decode_token``'s allow-list, and
+    a regression that mints the session with a link-length TTL.
+    """
+    token = issue_session_token("person-1")
+    claims = decode_token(token)
+    assert claims.token_type == "session"
+    assert claims.call_id is None
+    expected = settings.jwt_session_ttl_days * 24 * 60 * 60
+    assert abs(_ttl_seconds(token) - expected) < TTL_TOLERANCE_SECONDS
 
 
 def test_expired_token_raises_token_expired() -> None:
@@ -187,6 +230,93 @@ async def test_me_endpoint_returns_invited_call_id_for_invite_token(
     body = resp.json()
     assert body["person"]["id"] == person.id
     assert body["invited_call_id"] == call.id
+
+
+@pytest.mark.asyncio
+async def test_verify_sets_session_token_cookie_not_the_link_token(
+    client: AsyncClient, db: AsyncSession
+) -> None:
+    """The cookie set by /verify is a long-lived *session* token, not the
+    short login token that was clicked.
+
+    Catches a regression to storing the inbound magic-link token in the
+    cookie: with the 10-minute login TTL that would log the user out
+    minutes after login.
+    """
+    person = await _seed_person(db)
+    login_token = issue_login_token(person.id)
+    resp = await client.post("/api/auth/verify", json={"token": login_token})
+    assert resp.status_code == 200, resp.text
+
+    cookie_value = client.cookies.get("session")
+    assert cookie_value is not None
+    assert cookie_value != login_token
+    claims = decode_token(cookie_value)
+    assert claims.token_type == "session"
+    expected = settings.jwt_session_ttl_days * 24 * 60 * 60
+    assert (
+        claims.expires_at - claims.issued_at
+    ).total_seconds() > settings.jwt_login_ttl_minutes * 60
+    assert (
+        abs((claims.expires_at - claims.issued_at).total_seconds() - expected)
+        < TTL_TOLERANCE_SECONDS
+    )
+
+
+@pytest.mark.asyncio
+async def test_me_url_token_overrides_session_cookie(client: AsyncClient, db: AsyncSession) -> None:
+    """An explicit ?token= wins over an existing session cookie, and the
+    cookie is re-minted for that person.
+
+    Catches the ``session or token`` precedence bug where a stale cookie
+    masks a freshly clicked link (and the failure to switch the session
+    to the new person).
+    """
+    person_a = await _seed_person(db, email="a@example.com")
+    person_b = await _seed_person(db, email="b@example.com")
+
+    # Establish a session as A.
+    await client.post("/api/auth/verify", json={"token": issue_login_token(person_a.id)})
+
+    # Land on a link for B while A's cookie is still present.
+    me_resp = await client.get(f"/api/auth/me?token={issue_login_token(person_b.id)}")
+    assert me_resp.status_code == 200, me_resp.text
+    assert me_resp.json()["person"]["id"] == person_b.id
+
+    # The cookie should now resolve to B without any URL token.
+    follow_up = await client.get("/api/auth/me")
+    assert follow_up.status_code == 200, follow_up.text
+    assert follow_up.json()["person"]["id"] == person_b.id
+
+
+@pytest.mark.asyncio
+async def test_me_stale_url_token_falls_back_to_session(
+    client: AsyncClient, db: AsyncSession
+) -> None:
+    """An expired/invalid ?token= does not sign out an existing session.
+
+    Catches a regression where preferring the URL token unconditionally
+    401s a signed-in user who clicks a stale link.
+    """
+    person = await _seed_person(db)
+    await client.post("/api/auth/verify", json={"token": issue_login_token(person.id)})
+
+    expired = issue_login_token(person.id, ttl=timedelta(seconds=-1))
+    resp = await client.get(f"/api/auth/me?token={expired}")
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["person"]["id"] == person.id
+
+
+@pytest.mark.asyncio
+async def test_verify_rejects_expired_login_token(client: AsyncClient, db: AsyncSession) -> None:
+    """A login link clicked after its TTL is rejected at /verify.
+
+    Catches expiry not being enforced on the verify path.
+    """
+    person = await _seed_person(db)
+    stale = issue_login_token(person.id, ttl=timedelta(seconds=-1))
+    resp = await client.post("/api/auth/verify", json={"token": stale})
+    assert resp.status_code == 401
 
 
 @pytest.mark.asyncio
