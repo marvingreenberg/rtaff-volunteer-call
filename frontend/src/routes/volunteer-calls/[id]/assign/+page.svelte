@@ -608,7 +608,10 @@
      progress meters · a soft status callout · the Done action. */
   .top-bar {
     position: sticky;
-    top: 0;
+    /* Lock just below the app nav bar (which is sticky at the very top) so
+       the breadcrumb + page title scroll away behind the nav while this
+       action bar — with "Done Assigning" — stays pinned and visible. */
+    top: var(--nav-h);
     z-index: 5;
     display: grid;
     grid-template-columns: max-content 1fr max-content;

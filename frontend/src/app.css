@@ -78,6 +78,10 @@
   --task-pad-x: 16px;
   --check-size: 22px;
   --btn-h: 40px;
+  /* App nav-bar height (avatar 40px + 10px vertical padding + 1px border).
+     Sticky page sub-bars (e.g. the /assign action bar) offset by this so
+     they lock just *below* the nav instead of sliding behind it. */
+  --nav-h: 61px;
   --btn-pad-x: 16px;
   --btn-pad-y: 10px;
   --btn-fz: 0.92rem;
@@ -193,10 +197,15 @@ a:hover {
 /* ──────────────────────────────
    Header / Navbar
    ────────────────────────────── */
-header {
+/* The app nav bar. Scoped to the direct child of .app so this bare
+   `header` styling (sticky, blurred, z-indexed) does NOT also apply to
+   the semantic <header class="page-header"> PageHeader renders — which
+   otherwise became its own sticky z:10 bar that competed with the nav for
+   the top and painted over the avatar menu. */
+.app > header {
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: 50;
   background: rgba(255, 255, 255, 0.78);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -710,7 +719,7 @@ select:not(.native-select) {
    Portrait tablet (primary viewport)
    ────────────────────────────── */
 @media (max-width: 768px) {
-  header {
+  .app > header {
     padding: var(--sp-3) var(--sp-4);
     gap: var(--sp-3);
   }
