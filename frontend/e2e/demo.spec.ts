@@ -65,7 +65,12 @@ const BRYAN_PICK_INDICES = [0, 2, 6, 8];
 // the resulting screen" sleeps — are scaled in one place. Login flow
 // timings are left at their unscaled values so the magic-link
 // interactions stay snappy.
-const DISPLAY_HOLD_MULTIPLIER = 2.5;
+//
+// On camera (recording / `make demo`) we hold long enough to read. In the
+// headless smoke (`make test-e2e`, AUTODEMO=1) nobody's watching, so the
+// holds only burn wall-clock — at 2.5× the full walkthrough overruns the
+// 20-minute test budget. Collapse them to a token delay there.
+const DISPLAY_HOLD_MULTIPLIER = process.env.AUTODEMO === "1" ? 0.1 : 2.5;
 
 test("RT-AFF volunteer-call demo", async ({ page }) => {
   // 20 minutes — long enough that manual-stepping pauses for discussion
