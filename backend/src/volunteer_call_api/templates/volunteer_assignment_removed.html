@@ -4,14 +4,13 @@
 
 <p style="margin:0 0 14px 0;">
     <span style="background-color:{{ theme.colors.highlight }}; padding:2px 4px; font-weight:700;">Assignment update.</span>
-    Your previous assignment{{ 's' if removed_tasks|length > 1 else '' }} for {{ call_title }} {{ 'have' if removed_tasks|length > 1 else 'has' }} been changed and you're no longer on the team for the task{{ 's' if removed_tasks|length > 1 else '' }} below.
+    You've been removed from the {{ 'projects' if removed_tasks|length > 1 else 'project' }} below for {{ call_title }}, and your team lead has been notified.
 </p>
 
 <ul style="margin:0 0 18px 1.25em; padding:0;">
     {% for task in removed_tasks %}
     <li style="margin-bottom:4px;">
-        <span style="font-weight:600;">{{ task.date_label }}</span> &mdash; {{ task.short_description }}
-        {% if task.city %} ({{ task.city }}){% endif %}
+        <span style="font-weight:600;">{{ task.date_label }}</span> project{% if task.city %} in {{ task.city }}{% endif %}.
     </li>
     {% endfor %}
 </ul>

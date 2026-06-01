@@ -28,6 +28,8 @@
   import PageHeader from '$lib/components/PageHeader.svelte';
   import CallCard from '$lib/components/CallCard.svelte';
   import TaskRow from '$lib/components/TaskRow.svelte';
+  import DeclineDialog from '$lib/components/DeclineDialog.svelte';
+  import { callsAwaitingResponse, conflictFor } from '$lib/utils/decline';
 
   import { settingsState, setListView } from '$lib/stores/settings.svelte';
   import { truncateText } from '$lib/components/data-table';
@@ -42,6 +44,13 @@
   let openCalls = $state<VolunteerCallListResponse[]>([]);
   let loading = $state(true);
   let error = $state('');
+
+  // The availability grid is only for calls the volunteer is NOT assigned to;
+  // assigned calls are acted on through the My Assignments view (decline).
+  let gridCalls = $derived(callsAwaitingResponse(openCalls, assignments));
+
+  // Decline flow: the assignment whose decline dialog is open, if any.
+  let decliningAssignment = $state<MyAssignment | null>(null);
 
   // Per-call state keyed by call ID
   let callJobs = $state<Record<string, JobListItem[]>>({});
@@ -128,6 +137,7 @@
       }
 
       await Promise.all(openCalls.map((call) => loadCallData(call.id)));
+      await loadAssignedConflicts();
 
       // After render, scroll the deep-linked call into view.
       if (deepLinkCallId) {
@@ -159,6 +169,49 @@
       return { tone: 'gray', text: 'This call is closed.' };
     }
     return null;
+  }
+
+  // Calendar conflicts for calls the volunteer is assigned to aren't loaded by
+  // the grid path (those calls are filtered out of it), so fetch them here so
+  // the assignment cards can flag conflicts. Best-effort: a missing calendar
+  // or backend hiccup just means no badge.
+  async function loadAssignedConflicts() {
+    const ids = [...new Set(assignments.map((a) => a.call_id))];
+    await Promise.all(
+      ids.map(async (callId) => {
+        if (callConflicts[callId]) return;
+        try {
+          const conflicts = await volunteerCalls.calendarConflicts(callId);
+          const byTask: Record<string, TaskConflicts> = {};
+          for (const c of conflicts) byTask[c.task_id] = c;
+          callConflicts[callId] = byTask;
+          callConflicts = callConflicts;
+        } catch {
+          // best-effort
+        }
+      }),
+    );
+  }
+
+  function openDecline(a: MyAssignment) {
+    decliningAssignment = a;
+  }
+
+  function cancelDecline() {
+    decliningAssignment = null;
+  }
+
+  async function confirmDecline(message: string) {
+    const a = decliningAssignment;
+    if (!a) return;
+    try {
+      assignments = await volunteering.decline(a.assignment_id, message);
+      decliningAssignment = null;
+      // If the affected call is still visible in the grid, refresh its data.
+      if (callJobs[a.call_id]) await loadCallData(a.call_id);
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to decline';
+    }
   }
 
   async function loadCallData(callId: string) {
@@ -433,10 +486,10 @@
           See <a href="/settings">Settings</a> to connect your calendar and detect conflicts.
         </p>
       {/if}
-      {#if openCalls.length === 0}
+      {#if gridCalls.length === 0}
         <p class="empty-text">No volunteer calls are looking for volunteers right now.</p>
       {:else}
-        {#each openCalls as call (call.id)}
+        {#each gridCalls as call (call.id)}
           {@const banner = bannerFor(call.status)}
           {@const canSubmit = canSubmitAvailability(call.status)}
           {@const jobs = callJobs[call.id] || []}
@@ -591,11 +644,21 @@
       {:else}
         <div class="assignment-list">
           {#each assignments as a (a.assignment_id)}
+            {@const conflict = conflictFor(callConflicts, a.call_id, a.task_id)}
             <div class="card assignment-card">
               <div class="assignment-header">
                 <span class="assignment-name">{a.task_description}</span>
                 <span class="assignment-role badge badge-{a.role}">{a.role === 'team_leader' ? 'Team Leader' : 'Volunteer'}</span>
               </div>
+              {#if conflict}
+                <div
+                  class="assignment-conflict"
+                  role="status"
+                  title={conflict.conflicts.map((c) => c.summary ?? 'Calendar event').join('; ')}
+                >
+                  ⚠ Calendar conflict on this date
+                </div>
+              {/if}
               {#if a.address || a.city}
                 <div class="assignment-detail">
                   <span>{[a.address, a.city].filter(Boolean).join(', ')}</span>
@@ -623,12 +686,24 @@
                     </button>
                   {/if}
                 {/if}
+                <button class="btn btn-sm btn-outline decline-btn" onclick={() => openDecline(a)}>
+                  I can no longer do this
+                </button>
               </div>
             </div>
           {/each}
         </div>
       {/if}
     </section>
+
+    <DeclineDialog
+      open={decliningAssignment !== null}
+      taskDescription={decliningAssignment?.task_description ?? ''}
+      teamLeadName={decliningAssignment?.team_lead_name ?? null}
+      dateLabel={decliningAssignment?.date ? formatDate(decliningAssignment.date) : 'Date TBD'}
+      onConfirm={confirmDecline}
+      onCancel={cancelDecline}
+    />
   {/if}
 </div>
 
