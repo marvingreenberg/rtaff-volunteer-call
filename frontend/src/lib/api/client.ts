@@ -355,6 +355,14 @@ export const teamAssignments = {
 // Volunteering endpoints (volunteer-facing)
 export const volunteering = {
   myAssignments: () => request<MyAssignment[]>("/volunteering/my-assignments"),
+
+  /** Drop an assigned task. The optional message is forwarded to the team
+   * lead. Returns the volunteer's updated assignment list. */
+  decline: (assignmentId: string, message: string | null) =>
+    request<MyAssignment[]>(
+      `/volunteering/my-assignments/${assignmentId}/decline`,
+      { method: "POST", body: JSON.stringify({ message }) },
+    ),
 };
 
 // Notification endpoints

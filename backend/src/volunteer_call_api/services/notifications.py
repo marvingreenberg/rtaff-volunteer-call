@@ -123,12 +123,26 @@ def _team_lead_block(task: Task) -> dict[str, str | None] | None:
     }
 
 
-def task_view(task: Task, *, include_full_details: bool) -> dict[str, Any]:
-    """Render-friendly task dict shared by call-invite and assignment templates."""
+def task_view(
+    task: Task,
+    *,
+    include_full_details: bool,
+    roster: list[str] | None = None,
+    updated_sections: set[str] | None = None,
+) -> dict[str, Any]:
+    """Render-friendly task dict shared by call-invite and assignment templates.
+
+    `roster` is the list of teammate names shown in the volunteer's email so
+    people know who they're working with. `updated_sections` flags which
+    sections changed since the last send (drives the "(Updated)" markers); it
+    is left empty on first sends.
+    """
     view: dict[str, Any] = {
         "date_label": _format_date(task.date),
         "short_description": task.short_description,
         "city": task.city,
+        "roster": roster,
+        "updated_sections": sorted(updated_sections) if updated_sections else [],
     }
     if include_full_details:
         view.update(
@@ -140,6 +154,23 @@ def task_view(task: Task, *, include_full_details: bool) -> dict[str, Any]:
             }
         )
     return view
+
+
+def task_detail_fields(task: Task) -> dict[str, Any]:
+    """Serialized scalar detail fields stored in the roster snapshot so the
+    diff can tell *which* field changed between sends. Dates/times are
+    isoformatted so the JSON snapshot round-trips identically."""
+    return {
+        "date": task.date.isoformat() if task.date else None,
+        "time_start": task.time_start.isoformat() if task.time_start else None,
+        "time_end": task.time_end.isoformat() if task.time_end else None,
+        "address": task.address,
+        "city": task.city,
+        "short_description": task.short_description,
+        "notes": task.notes,
+        "volunteers_needed": task.volunteers_needed,
+        "skilled_needed": task.skilled_needed,
+    }
 
 
 async def generate_call_notifications(call_id: str, db: AsyncSession) -> tuple[int, int, int, int]:
@@ -206,6 +237,7 @@ async def generate_call_notifications(call_id: str, db: AsyncSession) -> tuple[i
         t.id: {
             "assigned": sorted(a.person_id for a in t.assignments),
             "team_lead": t.team_lead_id,
+            **task_detail_fields(t),
         }
         for t in tasks
     }
@@ -226,7 +258,21 @@ async def generate_call_notifications(call_id: str, db: AsyncSession) -> tuple[i
     last_roster: Roster | None = (
         cast(Roster, call.last_sent_roster) if call.last_sent_roster is not None else None
     )
-    tasks_changed, removed_by_task = diff_rosters(last_roster, cast(Roster, current_roster))
+    diff = diff_rosters(last_roster, cast(Roster, current_roster))
+    tasks_changed = diff.tasks_changed
+    removed_by_task = diff.removed_by_task
+    added_by_task = diff.added_by_task
+    changed_fields_by_task = diff.changed_fields_by_task
+
+    def updated_sections_for(task_id: str) -> set[str]:
+        """Sections to flag "(Updated)" in a volunteer's email. Empty on the
+        first send (nothing to mark)."""
+        if is_first_send:
+            return set()
+        sections = set(changed_fields_by_task.get(task_id, set()))
+        if added_by_task.get(task_id):
+            sections.add("team")
+        return sections
 
     # Hydrate any previously-assigned-but-now-removed Person rows that
     # aren't already in people_by_id (they were dropped from team_assignments
@@ -266,6 +312,11 @@ async def generate_call_notifications(call_id: str, db: AsyncSession) -> tuple[i
         changed_task = tasks_by_id.get(tid)
         if changed_task is None:
             continue  # task was deleted post-last-send; no current-state email
+        # Email all current assignees only when something additive happened:
+        # a volunteer was added, or a detail field changed. A removal-only edit
+        # notifies just the removed volunteer (handled below), not teammates.
+        if not (added_by_task.get(tid) or changed_fields_by_task.get(tid)):
+            continue
         for a in changed_task.assignments:
             person_to_changed_tasks.setdefault(a.person_id, []).append(changed_task)
 
@@ -281,7 +332,15 @@ async def generate_call_notifications(call_id: str, db: AsyncSession) -> tuple[i
         person = people_by_id.get(pid)
         if person is None or not is_subscribed(person):
             continue
-        task_views = [task_view(t, include_full_details=True) for t in changed_tasks]
+        task_views = [
+            task_view(
+                t,
+                include_full_details=True,
+                roster=[f"{a.person.first_name} {a.person.last_name}" for a in t.assignments],
+                updated_sections=updated_sections_for(t.id),
+            )
+            for t in changed_tasks
+        ]
         subject = f"Your assignments for {call.title}"
         full_body = assignment_template.render(
             subject=subject,
@@ -356,15 +415,34 @@ async def generate_call_notifications(call_id: str, db: AsyncSession) -> tuple[i
         lead = lead_task.team_lead
         if not is_subscribed(lead):
             continue
+        # Mark who joined / left since the last send so the lead sees roster
+        # churn at a glance. Suppressed on the first send (everything would
+        # otherwise read as "(added)").
+        added_ids = set() if is_first_send else added_by_task.get(tid, set())
+        removed_ids = set() if is_first_send else removed_by_task.get(tid, set())
         roster = [
             {
                 "name": f"{a.person.first_name} {a.person.last_name}",
                 "phone": a.person.phone,
                 "email": a.person.email,
                 "skills": list(a.person.skills),
+                "status": "added" if a.person_id in added_ids else None,
             }
             for a in lead_task.assignments
         ]
+        for pid in removed_ids:
+            dropped = people_by_id.get(pid)
+            if dropped is None:
+                continue
+            roster.append(
+                {
+                    "name": f"{dropped.first_name} {dropped.last_name}",
+                    "phone": dropped.phone,
+                    "email": dropped.email,
+                    "skills": list(dropped.skills),
+                    "status": "removed",
+                }
+            )
         subject = f"Your team for {call.title} — {lead_task.short_description}"
         full_body = team_lead_template.render(
             subject=subject,
@@ -423,3 +501,142 @@ async def generate_call_notifications(call_id: str, db: AsyncSession) -> tuple[i
     call.last_sent_roster = current_roster  # type: ignore[assignment]
 
     return assignment_emails, thanks_emails, team_lead_emails, removal_emails
+
+
+def drop_from_roster_snapshot(call: VolunteerCall, task_id: str, person_id: str) -> None:
+    """Remove a person from a task's assigned list in the persisted snapshot.
+
+    Used when a volunteer self-declines: their removal is communicated by the
+    immediate decline notice, so trimming the snapshot keeps the next staff
+    "Send Changed Assignments" diff from re-firing a removal email at them.
+    Reassigns the column to a fresh dict so SQLAlchemy detects the JSON change.
+    """
+    if not call.last_sent_roster:
+        return
+    roster = cast(Roster, call.last_sent_roster)
+    if task_id not in roster:
+        return
+    entry: dict[str, Any] = dict(roster[task_id])
+    assigned = list(entry.get("assigned") or [])
+    if person_id not in assigned:
+        return
+    entry["assigned"] = [p for p in assigned if p != person_id]
+    updated: dict[str, Any] = {**roster, task_id: entry}
+    # The model annotates this column as dict[str, list[str]] but the real
+    # shape is the nested Roster; cast to the declared type for the assignment.
+    call.last_sent_roster = cast("dict[str, list[str]]", updated)
+
+
+async def notify_decline(
+    call_id: str,
+    task_id: str,
+    volunteer_id: str,
+    message: str | None,
+    db: AsyncSession,
+) -> int:
+    """Email the team lead and call admin that a volunteer has declined, with
+    the updated roster and the volunteer's note, and send the volunteer a brief
+    acknowledgement. Re-queries everything fresh by id so it is safe to call
+    after the decline has been committed. Returns the number of emails sent."""
+    call = (await db.execute(select(VolunteerCall).where(VolunteerCall.id == call_id))).scalar_one()
+    task = (
+        await db.execute(
+            select(Task)
+            .options(
+                selectinload(Task.team_lead),
+                selectinload(Task.assignments).selectinload(TeamAssignment.person),
+            )
+            .where(Task.id == task_id)
+        )
+    ).scalar_one()
+    volunteer = (await db.execute(select(Person).where(Person.id == volunteer_id))).scalar_one()
+    admin = None
+    if call.created_by_id is not None:
+        admin = (
+            await db.execute(select(Person).where(Person.id == call.created_by_id))
+        ).scalar_one_or_none()
+
+    team_lead_template = _jinja_env.get_template("team_lead_roster.html")
+    removal_template = _jinja_env.get_template("volunteer_assignment_removed.html")
+
+    def volunteering_url_for(person: Person) -> str:
+        return (
+            f"{settings.app_base_url}/volunteering?token={issue_invite_token(person.id, call.id)}"
+        )
+
+    def volunteering_link_for(person: Person) -> str:
+        return f"/volunteering?token={issue_invite_token(person.id, call.id)}"
+
+    volunteer_name = f"{volunteer.first_name} {volunteer.last_name}".strip()
+    decline_notice = {"volunteer_name": volunteer_name, "message": message}
+    roster = [
+        {
+            "name": f"{a.person.first_name} {a.person.last_name}",
+            "phone": a.person.phone,
+            "email": a.person.email,
+            "skills": list(a.person.skills),
+            "status": None,
+        }
+        for a in task.assignments
+    ]
+
+    sent = 0
+
+    # --- Lead + admin: updated roster with the cannot-attend callout ---
+    lead = task.team_lead
+    recipients: list[Person] = []
+    if lead is not None and is_subscribed(lead):
+        recipients.append(lead)
+    if admin is not None and is_subscribed(admin) and (lead is None or admin.id != lead.id):
+        recipients.append(admin)
+    subject = f"Roster update: {call.title} — {task.short_description}"
+    summary_body = (
+        f"{volunteer_name} can no longer attend {task.short_description} for {call.title}."
+    )
+    for person in recipients:
+        full_body = team_lead_template.render(
+            subject=subject,
+            title=call.title,
+            subtitle=task.short_description,
+            first_name=person.first_name,
+            task=task_view(task, include_full_details=True),
+            roster=roster,
+            decline=decline_notice,
+            volunteering_url=volunteering_url_for(person),
+        )
+        if deliver_notification(
+            person=person,
+            subject=subject,
+            full_body=full_body,
+            summary_body=summary_body,
+            link=volunteering_link_for(person),
+            inline_images=EMAIL_INLINE_IMAGES,
+        ):
+            sent += 1
+
+    # --- Volunteer: brief acknowledgement (no project details) ---
+    if is_subscribed(volunteer):
+        ack_subject = f"Assignment update for {call.title}"
+        ack_body = removal_template.render(
+            subject=ack_subject,
+            title=call.title,
+            subtitle="Assignment changed",
+            first_name=volunteer.first_name,
+            call_title=call.title,
+            removed_tasks=[task_view(task, include_full_details=False)],
+            volunteering_url=volunteering_url_for(volunteer),
+        )
+        if deliver_notification(
+            person=volunteer,
+            subject=ack_subject,
+            full_body=ack_body,
+            summary_body=(
+                f"You've been removed from a task for {call.title}; "
+                "your team lead has been notified."
+            ),
+            link=volunteering_link_for(volunteer),
+            inline_images=EMAIL_INLINE_IMAGES,
+        ):
+            sent += 1
+
+    return sent

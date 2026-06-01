@@ -524,6 +524,8 @@ export interface AssignmentNoticesResponse {
 
 export interface MyAssignment {
   assignment_id: string;
+  task_id: string;
+  team_lead_name: string | null;
   task_description: string;
   address: string | null;
   city: string | null;
