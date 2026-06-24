@@ -44,7 +44,7 @@
   },
   "dependencies": {
     "@sveltejs/adapter-static": "^3.0.10",
-    "bits-ui": "^2.16.2",
+    "bits-ui": "^2.18.1",
     "signature_pad": "^5.1.3"
   }
 }
